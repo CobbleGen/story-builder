@@ -247,7 +247,7 @@ describe('characters', () => {
     ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
     ;[data, beat] = addBeat(data, { arcId: main, title: `${mentionToken(mara)} arrives`, chapterId: ch1 })
     data = updateCharacter(data, mara, { name: 'Mara Quinn' })
-    expect(toDisplay(data.beats[beat].title, lookupOf(data.characters))).toBe('@Mara Quinn arrives')
+    expect(toDisplay(data.beats[beat].title, lookupOf(data.characters))).toBe('Mara Quinn arrives')
   })
 
   it('assigns arcs and POV, and cleans up when deleted', () => {

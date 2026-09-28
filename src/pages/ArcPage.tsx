@@ -242,9 +242,9 @@ function ArcBeatComposer({ arcId }: { arcId: string }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
 
-  const submit = () => {
-    if (!title.trim()) return
-    addBeat({ arcId, title: title.trim(), description: description.trim() })
+  const submit = (text = title) => {
+    if (!text.trim()) return
+    addBeat({ arcId, title: text.trim(), description: description.trim() })
     setTitle('')
     setDescription('')
   }

@@ -123,22 +123,13 @@ a {
   color: transparent;
 }
 
+/* A mention is just the name in the character's colour, darkened a little
+   so light colours stay readable on the pale backgrounds. */
 .mention {
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--char, var(--ink-3)) 17%, transparent);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--char, var(--ink-3)) 17%, transparent);
-  color: color-mix(in srgb, var(--char, var(--ink-3)) 78%, black);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-}
-
-.mention-at {
-  opacity: 0.5;
+  color: color-mix(in srgb, var(--char, var(--ink-3)) 72%, black);
 }
 
 .mention.unknown {
-  background: none;
-  box-shadow: none;
   color: var(--ink-3);
 }
 

@@ -264,9 +264,9 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
 function QuickAddBeat({ arcId }: { arcId: string }) {
   const addBeat = useStory((s) => s.addBeat)
   const [title, setTitle] = useState('')
-  const submit = () => {
-    if (!title.trim()) return
-    addBeat({ arcId, title: title.trim() })
+  const submit = (text = title) => {
+    if (!text.trim()) return
+    addBeat({ arcId, title: text.trim() })
     setTitle('')
   }
   return (
@@ -307,9 +307,9 @@ function NewArcForm() {
     setName('')
     setColor('')
   }
-  const submit = () => {
-    if (!name.trim()) return
-    toggleArc(addArc({ name: name.trim(), color: chosen }))
+  const submit = (text = name) => {
+    if (!text.trim()) return
+    toggleArc(addArc({ name: text.trim(), color: chosen }))
     close()
   }
 

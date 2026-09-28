@@ -201,9 +201,9 @@ function BeatComposer({ chapterId }: { chapterId: string }) {
     )
   }
 
-  const submit = () => {
-    if (!title.trim()) return
-    addBeat({ arcId, title: title.trim(), chapterId })
+  const submit = (text = title) => {
+    if (!text.trim()) return
+    addBeat({ arcId, title: text.trim(), chapterId })
     setTitle('')
   }
   const close = () => {

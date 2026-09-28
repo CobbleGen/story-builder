@@ -12,13 +12,24 @@ import {
 import { createPortal } from 'react-dom'
 import { UserPlus } from 'lucide-react'
 import type { Character } from '../types'
-import { activeQuery, displayName, parseMentions, toDisplay, toStored, type Segment } from '../lib/mentions'
+import {
+  activeQuery,
+  applyTextEdit,
+  displayName,
+  linkTyped,
+  matchesName,
+  mentionToken,
+  parseMentions,
+  replaceRange,
+  toDisplay,
+  type Segment,
+} from '../lib/mentions'
 import { nextArcColor } from '../lib/colors'
 import { useCharacterLookup, useStory } from '../store/storyStore'
-import { MentionChip } from './MentionText'
+import { MentionName } from './MentionText'
 import { CharacterAvatar } from './CharacterAvatar'
 
-type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'className'> & {
+type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'className' | 'onSubmit'> & {
   /** Stored text (mentions as tokens). */
   value: string
   onChange: (value: string) => void
@@ -27,27 +38,24 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
   className?: string
   /** Enter blurs (or calls onSubmit) instead of adding a newline; Shift+Enter still adds one. */
   submitOnEnter?: boolean
-  onSubmit?: () => void
+  /** Called on Enter with the field's final value (any typed @Name already linked). */
+  onSubmit?: (value: string) => void
   /** Plain text: no mentions or suggestions. */
   plain?: boolean
 }
 
 type Option = { kind: 'character'; character: Character } | { kind: 'create'; name: string }
+type Query = { start: number; query: string }
 
 const MAX_SUGGESTIONS = 6
-
-function matches(character: Character, query: string): boolean {
-  const name = displayName(character).toLowerCase()
-  const q = query.toLowerCase()
-  if (/\s/.test(q)) return name.startsWith(q)
-  return name.startsWith(q) || name.split(/\s+/).some((word) => word.startsWith(q))
-}
+const NEW_NAME_RE = /^[\p{L}\p{N}_'’-]+$/u
 
 /**
- * A growing text field that understands `@` mentions: typing `@` suggests
- * characters, and mentions are highlighted in the character's color as you
- * type. The highlighted text is drawn in a layer behind a transparent
- * textarea, so native editing, selection and undo keep working.
+ * A growing text field that understands mentions: typing `@` suggests
+ * characters, and a mention shows as the character's name in their color.
+ * The colored text is drawn in a layer behind a transparent textarea, so
+ * native editing, selection and undo keep working; edits are mapped back
+ * onto the stored text so mentions survive typing around them.
  */
 export function MentionTextarea({
   value,
@@ -68,9 +76,14 @@ export function MentionTextarea({
   const inner = useRef<HTMLTextAreaElement>(null)
   const marker = useRef<HTMLSpanElement>(null)
   const pendingCaret = useRef<number | null>(null)
+  // The latest stored value, including changes the parent hasn't rendered yet.
+  const latest = useRef(value)
+  useLayoutEffect(() => {
+    latest.current = value
+  }, [value])
   const listId = useId()
   const [focused, setFocused] = useState(false)
-  const [query, setQuery] = useState<{ start: number; query: string } | null>(null)
+  const [query, setQuery] = useState<Query | null>(null)
   const [active, setActive] = useState(0)
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null)
   useImperativeHandle(ref, () => inner.current!, [])
@@ -78,29 +91,35 @@ export function MentionTextarea({
   const display = plain ? value : toDisplay(value, lookup)
   const segments: Segment[] = plain ? [{ kind: 'text', text: value }] : parseMentions(value, lookup)
 
+  /** The `@name` being typed at the caret, while it can still become a mention. */
+  const liveQuery = (text: string, caret: number): Query | null => {
+    const q = activeQuery(text, caret)
+    if (!q) return null
+    const possible =
+      q.query === '' ||
+      characters.some((c) => matchesName(c, q.query)) ||
+      NEW_NAME_RE.test(q.query)
+    return possible ? q : null
+  }
+
   let options: Option[] = []
   if (query && !plain) {
-    const found = characters.filter((c) => matches(c, query.query))
-    const exact = found.find((c) => displayName(c) === query.query)
-    // Put an exact match first; hide the list when it's the only choice.
+    const q = query.query.toLowerCase()
+    const found = characters.filter((c) => matchesName(c, query.query))
+    const exact = found.find((c) => displayName(c).toLowerCase() === q)
     options = (exact ? [exact, ...found.filter((c) => c !== exact)] : found)
       .slice(0, MAX_SUGGESTIONS)
       .map((character) => ({ kind: 'character' as const, character }))
-    const name = query.query
-    // Offer to create a character from a single typed word; longer names can be set on their page.
-    if (name && !/\s/.test(name) && !characters.some((c) => displayName(c).toLowerCase() === name.toLowerCase())) {
-      options.push({ kind: 'create', name })
-    }
-    if (exact && options.length === 1) options = []
+    if (query.query && !exact && NEW_NAME_RE.test(query.query)) options.push({ kind: 'create', name: query.query })
   }
   const open = focused && options.length > 0
   const activeIndex = Math.min(active, Math.max(0, options.length - 1))
 
   useLayoutEffect(() => {
-    if (pendingCaret.current !== null && inner.current) {
+    if (pendingCaret.current !== null && inner.current && document.activeElement === inner.current) {
       inner.current.setSelectionRange(pendingCaret.current, pendingCaret.current)
-      pendingCaret.current = null
     }
+    pendingCaret.current = null
   })
 
   // Place the suggestion list under the `@` being typed.
@@ -108,42 +127,81 @@ export function MentionTextarea({
     if (!open || !marker.current) return
     const r = marker.current.getBoundingClientRect()
     const left = Math.max(8, Math.min(r.left - 4, window.innerWidth - 268))
-    const next = r.bottom + 240 > window.innerHeight ? { left, bottom: window.innerHeight - r.top + 4 } : { left, top: r.bottom + 4 }
+    const next =
+      r.bottom + 240 > window.innerHeight ? { left, bottom: window.innerHeight - r.top + 4 } : { left, top: r.bottom + 4 }
     setPos((prev) =>
       prev && prev.left === next.left && prev.top === next.top && prev.bottom === next.bottom ? prev : next,
     )
   }, [open, query, display])
 
-  const refreshQuery = (el: HTMLTextAreaElement) => {
-    if (plain) return
-    let q = el.selectionStart === el.selectionEnd ? activeQuery(el.value, el.selectionStart) : null
-    // Past a space, keep suggesting only while the text still starts a name.
-    if (q && /\s/.test(q.query) && !characters.some((c) => matches(c, q!.query))) q = null
+  const commit = (stored: string, caret?: number) => {
+    if (caret !== undefined && toDisplay(stored, lookup) !== inner.current?.value) pendingCaret.current = caret
+    latest.current = stored
+    if (stored !== value) onChange(stored)
+  }
+
+  const setQueryIfChanged = (q: Query | null) => {
     if (q?.start !== query?.start || q?.query !== query?.query) {
       setQuery(q)
       setActive(0)
     }
   }
 
+  /** Links every finished @Name, e.g. when leaving the field or submitting. */
+  const linkAll = () => {
+    const linked = linkTyped(latest.current, characters, lookup).stored
+    if (linked !== latest.current) commit(linked)
+    return linked
+  }
+
+  const handleChange = (el: HTMLTextAreaElement) => {
+    if (plain) {
+      onChange(el.value)
+      return
+    }
+    const caret = el.selectionStart
+    const q = liveQuery(el.value, caret)
+    const result = applyTextEdit(latest.current, characters, lookup, el.value, caret, q?.start ?? null)
+    commit(result.stored, result.caret)
+    setQueryIfChanged(liveQuery(toDisplay(result.stored, lookup), result.caret))
+  }
+
+  const handleSelect = (el: HTMLTextAreaElement) => {
+    if (plain) return
+    if (el.selectionStart !== el.selectionEnd) {
+      setQueryIfChanged(null)
+      return
+    }
+    // Only act on what the field shows now; skip if a change is still in flight.
+    if (toDisplay(latest.current, lookup) !== el.value) return
+    const caret = el.selectionStart
+    const q = liveQuery(el.value, caret)
+    setQueryIfChanged(q)
+    // Moving away from a finished @Name turns it into a mention.
+    const result = linkTyped(latest.current, characters, lookup, { skipAt: q?.start ?? null, caret })
+    if (result.stored !== latest.current) commit(result.stored, result.caret)
+  }
+
   const choose = (option: Option) => {
     const el = inner.current
     if (!el || !query) return
-    let pool = characters
+    let id: string
     let name: string
     if (option.kind === 'create') {
       name = option.name
-      addCharacter({ name, color: nextArcColor(characters.map((c) => c.color)) })
-      pool = useStory.getState().characters
+      id = addCharacter({ name, color: nextArcColor(characters.map((c) => c.color)) })
     } else {
       name = displayName(option.character)
+      id = option.character.id
     }
-    const before = display.slice(0, query.start)
-    const after = display.slice(el.selectionStart)
-    const inserted = `@${name}`
-    const text = before + inserted + (/^\s/.test(after) ? '' : ' ') + after
-    pendingCaret.current = before.length + inserted.length + 1
+    const caret = el.selectionStart
+    const after = el.value.slice(caret)
+    const spacer = /^\s/.test(after) ? '' : ' '
+    const stored = replaceRange(latest.current, lookup, query.start, caret, mentionToken(id) + spacer)
     setQuery(null)
-    onChange(toStored(text, pool))
+    pendingCaret.current = query.start + name.length + 1
+    latest.current = stored
+    onChange(stored)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -170,7 +228,7 @@ export function MentionTextarea({
     if (e.defaultPrevented) return
     if (submitOnEnter && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      if (onSubmit) onSubmit()
+      if (onSubmit) onSubmit(plain ? latest.current : linkAll())
       else e.currentTarget.blur()
     } else if (e.key === 'Escape' && !onSubmit) {
       e.currentTarget.blur()
@@ -191,7 +249,7 @@ export function MentionTextarea({
       }
     } else {
       if (markAt === offset) backdrop.push(<span key="marker" ref={marker} />)
-      backdrop.push(<MentionChip key={i} segment={s} />)
+      backdrop.push(<MentionName key={i} segment={s} />)
     }
     offset = end
   })
@@ -214,11 +272,8 @@ export function MentionTextarea({
         aria-expanded={plain ? undefined : open}
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open ? `${listId}-${activeIndex}` : undefined}
-        onChange={(e) => {
-          onChange(plain ? e.target.value : toStored(e.target.value, characters))
-          refreshQuery(e.target)
-        }}
-        onSelect={(e) => refreshQuery(e.currentTarget)}
+        onChange={(e) => handleChange(e.target)}
+        onSelect={(e) => handleSelect(e.currentTarget)}
         onKeyDown={handleKeyDown}
         onFocus={(e) => {
           setFocused(true)
@@ -227,6 +282,7 @@ export function MentionTextarea({
         onBlur={(e) => {
           setFocused(false)
           setQuery(null)
+          if (!plain) linkAll()
           onBlur?.(e)
         }}
       />
@@ -255,9 +311,7 @@ export function MentionTextarea({
                     <span className="avatar avatar-sm avatar-new">
                       <UserPlus size={12} />
                     </span>
-                    <span className="mention-option-name">
-                      New character “{option.name}”
-                    </span>
+                    <span className="mention-option-name">New character “{option.name}”</span>
                   </>
                 )}
               </div>

@@ -1,6 +1,6 @@
 import type { Arc, Beat, Chapter, Character, CharacterAttribute, StoryData } from '../types'
 import { makeId } from '../lib/id'
-import { displayName, lookupOf, mentionToken, toDisplay, toStored } from '../lib/mentions'
+import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -75,7 +75,7 @@ export function mapStoryText(data: StoryData, fn: (text: string) => string): Sto
 /** Turns any plain `@Name` text that names a character into a real mention. */
 export function linkMentions(data: StoryData): StoryData {
   const lookup = lookupOf(data.characters)
-  return mapStoryText(data, (text) => toStored(toDisplay(text, lookup), data.characters))
+  return mapStoryText(data, (text) => linkTyped(text, data.characters, lookup).stored)
 }
 
 // ---------- Chapters ----------
