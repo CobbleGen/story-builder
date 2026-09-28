@@ -38,8 +38,9 @@ story.
 
 ## Hosting
 
-The app is a static site deployed on Vercel from this repository: every
-push to the production branch redeploys it. Stories live in each visitor's
+Live at **https://story-builder-flame.vercel.app**. It's a static site
+deployed on Vercel from this repository: every push to the production branch
+redeploys it. Stories live in each visitor's
 browser, so updates never touch them.
 
 ## Development
