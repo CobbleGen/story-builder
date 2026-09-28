@@ -58,6 +58,12 @@
   box-shadow: var(--shadow-sm);
 }
 
+.map-canvas .react-flow__attribution {
+  --xy-attribution-background-color: transparent;
+  opacity: 0.55;
+  font-size: 9px;
+}
+
 .map-canvas .react-flow__node {
   cursor: grab;
 }

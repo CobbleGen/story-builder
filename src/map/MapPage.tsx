@@ -266,7 +266,7 @@ function MapCanvas() {
             deleteKeyCode={['Backspace', 'Delete']}
             minZoom={0.1}
             maxZoom={2.5}
-            proOptions={{ hideAttribution: true }}
+            attributionPosition="top-right"
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cfc9bd" />
             <Controls showInteractive={false} position="bottom-right" />
