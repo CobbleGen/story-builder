@@ -1,6 +1,7 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { TopBar } from './components/TopBar'
 import { BeatEditor } from './components/BeatEditor'
+import { ConfirmDialog } from './components/ConfirmDialog'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
 
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="*" element={<BoardPage />} />
         </Routes>
         <BeatEditor />
+        <ConfirmDialog />
       </div>
     </HashRouter>
   )

@@ -4,6 +4,7 @@ import { Download, FilePlus2, Feather, Sparkles, Upload } from 'lucide-react'
 import { useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
+import { askConfirm } from '../lib/confirm'
 
 function slug(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
@@ -27,18 +28,34 @@ export function TopBar() {
   }
 
   const importStory = async (file: File) => {
+    let data: unknown
     try {
-      const data = JSON.parse(await file.text())
-      if (window.confirm('Replace the current story with the imported one?')) replaceStory(data)
+      data = JSON.parse(await file.text())
     } catch {
-      window.alert('That file could not be read as a story export.')
+      await askConfirm({
+        title: 'That file isn’t a story export',
+        message: 'Choose a .json file saved with “Export story”.',
+        notice: true,
+      })
+      return
     }
+    const ok = await askConfirm({
+      title: 'Replace your story with the imported one?',
+      message: 'Everything on the board now will be replaced. Export it first if you want to keep it.',
+      confirmLabel: 'Replace story',
+      danger: true,
+    })
+    if (ok) replaceStory(data)
   }
 
-  const replaceWith = (build: () => unknown, what: string) => {
-    if (window.confirm(`Replace the current story with ${what}? Export it first if you want to keep it.`)) {
-      replaceStory(build())
-    }
+  const replaceWith = async (build: () => unknown, title: string, confirmLabel: string) => {
+    const ok = await askConfirm({
+      title,
+      message: 'This replaces everything on the board. Export your story first if you want to keep it.',
+      confirmLabel,
+      danger: true,
+    })
+    if (ok) replaceStory(build())
   }
 
   return (
@@ -69,8 +86,8 @@ export function TopBar() {
           items={[
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: exportStory },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
-            { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'a blank story') },
-            { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'the example story') },
+            { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
+            { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
           ]}
         />
         <input

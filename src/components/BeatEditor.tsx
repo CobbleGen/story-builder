@@ -6,6 +6,7 @@ import { useUi } from '../store/uiStore'
 import { Modal } from './Modal'
 import { ArcPicker } from './ArcPicker'
 import { AutoTextarea } from './AutoTextarea'
+import { askConfirm } from '../lib/confirm'
 
 /** Dialog for editing the beat selected in the UI store. Changes save as you type. */
 export function BeatEditor() {
@@ -23,8 +24,14 @@ export function BeatEditor() {
   if (!beat) return null
   const arc = arcs.find((a) => a.id === beat.arcId)
 
-  const remove = () => {
-    if (window.confirm(`Delete the beat “${beat.title || 'Untitled beat'}”?`)) {
+  const remove = async () => {
+    const ok = await askConfirm({
+      title: 'Delete this beat?',
+      message: `“${beat.title || 'Untitled beat'}” will be removed from its arc${beat.chapterId ? ' and chapter' : ''}.`,
+      confirmLabel: 'Delete beat',
+      danger: true,
+    })
+    if (ok) {
       deleteBeat(beat.id)
       close()
     }

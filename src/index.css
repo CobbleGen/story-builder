@@ -41,6 +41,14 @@ body,
   margin: 0;
 }
 
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 button,
 input,
 textarea,
@@ -133,6 +141,14 @@ a {
   background: var(--primary-hover);
 }
 
+.btn.primary.destructive {
+  background: var(--danger);
+}
+
+.btn.primary.destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -187,8 +203,7 @@ a {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
 }
 
 .topbar {
@@ -1382,6 +1397,37 @@ a {
   margin-right: auto;
 }
 
+.modal.confirm {
+  width: min(420px, 100%);
+  border-top: 0;
+}
+
+.modal.confirm .modal-body {
+  padding: 22px 24px 4px;
+}
+
+.modal.confirm .modal-footer {
+  justify-content: flex-end;
+}
+
+.modal.confirm .modal-footer > :first-child {
+  margin-right: 0;
+}
+
+.confirm-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.confirm-message {
+  margin: 8px 0 0;
+  color: var(--ink-2);
+}
+
 .editor-title:focus {
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--focus) 60%, transparent);
   border-radius: 6px 6px 0 0;
@@ -1497,7 +1543,7 @@ a {
   }
 
   .board {
-    padding: 14px 12px;
+    padding: 14px 16px;
   }
 
   .arc-view {

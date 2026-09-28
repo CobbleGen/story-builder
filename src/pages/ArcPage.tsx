@@ -20,6 +20,7 @@ import { useUi } from '../store/uiStore'
 import { Sidebar } from '../components/Sidebar'
 import { AutoTextarea } from '../components/AutoTextarea'
 import { ColorSwatches } from '../components/ColorSwatches'
+import { askConfirm } from '../lib/confirm'
 
 export function ArcPage() {
   const { arcId } = useParams()
@@ -66,10 +67,15 @@ function ArcView({ arc }: { arc: Arc }) {
     moveArcBeat(arc.id, arc.beatIds.indexOf(String(active.id)), arc.beatIds.indexOf(String(over.id)))
   }
 
-  const remove = () => {
+  const remove = async () => {
     const n = arc.beatIds.length
-    const note = n ? `\n\nThis also deletes its ${n} beat${n === 1 ? '' : 's'}, including any placed in chapters.` : ''
-    if (window.confirm(`Delete the arc “${arc.name || 'Untitled arc'}”?${note}`)) {
+    const ok = await askConfirm({
+      title: `Delete the arc “${arc.name || 'Untitled arc'}”?`,
+      message: n ? `This also deletes its ${n} beat${n === 1 ? '' : 's'}, including any placed in chapters.` : undefined,
+      confirmLabel: 'Delete arc',
+      danger: true,
+    })
+    if (ok) {
       deleteArc(arc.id)
       navigate('/')
     }

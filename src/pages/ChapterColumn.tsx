@@ -9,6 +9,7 @@ import { AutoTextarea } from '../components/AutoTextarea'
 import { ArcPicker } from '../components/ArcPicker'
 import { BeatCardView, DraggableBeatCard } from '../components/BeatCard'
 import { Menu } from '../components/Menu'
+import { askConfirm } from '../lib/confirm'
 import { chapterSortId, type ChapterDragData } from '../lib/dnd'
 
 interface Props {
@@ -50,11 +51,17 @@ export function ChapterColumn({
     onFocused?.()
   }, [autoFocus, onFocused])
 
-  const remove = () => {
+  const remove = async () => {
     const count = chapter.beatIds.length
-    const label = chapter.title ? `“${chapter.title}”` : `Chapter ${number}`
-    const note = count ? `\n\nIts ${count} beat${count === 1 ? '' : 's'} will stay on their arcs, unplaced.` : ''
-    if (window.confirm(`Delete ${label}?${note}`)) deleteChapter(chapter.id)
+    const ok = await askConfirm({
+      title: `Delete chapter ${number}${chapter.title ? `, “${chapter.title}”` : ''}?`,
+      message: count
+        ? `Its ${count} beat${count === 1 ? '' : 's'} will stay on ${count === 1 ? 'its arc' : 'their arcs'}, unplaced.`
+        : undefined,
+      confirmLabel: 'Delete chapter',
+      danger: true,
+    })
+    if (ok) deleteChapter(chapter.id)
   }
 
   return (
