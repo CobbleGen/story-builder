@@ -29,8 +29,18 @@ This first version is the **chapter board**:
   new one). Mentions are highlighted in the character's colour, and renaming
   a character updates every mention.
 
-Your story is saved in the browser (localStorage). Use the **⋯** menu
-(top right) to export it as JSON, import it again, or start a blank story.
+Your story saves automatically in the browser as you type, and stays when
+the app is updated. Copies are also kept in the browser before each app
+update, twice a day while you work, and before the story is replaced; restore
+one from **⋯ → Backups**. The same menu exports the story as JSON (the way to
+move it to another browser or device), imports it again, or starts a blank
+story.
+
+## Hosting
+
+The app is a static site deployed on Vercel from this repository: every
+push to the production branch redeploys it. Stories live in each visitor's
+browser, so updates never touch them.
 
 ## Development
 

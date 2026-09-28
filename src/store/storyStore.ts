@@ -4,6 +4,7 @@ import type { StoryData } from '../types'
 import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf } from '../lib/mentions'
+import { STORY_KEY } from './backups'
 
 type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
 
@@ -88,7 +89,7 @@ export const useStory = create<StoryStore>()(
       }
     },
     {
-      name: 'story-builder:story',
+      name: STORY_KEY,
       version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => pickData(s),
@@ -130,4 +131,13 @@ export function useCharacterLookup() {
     lookupCache.set(characters, map)
   }
   return map
+}
+
+// After the first edit, ask the browser to keep this site's storage even when
+// space runs low, so the saved story isn't cleared automatically.
+if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+  const stop = useStory.subscribe(() => {
+    stop()
+    navigator.storage.persist().catch(() => {})
+  })
 }

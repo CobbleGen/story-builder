@@ -5,5 +5,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   // Relative asset paths so the build works from any folder (the app uses hash routing).
   base: './',
+  define: {
+    __BUILD_ID__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || `local-${Date.now()}`),
+  },
   plugins: [react()],
 })

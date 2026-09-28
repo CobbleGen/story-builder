@@ -1,10 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Download, FilePlus2, Feather, Sparkles, Upload } from 'lucide-react'
+import { Download, FilePlus2, Feather, History, Sparkles, Upload } from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
+import { backupNow } from '../store/backups'
+import { BackupsDialog } from './BackupsDialog'
 
 function slug(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
@@ -15,6 +17,7 @@ export function TopBar() {
   const setTitle = useStory((s) => s.setTitle)
   const replaceStory = useStory((s) => s.replaceStory)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [showBackups, setShowBackups] = useState(false)
 
   const exportStory = () => {
     const story = pickData(useStory.getState())
@@ -41,21 +44,26 @@ export function TopBar() {
     }
     const ok = await askConfirm({
       title: 'Replace your story with the imported one?',
-      message: 'Everything on the board now will be replaced. Export it first if you want to keep it.',
+      message: 'Everything on the board now will be replaced. A backup of your current story is kept (⋯ → Backups).',
       confirmLabel: 'Replace story',
       danger: true,
     })
-    if (ok) replaceStory(data)
+    if (ok) {
+      await backupNow()
+      replaceStory(data)
+    }
   }
 
   const replaceWith = async (build: () => unknown, title: string, confirmLabel: string) => {
     const ok = await askConfirm({
       title,
-      message: 'This replaces everything on the board. Export your story first if you want to keep it.',
+      message: 'This replaces everything on the board. A backup of your current story is kept (⋯ → Backups).',
       confirmLabel,
       danger: true,
     })
-    if (ok) replaceStory(build())
+    if (!ok) return
+    await backupNow()
+    replaceStory(build())
   }
 
   return (
@@ -86,6 +94,7 @@ export function TopBar() {
           items={[
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: exportStory },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
+            { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
             { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
             { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
           ]}
@@ -102,6 +111,7 @@ export function TopBar() {
           }}
         />
       </div>
+      {showBackups && <BackupsDialog onClose={() => setShowBackups(false)} />}
     </header>
   )
 }
