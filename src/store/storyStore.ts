@@ -39,7 +39,8 @@ interface StoryActions {
 
 export type StoryStore = StoryData & StoryActions
 
-const pickData = (s: StoryData): StoryData => ({
+/** Just the story's data, without the store's actions (for saving and export). */
+export const pickData = (s: StoryData): StoryData => ({
   title: s.title,
   chapters: s.chapters,
   arcs: s.arcs,

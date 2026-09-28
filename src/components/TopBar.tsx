@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Download, FilePlus2, Feather, Sparkles, Upload } from 'lucide-react'
-import { useStory } from '../store/storyStore'
+import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
@@ -17,12 +17,12 @@ export function TopBar() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const exportStory = () => {
-    const { title, chapters, arcs, beats } = useStory.getState()
-    const blob = new Blob([JSON.stringify({ title, chapters, arcs, beats }, null, 2)], { type: 'application/json' })
+    const story = pickData(useStory.getState())
+    const blob = new Blob([JSON.stringify(story, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${slug(title)}.json`
+    a.download = `${slug(story.title)}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
