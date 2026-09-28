@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { askConfirm } from '../lib/confirm'
-import { backupNow, listBackups, type Backup, type BackupReason } from '../store/backups'
+import { listBackups, type Backup, type BackupReason } from '../store/backups'
+import { backupNow } from '../store/persistence'
 import { useStory } from '../store/storyStore'
 import { Modal } from './Modal'
 

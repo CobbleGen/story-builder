@@ -5,7 +5,7 @@ import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
-import { backupNow } from '../store/backups'
+import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
 
 function slug(text: string) {
@@ -85,8 +85,10 @@ export function TopBar() {
       />
       <nav className="topnav">
         <NavLink to="/" end>
-          Chapter board
+          <span className="nav-long">Chapter </span>
+          <span className="nav-short-cap">board</span>
         </NavLink>
+        <NavLink to="/write">Manuscript</NavLink>
       </nav>
       <div className="topbar-actions">
         <Menu

@@ -1,10 +1,11 @@
+import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 import type { StoryData } from '../types'
 import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf } from '../lib/mentions'
-import { STORY_KEY } from './backups'
+import { STORY_KEY, storyStorage } from './persistence'
 
 type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
 
@@ -34,6 +35,7 @@ interface StoryActions {
   updateAttribute: (...args: Tail<Parameters<typeof ops.updateAttribute>>) => void
   deleteAttribute: (...args: Tail<Parameters<typeof ops.deleteAttribute>>) => void
   moveAttribute: (...args: Tail<Parameters<typeof ops.moveAttribute>>) => void
+  setChapterText: (...args: Tail<Parameters<typeof ops.setChapterText>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
 }
@@ -47,6 +49,7 @@ export const pickData = (s: StoryData): StoryData => ({
   arcs: s.arcs,
   beats: s.beats,
   characters: s.characters,
+  texts: s.texts,
 })
 
 export const useStory = create<StoryStore>()(
@@ -85,13 +88,14 @@ export const useStory = create<StoryStore>()(
         updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a)),
         deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a)),
         moveAttribute: (...a) => apply(ops.moveAttribute(data(), ...a)),
+        setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
         replaceStory: (input) => apply(ops.normalizeStory(input)),
       }
     },
     {
       name: STORY_KEY,
-      version: 2,
-      storage: createJSONStorage(() => localStorage),
+      version: 3,
+      storage: storyStorage<StoryData>(),
       partialize: (s) => pickData(s),
       // Older saves are upgraded by normalizeStory in merge below.
       migrate: (persisted) => persisted as StoryStore,
@@ -133,11 +137,21 @@ export function useCharacterLookup() {
   return map
 }
 
+/** Whether the saved story has been loaded (it loads asynchronously). */
+export function useStoryLoaded(): boolean {
+  return useSyncExternalStore(
+    (onChange) => useStory.persist.onFinishHydration(onChange),
+    () => useStory.persist.hasHydrated(),
+  )
+}
+
 // After the first edit, ask the browser to keep this site's storage even when
 // space runs low, so the saved story isn't cleared automatically.
 if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
-  const stop = useStory.subscribe(() => {
-    stop()
-    navigator.storage.persist().catch(() => {})
+  useStory.persist.onFinishHydration(() => {
+    const stop = useStory.subscribe(() => {
+      stop()
+      navigator.storage.persist().catch(() => {})
+    })
   })
 }

@@ -6,6 +6,8 @@ export interface Beat {
   description: string
   /** The chapter this beat is placed in, or null while it only lives on its arc. */
   chapterId: string | null
+  /** Ticked off in the manuscript: the beat has been written. */
+  done: boolean
 }
 
 export interface Chapter {
@@ -44,6 +46,22 @@ export interface Character {
   attributes: CharacterAttribute[]
 }
 
+/** A ProseMirror/TipTap JSON node, as stored. */
+export interface RichNode {
+  type: string
+  attrs?: Record<string, unknown>
+  content?: RichNode[]
+  marks?: { type: string; attrs?: Record<string, unknown> }[]
+  text?: string
+}
+
+/** A chapter's written text. */
+export interface ChapterText {
+  doc: RichNode
+  words: number
+  updatedAt: number
+}
+
 export interface StoryData {
   title: string
   /** Chapters in reading order; a chapter's number is its position + 1. */
@@ -51,4 +69,6 @@ export interface StoryData {
   arcs: Arc[]
   beats: Record<string, Beat>
   characters: Character[]
+  /** Chapter id -> the chapter's written text. */
+  texts: Record<string, ChapterText>
 }

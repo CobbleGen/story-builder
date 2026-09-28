@@ -5,6 +5,7 @@ import { useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { involves } from '../lib/highlight'
 import type { BeatDragData } from '../lib/dnd'
+import { Check } from 'lucide-react'
 import { MentionText } from './MentionText'
 
 type ViewProps = HTMLAttributes<HTMLDivElement> & {
@@ -42,6 +43,11 @@ export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatC
         </div>
       )}
       <div className="beat-meta">
+        {beat.done && (
+          <span className="beat-done" title="Written">
+            <Check size={12} strokeWidth={3} />
+          </span>
+        )}
         <span className="arc-chip">
           <span className="arc-dot" />
           <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { TopBar } from './components/TopBar'
 import { BeatEditor } from './components/BeatEditor'
@@ -5,20 +6,43 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
 import { CharacterPage } from './pages/CharacterPage'
+import { useStoryLoaded } from './store/storyStore'
+import { useSaveStatus } from './store/persistence'
+
+// The text editor is large; load it only when someone opens the manuscript.
+const WritePage = lazy(() => import('./pages/WritePage'))
 
 export default function App() {
+  const loaded = useStoryLoaded()
+  const saveFailed = useSaveStatus((s) => s.status === 'error')
+
+  if (!loaded) return <div className="boot">Opening your story…</div>
+
   return (
     <HashRouter>
       <div className="app">
         <TopBar />
         <Routes>
           <Route path="/" element={<BoardPage />} />
+          <Route
+            path="/write/:chapterId?"
+            element={
+              <Suspense fallback={<div className="boot">Opening the manuscript…</div>}>
+                <WritePage />
+              </Suspense>
+            }
+          />
           <Route path="/arcs/:arcId" element={<ArcPage />} />
           <Route path="/characters/:characterId" element={<CharacterPage />} />
           <Route path="*" element={<BoardPage />} />
         </Routes>
         <BeatEditor />
         <ConfirmDialog />
+        {saveFailed && (
+          <div className="save-banner" role="alert">
+            Your latest changes couldn’t be saved in this browser. Use ⋯ → Export story to keep a copy.
+          </div>
+        )}
       </div>
     </HashRouter>
   )

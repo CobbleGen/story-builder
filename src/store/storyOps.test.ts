@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { StoryData } from '../types'
+import type { RichNode } from '../types'
 import {
   addAttribute,
+  setChapterText,
   addCharacter,
   deleteAttribute,
   deleteCharacter,
@@ -26,7 +28,7 @@ import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 
 function setup() {
-  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [] }
+  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
   let ch1: string, ch2: string, ch3: string, main: string, love: string
   ;[data, ch1] = addChapter(data, { title: 'One' })
   ;[data, ch2] = addChapter(data, { title: 'Two' })
@@ -210,7 +212,7 @@ describe('normalizeStory', () => {
   })
 
   it('survives garbage', () => {
-    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [] })
+    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [], texts: {} })
   })
 
   it('upgrades a story saved before characters existed', () => {
@@ -287,5 +289,61 @@ describe('characters', () => {
     ])
     data = deleteAttribute(data, mara, wants)
     expect(data.characters[0].attributes.map((a) => a.id)).toEqual([age])
+  })
+})
+
+describe('chapter texts', () => {
+  const para = (...content: RichNode[]): RichNode => ({ type: 'paragraph', content })
+  const doc = (...content: RichNode[]): RichNode => ({ type: 'doc', content })
+  const text = (t: string, marks?: RichNode['marks']): RichNode => (marks ? { type: 'text', text: t, marks } : { type: 'text', text: t })
+  const link = (beatId: string) => ({ type: 'beatLink', attrs: { beatId } })
+
+  it('saves text only for chapters that exist, and drops it with the chapter', () => {
+    let { data, ch1 } = setup()
+    data = setChapterText(data, ch1, { doc: doc(para(text('Hi'))), words: 1, updatedAt: 1 })
+    data = setChapterText(data, 'ch_missing', { doc: doc(), words: 0, updatedAt: 1 })
+    expect(Object.keys(data.texts)).toEqual([ch1])
+    data = deleteChapter(data, ch1)
+    expect(data.texts).toEqual({})
+  })
+
+  it('removes a deleted beat’s highlights and merges the text back together', () => {
+    let { data, main, ch1 } = setup()
+    let a: string
+    ;[data, a] = addBeat(data, { arcId: main, title: 'A', chapterId: ch1 })
+    data = setChapterText(data, ch1, {
+      doc: doc(para(text('The '), text('storm', [link(a)]), text(' hit.'))),
+      words: 3,
+      updatedAt: 1,
+    })
+    data = deleteBeat(data, a)
+    expect(data.texts[ch1].doc).toEqual(doc(para(text('The storm hit.'))))
+  })
+
+  it('turns a deleted character’s mentions into their name', () => {
+    let { data, ch1 } = setup()
+    let mara: string
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    const mention = { type: 'mention', attrs: { id: mara, label: 'Mara' } }
+    data = setChapterText(data, ch1, { doc: doc(para(mention, text(' ran.'))), words: 2, updatedAt: 1 })
+    data = deleteCharacter(data, mara)
+    expect(data.texts[ch1].doc).toEqual(doc(para(text('Mara ran.'))))
+  })
+
+  it('keeps valid texts and beat progress when loading', () => {
+    const data = normalizeStory({
+      chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
+      arcs: [{ id: 'a1', name: 'A', color: '#000', beatIds: ['b1'] }],
+      beats: { b1: { id: 'b1', arcId: 'a1', title: 'B', done: true }, b2: { id: 'b2', arcId: 'a1', title: 'C' } },
+      texts: {
+        c1: { doc: { type: 'doc', content: [] }, words: 12, updatedAt: 5 },
+        c2: { doc: { type: 'doc' }, words: 1 },
+        bad: 'nope',
+      },
+    })
+    expect(Object.keys(data.texts)).toEqual(['c1'])
+    expect(data.texts.c1.words).toBe(12)
+    expect(data.beats.b1.done).toBe(true)
+    expect(data.beats.b2.done).toBe(false)
   })
 })

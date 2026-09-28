@@ -26,11 +26,18 @@ This first version is the **chapter board**:
 - **Point of view**: pick a chapter's POV character from its header; the
   chapter takes on that character's colour.
 - **@mentions**: type `@` in any text to mention a character (or create a
-  new one). Mentions are highlighted in the character's colour, and renaming
+  new one). Mentions show as the name in the character's colour, and renaming
   a character updates every mention.
+- **Manuscript** (second tab in the top bar) is where each chapter is
+  written, in a full text editor: headings, bold/italic/underline, quotes,
+  lists, scene breaks, undo, smart quotes and dashes, and `@` mentions. The
+  chapter's beats are a checklist on the left: tick one off, or select text
+  first and tick it to colour that text in the beat's arc. A switch turns the
+  arc colours on and off. Select text and choose **New beat** to make a beat
+  from it. Arrows on either side move to the previous and next chapter.
 
-Your story saves automatically in the browser as you type, and stays when
-the app is updated. Copies are also kept in the browser before each app
+Your story saves automatically in the browser (IndexedDB) as you type, and
+stays when the app is updated. Copies are also kept in the browser before each app
 update, twice a day while you work, and before the story is replaced; restore
 one from **⋯ → Backups**. The same menu exports the story as JSON (the way to
 move it to another browser or device), imports it again, or starts a blank
@@ -67,6 +74,10 @@ any static host or sub-folder.
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
 - `src/pages/CharacterPage.tsx`: a single character's page
+- `src/pages/WritePage.tsx` and `src/editor/`: the manuscript editor (TipTap),
+  its beat links, mentions and beats checklist
+- `src/store/persistence.ts`: saving to IndexedDB (batched writes, migration
+  from older saves); `src/store/backups.ts`: automatic backups
 - `src/components/Sidebar.tsx`: the arcs / characters sidebar
 - `src/lib/mentions.ts` and `src/components/MentionTextarea.tsx`: how
   `@mentions` are stored (as character ids) and edited

@@ -10,7 +10,7 @@ const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
  * real character links at the end.
  */
 export function buildSampleStory(): StoryData {
-  let data: StoryData = { title: 'The Lighthouse at Gull Point', chapters: [], arcs: [], beats: {}, characters: [] }
+  let data: StoryData = { title: 'The Lighthouse at Gull Point', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
 
   const character = (
     name: string,
@@ -86,7 +86,7 @@ export function buildSampleStory(): StoryData {
 }
 
 export function buildBlankStory(): StoryData {
-  let data: StoryData = { title: 'Untitled story', chapters: [], arcs: [], beats: {}, characters: [] }
+  let data: StoryData = { title: 'Untitled story', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
   ;[data] = addChapter(data, { title: '' })
   ;[data] = addArc(data, { name: 'Main plot', color: ARC_COLORS[6].value })
   return data

@@ -15,12 +15,21 @@ interface UiState {
   highlight: Highlight
   /** Beat open in the editor dialog. */
   editingBeatId: string | null
+  /** Manuscript: colour text linked to beats in their arc's colour. */
+  showArcColors: boolean
+  /** Manuscript: the beats checklist is open. */
+  beatsPanelOpen: boolean
+  /** Chapter last opened in the manuscript. */
+  lastChapterId: string | null
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
   setLastArcId: (arcId: string) => void
   setHighlight: (highlight: Highlight) => void
   openBeat: (beatId: string | null) => void
+  toggleArcColors: () => void
+  toggleBeatsPanel: () => void
+  setLastChapterId: (chapterId: string) => void
 }
 
 export const useUi = create<UiState>()(
@@ -33,6 +42,9 @@ export const useUi = create<UiState>()(
       lastArcId: null,
       highlight: null,
       editingBeatId: null,
+      showArcColors: true,
+      beatsPanelOpen: typeof window === 'undefined' || window.innerWidth > 760,
+      lastChapterId: null,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -40,6 +52,9 @@ export const useUi = create<UiState>()(
       setLastArcId: (lastArcId) => set({ lastArcId }),
       setHighlight: (highlight) => set({ highlight }),
       openBeat: (editingBeatId) => set({ editingBeatId }),
+      toggleArcColors: () => set((s) => ({ showArcColors: !s.showArcColors })),
+      toggleBeatsPanel: () => set((s) => ({ beatsPanelOpen: !s.beatsPanelOpen })),
+      setLastChapterId: (lastChapterId) => set({ lastChapterId }),
     }),
     {
       name: 'story-builder:ui',
@@ -49,6 +64,9 @@ export const useUi = create<UiState>()(
         sidebarMode: s.sidebarMode,
         expandedArcs: s.expandedArcs,
         lastArcId: s.lastArcId,
+        showArcColors: s.showArcColors,
+        beatsPanelOpen: s.beatsPanelOpen,
+        lastChapterId: s.lastChapterId,
       }),
     },
   ),

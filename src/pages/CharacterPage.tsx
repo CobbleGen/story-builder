@@ -19,6 +19,7 @@ import { chapterNumbers, useCharacterLookup, useStory } from '../store/storyStor
 import { useUi } from '../store/uiStore'
 import { askConfirm } from '../lib/confirm'
 import { displayName, mentions, plainText } from '../lib/mentions'
+import { countMentions } from '../lib/richText'
 import { Sidebar } from '../components/Sidebar'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
@@ -59,6 +60,7 @@ function CharacterView({ character }: { character: Character }) {
   const arcs = useStory((s) => s.arcs)
   const beats = useStory((s) => s.beats)
   const characters = useStory((s) => s.characters)
+  const texts = useStory((s) => s.texts)
   const updateCharacter = useStory((s) => s.updateCharacter)
   const deleteCharacter = useStory((s) => s.deleteCharacter)
   const navigate = useNavigate()
@@ -75,7 +77,8 @@ function CharacterView({ character }: { character: Character }) {
       (c) =>
         c.id !== character.id &&
         (mentions(c.description, character.id) || c.attributes.some((a) => mentions(a.value, character.id))),
-    ).length
+    ).length +
+    Object.values(texts).filter((t) => countMentions(t.doc, character.id) > 0).length
 
   const remove = async () => {
     const ok = await askConfirm({
@@ -392,7 +395,11 @@ function MentionedIn({ character }: { character: Character }) {
   const characterList = characters.filter(
     (c) => c.id !== id && (mentions(c.description, id) || c.attributes.some((a) => mentions(a.value, id))),
   )
-  const empty = !beatList.length && !chapterList.length && !arcList.length && !characterList.length
+  const texts = useStory((s) => s.texts)
+  const textList = chapters
+    .map((c) => ({ chapter: c, count: texts[c.id] ? countMentions(texts[c.id].doc, id) : 0 }))
+    .filter((t) => t.count > 0)
+  const empty = !beatList.length && !chapterList.length && !arcList.length && !characterList.length && !textList.length
 
   return (
     <section className="char-section">
@@ -422,6 +429,20 @@ function MentionedIn({ character }: { character: Character }) {
               </li>
             )
           })}
+          {textList.map(({ chapter: c, count }) => (
+            <li key={`text-${c.id}`} className="link-row">
+              <Link to={`/write/${c.id}`} className="link-row-main">
+                <ChapterTag number={numbers[c.id]} />
+                <span className="link-row-title">
+                  <MentionText text={c.title} fallback={<span className="muted">Untitled chapter</span>} />
+                  <span className="link-row-snippet">
+                    Named {count} time{count === 1 ? '' : 's'} in the text
+                  </span>
+                </span>
+                <span className="link-row-kind">Manuscript</span>
+              </Link>
+            </li>
+          ))}
           {chapterList.map((c) => (
             <li key={c.id} className="link-row">
               <Link to="/" className="link-row-main">

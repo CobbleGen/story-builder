@@ -1,6 +1,7 @@
-import type { Arc, Beat, Chapter, Character, CharacterAttribute, StoryData } from '../types'
+import type { Arc, Beat, Chapter, ChapterText, Character, CharacterAttribute, RichNode, StoryData } from '../types'
 import { makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
+import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -35,6 +36,19 @@ function mapArcs(data: StoryData, fn: (a: Arc) => Arc): StoryData {
 
 function mapCharacters(data: StoryData, fn: (c: Character) => Character): StoryData {
   return { ...data, characters: data.characters.map(fn) }
+}
+
+/** Applies fn to every chapter's written text, keeping untouched entries as they are. */
+function mapTexts(data: StoryData, fn: (doc: RichNode) => RichNode): StoryData {
+  let texts = data.texts
+  for (const [id, text] of Object.entries(data.texts)) {
+    const doc = fn(text.doc)
+    if (doc !== text.doc) {
+      if (texts === data.texts) texts = { ...data.texts }
+      texts[id] = { ...text, doc }
+    }
+  }
+  return texts === data.texts ? data : { ...data, texts }
 }
 
 /** Applies fn to every text field that can hold mentions, keeping untouched objects as they are. */
@@ -111,7 +125,14 @@ export function deleteChapter(data: StoryData, id: string): StoryData {
   for (const beatId of chapter.beatIds) {
     if (beats[beatId]) beats[beatId] = { ...beats[beatId], chapterId: null }
   }
-  return { ...data, beats, chapters: data.chapters.filter((c) => c.id !== id) }
+  const { [id]: _removed, ...texts } = data.texts
+  return { ...data, beats, texts, chapters: data.chapters.filter((c) => c.id !== id) }
+}
+
+/** Saves a chapter's written text. */
+export function setChapterText(data: StoryData, chapterId: string, text: ChapterText): StoryData {
+  if (!data.chapters.some((c) => c.id === chapterId)) return data
+  return { ...data, texts: { ...data.texts, [chapterId]: text } }
 }
 
 export function moveChapter(data: StoryData, from: number, to: number): StoryData {
@@ -151,7 +172,7 @@ export function deleteArc(data: StoryData, id: string): StoryData {
   const beats = { ...data.beats }
   for (const beatId of doomed) delete beats[beatId]
   return {
-    ...data,
+    ...mapTexts(data, (doc) => stripBeatLinks(doc, doomed)),
     beats,
     arcs: data.arcs.filter((a) => a.id !== id),
     chapters: data.chapters.map((c) =>
@@ -211,7 +232,10 @@ export function deleteCharacter(data: StoryData, id: string): StoryData {
   if (!character) return data
   const token = mentionToken(id)
   const name = displayName(character)
-  const next = mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text))
+  const next = mapTexts(
+    mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
+    (doc) => unlinkMentions(doc, id, name),
+  )
   return {
     ...next,
     characters: next.characters.filter((c) => c.id !== id),
@@ -310,6 +334,7 @@ export interface NewBeat {
   chapterIndex?: number
   /** Position inside the arc; defaults to the end, or to chapter order when placed in a chapter. */
   arcIndex?: number
+  done?: boolean
 }
 
 export function addBeat(data: StoryData, init: NewBeat): [StoryData, string] {
@@ -323,6 +348,7 @@ export function addBeat(data: StoryData, init: NewBeat): [StoryData, string] {
     title: init.title,
     description: init.description ?? '',
     chapterId,
+    done: init.done ?? false,
   }
   let next: StoryData = { ...data, beats: { ...data.beats, [beat.id]: beat } }
   if (chapterId) {
@@ -340,7 +366,7 @@ export function addBeat(data: StoryData, init: NewBeat): [StoryData, string] {
 export function updateBeat(
   data: StoryData,
   id: string,
-  patch: Partial<Pick<Beat, 'title' | 'description'>>,
+  patch: Partial<Pick<Beat, 'title' | 'description' | 'done'>>,
 ): StoryData {
   const beat = data.beats[id]
   if (!beat) return data
@@ -416,7 +442,7 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
   const beats = { ...data.beats }
   delete beats[id]
   return {
-    ...data,
+    ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
     beats,
     arcs: data.arcs.map((a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a)),
     chapters: beat.chapterId
@@ -488,6 +514,7 @@ export function normalizeStory(input: unknown): StoryData {
       title: str(b.title),
       description: str(b.description),
       chapterId: chapterIds.has(chapterId) ? chapterId : null,
+      done: b.done === true,
     }
   }
 
@@ -519,5 +546,15 @@ export function normalizeStory(input: unknown): StoryData {
     }
   }
 
-  return linkMentions({ title: str(raw.title, 'Untitled story'), arcs, chapters, beats, characters })
+  const texts: Record<string, ChapterText> = {}
+  for (const [id, t] of Object.entries(isRecord(raw.texts) ? raw.texts : {})) {
+    if (!chapterIds.has(id) || !isRecord(t) || !isDoc(t.doc)) continue
+    texts[id] = {
+      doc: t.doc,
+      words: typeof t.words === 'number' ? t.words : 0,
+      updatedAt: typeof t.updatedAt === 'number' ? t.updatedAt : 0,
+    }
+  }
+
+  return linkMentions({ title: str(raw.title, 'Untitled story'), arcs, chapters, beats, characters, texts })
 }
