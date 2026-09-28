@@ -66,11 +66,36 @@ export interface ChapterText {
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'beat'
 export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange'
 export type TextSize = 'sm' | 'md' | 'lg'
+/** A text box shown as a list: each line is an item. */
+export type MapListStyle = 'bullet' | 'number' | 'check'
+/** What an opened-up card shows: a chapter's pages, or the beats of a chapter or arc. */
+export type MapCardView = 'text' | 'beats'
 
 export type MapNode =
-  | { id: string; kind: MapEntityKind; refId: string; x: number; y: number }
+  | {
+      id: string
+      kind: MapEntityKind
+      refId: string
+      x: number
+      y: number
+      /** Chapters open up to their pages or beats, arcs to their beats. */
+      expanded?: MapCardView
+    }
   | { id: string; kind: 'note'; x: number; y: number; width: number; height: number; text: string; color: NoteColor }
-  | { id: string; kind: 'text'; x: number; y: number; width: number; text: string; size: TextSize }
+  | {
+      id: string
+      kind: 'text'
+      x: number
+      y: number
+      width: number
+      text: string
+      size: TextSize
+      /** Background colour; none when absent. */
+      bg?: NoteColor
+      list?: MapListStyle
+      /** Ticked items of a checklist, by line. */
+      checked?: number[]
+    }
 
 /** A line between two things on the mind map. */
 export interface MapEdge {

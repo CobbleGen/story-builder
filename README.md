@@ -40,11 +40,18 @@ It has three views: the **chapter board**, the **manuscript** and the
   arcs, characters and beats onto it from the panel on the left (or click
   one to drop it in the middle); the cards show the live item and open it on
   double-click. Add sticky notes (double-click the empty board, pick a colour,
-  resize them) and text boxes in three sizes, both with `@` mentions. Drag
-  from the dot on a card's edge to another card to draw a line, then select
-  the line to label it or give it an arrow. Pan by dragging the board, zoom
-  with the wheel, a pinch or the buttons. Delete removes a card from the map
-  only; the story item stays.
+  resize them) and text boxes in three sizes, both with `@` mentions. Text
+  boxes can have a background colour and can become a bulleted, numbered or
+  tick-box list. Drag from the dot on a card's edge to another card to draw a
+  line, then select the line to label it or give it an arrow. Pan by dragging
+  the board, zoom with the wheel, a pinch or the buttons. Delete removes a
+  card from the map only; the story item stays.
+- **Opening up cards on the mind map**: a chapter card's **Pages** button
+  shows the chapter's text a page at a time (arrows or the page picker to move
+  through it), and **Beats** lists its beats. An arc card lists its beats in
+  order, with their chapter numbers. Hover the gap between two beats and click
+  the + to add a beat right there, or use **Add beat** at the end; tick beats
+  as written, click one to edit it, or drag it out onto the map.
 
 Your story saves automatically in the browser (IndexedDB) as you type, and
 stays when the app is updated. Copies are also kept in the browser before each app

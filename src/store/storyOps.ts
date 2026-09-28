@@ -5,7 +5,9 @@ import type {
   ChapterText,
   Character,
   CharacterAttribute,
+  MapCardView,
   MapEdge,
+  MapListStyle,
   MapNode,
   NoteColor,
   RichNode,
@@ -496,6 +498,10 @@ export type MapNodePatch = Partial<{
   text: string
   color: NoteColor
   size: TextSize
+  bg: NoteColor | undefined
+  list: MapListStyle | undefined
+  checked: number[]
+  expanded: MapCardView | undefined
 }>
 
 const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refId' in n
@@ -587,6 +593,7 @@ export function removeMapEdges(data: StoryData, ids: string[]): StoryData {
 // ---------- Integrity ----------
 
 export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange']
+export const MAP_LIST_STYLES: MapListStyle[] = ['bullet', 'number', 'check']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -706,7 +713,12 @@ export function normalizeStory(input: unknown): StoryData {
     const kind = str(n.kind)
     if (kind in refs) {
       const refId = str(n.refId)
-      if (refs[kind].has(refId)) nodes.push({ id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y })
+      if (!refs[kind].has(refId)) continue
+      const node: MapNode = { id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y }
+      if ((kind === 'chapter' && (n.expanded === 'text' || n.expanded === 'beats')) || (kind === 'arc' && n.expanded === 'beats')) {
+        node.expanded = n.expanded
+      }
+      nodes.push(node)
     } else if (kind === 'note') {
       const color = str(n.color) as NoteColor
       nodes.push({
@@ -721,15 +733,26 @@ export function normalizeStory(input: unknown): StoryData {
       })
     } else if (kind === 'text') {
       const size = str(n.size) as TextSize
-      nodes.push({
+      const text = str(n.text)
+      const node: MapNode = {
         id,
         kind,
         x,
         y,
         width: num(n.width, 280, 60, 3000),
-        text: str(n.text),
+        text,
         size: size === 'sm' || size === 'lg' ? size : 'md',
-      })
+      }
+      const bg = str(n.bg) as NoteColor
+      if (NOTE_COLORS.includes(bg)) node.bg = bg
+      const listStyle = str(n.list) as MapListStyle
+      if (MAP_LIST_STYLES.includes(listStyle)) node.list = listStyle
+      const lines = text.split('\n').length
+      const checked = [...new Set(Array.isArray(n.checked) ? n.checked : [])]
+        .filter((i): i is number => Number.isInteger(i) && i >= 0 && i < lines)
+        .sort((a, b) => a - b)
+      if (checked.length) node.checked = checked
+      nodes.push(node)
     }
   }
   const nodeIds = new Set(nodes.map((n) => n.id))

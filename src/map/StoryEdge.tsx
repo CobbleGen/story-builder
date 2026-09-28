@@ -60,7 +60,7 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`map-edge${selected ? ' selected' : ''}`} interactionWidth={18} />
       <EdgeLabelRenderer>
         <div
-          className="map-edge-label-wrap nodrag nopan"
+          className={`map-edge-label-wrap nodrag nopan${selected ? ' selected' : ''}`}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
           {editing ? (

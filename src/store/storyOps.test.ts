@@ -421,4 +421,28 @@ describe('mind map', () => {
     expect(data.mindMap.nodes[1]).toMatchObject({ color: 'yellow', width: 220, height: 160 })
     expect(data.mindMap.edges).toEqual([{ id: 'e1', source: 'n1', target: 'n3', label: 'why', arrow: false }])
   })
+
+  it('keeps how cards are opened up and how text boxes look', () => {
+    const data = normalizeStory({
+      chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
+      arcs: [{ id: 'a1', name: 'Main', color: '#123456', beatIds: [] }],
+      mindMap: {
+        nodes: [
+          { id: 'n1', kind: 'chapter', refId: 'c1', x: 0, y: 0, expanded: 'text' },
+          { id: 'n2', kind: 'arc', refId: 'a1', x: 0, y: 0, expanded: 'beats' },
+          { id: 'n3', kind: 'arc', refId: 'a1', x: 0, y: 0, expanded: 'text' },
+          { id: 'n4', kind: 'text', x: 0, y: 0, text: 'Rope\nLantern', bg: 'green', list: 'check', checked: [1, 1, 5, -1, 'x'] },
+          { id: 'n5', kind: 'text', x: 0, y: 0, text: 'Plain', bg: 'neon', list: 'stars' },
+        ],
+      },
+    })
+    const [chapter, arc, badArc, list, plain] = data.mindMap.nodes
+    expect(chapter).toMatchObject({ expanded: 'text' })
+    expect(arc).toMatchObject({ expanded: 'beats' })
+    expect(badArc).not.toHaveProperty('expanded')
+    expect(list).toMatchObject({ bg: 'green', list: 'check', checked: [1] })
+    expect(plain).not.toHaveProperty('bg')
+    expect(plain).not.toHaveProperty('list')
+    expect(plain).not.toHaveProperty('checked')
+  })
 })

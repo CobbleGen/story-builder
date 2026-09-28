@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
-import { ArrowUpRight, BookOpen, Check, CircleDashed, PenLine, X } from 'lucide-react'
-import type { MapNode } from '../types'
+import { ArrowUpRight, BookOpen, Check, ChevronDown, CircleDashed, FileText, ListTree, PenLine, X } from 'lucide-react'
+import type { MapCardView, MapNode } from '../types'
 import { chapterNumbers, useStory } from '../store/storyStore'
 import { displayName } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
-import { useMap, useToolbarSide, type StoryFlowNode } from './mapShared'
+import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { BeatList, ChapterPages } from './CardPanels'
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 
@@ -24,8 +25,6 @@ export function Handles() {
 interface CardProps {
   node: MapNode
   selected: boolean
-  /** The card's top edge on the map, to keep its toolbar on screen. */
-  y: number
   kindLabel: ReactNode
   color?: string
   openLabel: string
@@ -34,15 +33,16 @@ interface CardProps {
   className?: string
 }
 
-function Card({ node, selected, y, kindLabel, color, openLabel, openIcon, children, className }: CardProps) {
+function Card({ node, selected, kindLabel, color, openLabel, openIcon, children, className }: CardProps) {
   const { openItem, removeNode } = useMap()
-  const side = useToolbarSide(selected, y)
+  const toolbar = useToolbarPlacement(node.id, selected)
+  const expanded = 'expanded' in node && node.expanded
   return (
     <div
-      className={`map-card${className ? ` ${className}` : ''}`}
+      className={`map-card${className ? ` ${className}` : ''}${expanded ? ` expanded ${expanded}` : ''}`}
       style={color ? ({ '--card': color } as React.CSSProperties) : undefined}
     >
-      <NodeToolbar isVisible={selected} position={side} className="map-toolbar">
+      <NodeToolbar isVisible={selected} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         <button className="map-tool" onClick={() => openItem(node)}>
           {openIcon ?? <ArrowUpRight size={14} />} {openLabel}
         </button>
@@ -69,14 +69,50 @@ function Missing({ what }: { what: string }) {
 
 type EntityNode = Extract<MapNode, { refId: string }>
 
-export function ArcNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFlowNode>) {
+/** Opens a card up to one of its views, or closes it again. */
+function useToggleView(node: EntityNode) {
+  const updateMapNode = useStory((s) => s.updateMapNode)
+  return (view: MapCardView) => updateMapNode(node.id, { expanded: node.expanded === view ? undefined : view })
+}
+
+function ViewButton({
+  active,
+  onClick,
+  icon,
+  label,
+  title,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: ReactNode
+  label: ReactNode
+  title: string
+}) {
+  return (
+    <button
+      type="button"
+      className={`map-view-btn nodrag${active ? ' active' : ''}`}
+      onClick={onClick}
+      aria-pressed={active}
+      aria-expanded={active}
+      title={title}
+    >
+      {icon}
+      {label}
+      <ChevronDown size={12} className="chevron" />
+    </button>
+  )
+}
+
+export function ArcNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const arc = useStory((s) => s.arcs.find((a) => a.id === node.refId))
   const characters = useStory((s) => s.characters)
+  const toggle = useToggleView(node)
   if (!arc) return <Missing what="Arc" />
   const cast = arc.characterIds.map((id) => characters.find((c) => c.id === id)).filter((c) => !!c)
   return (
-    <Card node={node} selected={selected} y={positionAbsoluteY} color={arc.color} kindLabel="Arc" openLabel="Open arc">
+    <Card node={node} selected={selected} color={arc.color} className="arc-card" kindLabel="Arc" openLabel="Open arc">
       <div className="map-card-title">
         <MentionText text={arc.name} fallback="Untitled arc" />
       </div>
@@ -86,9 +122,13 @@ export function ArcNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFl
         </div>
       )}
       <div className="map-card-foot">
-        <span>
-          {arc.beatIds.length} beat{arc.beatIds.length === 1 ? '' : 's'}
-        </span>
+        <ViewButton
+          active={node.expanded === 'beats'}
+          onClick={() => toggle('beats')}
+          icon={<ListTree size={13} />}
+          label={`${arc.beatIds.length} beat${arc.beatIds.length === 1 ? '' : 's'}`}
+          title={node.expanded === 'beats' ? 'Hide the beats' : 'Show the beats in this arc'}
+        />
         {cast.length > 0 && (
           <span className="map-cast">
             {cast.slice(0, 5).map((c) => (
@@ -97,29 +137,33 @@ export function ArcNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFl
           </span>
         )}
       </div>
+      {node.expanded === 'beats' && <BeatList beatIds={arc.beatIds} scope={{ kind: 'arc', arcId: arc.id }} />}
     </Card>
   )
 }
 
-export function ChapterNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFlowNode>) {
+export function ChapterNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const chapters = useStory((s) => s.chapters)
   const chapter = chapters.find((c) => c.id === node.refId)
   const pov = useStory((s) => s.characters.find((c) => c.id === chapter?.povCharacterId))
   const words = useStory((s) => s.texts[node.refId]?.words ?? 0)
   const beats = useStory((s) => s.beats)
+  const { openItem } = useMap()
+  const toggle = useToggleView(node)
   if (!chapter) return <Missing what="Chapter" />
   const written = chapter.beatIds.filter((id) => beats[id]?.done).length
+  const number = chapterNumbers(chapters)[chapter.id]
   return (
     <Card
       node={node}
       selected={selected}
-      y={positionAbsoluteY}
+     
       color={pov?.color ?? '#6f7480'}
       className="chapter-card"
       kindLabel={
         <>
-          <BookOpen size={12} /> Chapter {chapterNumbers(chapters)[chapter.id]}
+          <BookOpen size={12} /> Chapter {number}
           {pov && <span className="map-pov">· {displayName(pov)}’s POV</span>}
         </>
       }
@@ -136,22 +180,46 @@ export function ChapterNode({ data, selected, positionAbsoluteY }: NodeProps<Sto
       )}
       <div className="map-card-foot">
         <span>{words ? `${words.toLocaleString()} words` : 'Not started'}</span>
-        {chapter.beatIds.length > 0 && (
-          <span>
-            {written}/{chapter.beatIds.length} beats written
-          </span>
-        )}
+        <span className="map-views">
+          <ViewButton
+            active={node.expanded === 'text'}
+            onClick={() => toggle('text')}
+            icon={<FileText size={13} />}
+            label="Pages"
+            title={node.expanded === 'text' ? 'Hide the pages' : 'Read the chapter here, a page at a time'}
+          />
+          <ViewButton
+            active={node.expanded === 'beats'}
+            onClick={() => toggle('beats')}
+            icon={<ListTree size={13} />}
+            label={
+              <>
+                Beats
+                {chapter.beatIds.length > 0 && (
+                  <span className="map-view-count" title={`${written} of ${chapter.beatIds.length} written`}>
+                    {written}/{chapter.beatIds.length}
+                  </span>
+                )}
+              </>
+            }
+            title={node.expanded === 'beats' ? 'Hide the beats' : 'Show the beats in this chapter'}
+          />
+        </span>
       </div>
+      {node.expanded === 'text' && (
+        <ChapterPages chapterId={chapter.id} number={number} title={chapter.title} onWrite={() => openItem(node)} />
+      )}
+      {node.expanded === 'beats' && <BeatList beatIds={chapter.beatIds} scope={{ kind: 'chapter', chapterId: chapter.id }} />}
     </Card>
   )
 }
 
-export function CharacterNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFlowNode>) {
+export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const character = useStory((s) => s.characters.find((c) => c.id === node.refId))
   if (!character) return <Missing what="Character" />
   return (
-    <Card node={node} selected={selected} y={positionAbsoluteY} color={character.color} className="character-card" kindLabel="Character" openLabel="Open character">
+    <Card node={node} selected={selected} color={character.color} className="character-card" kindLabel="Character" openLabel="Open character">
       <div className="map-character-head">
         <CharacterAvatar character={character} size="md" />
         <div className="map-card-title">{displayName(character)}</div>
@@ -180,7 +248,7 @@ export function CharacterNode({ data, selected, positionAbsoluteY }: NodeProps<S
   )
 }
 
-export function BeatNode({ data, selected, positionAbsoluteY }: NodeProps<StoryFlowNode>) {
+export function BeatNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const beat = useStory((s) => s.beats[node.refId])
   const arc = useStory((s) => s.arcs.find((a) => a.id === beat?.arcId))
@@ -191,7 +259,7 @@ export function BeatNode({ data, selected, positionAbsoluteY }: NodeProps<StoryF
     <Card
       node={node}
       selected={selected}
-      y={positionAbsoluteY}
+     
       color={arc?.color}
       className="beat-card-map"
       kindLabel={

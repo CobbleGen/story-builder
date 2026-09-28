@@ -1,7 +1,18 @@
-import type { StoryData } from '../types'
+import type { RichNode, StoryData } from '../types'
 import { ARC_COLORS } from '../lib/colors'
 import type { NewMapNode } from './storyOps'
-import { addArc, addBeat, addChapter, addCharacter, addMapEdge, addMapNode, linkMentions, updateChapter, updateMapEdge } from './storyOps'
+import {
+  addArc,
+  addBeat,
+  addChapter,
+  addCharacter,
+  addMapEdge,
+  addMapNode,
+  linkMentions,
+  setChapterText,
+  updateChapter,
+  updateMapEdge,
+} from './storyOps'
 
 const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
 
@@ -39,8 +50,10 @@ export function buildSampleStory(): StoryData {
     ;[data, id] = addArc(data, { name, color: color(colorName), description, characterIds })
     return id
   }
-  const beat = (arcId: string, title: string, description: string, chapterId: string | null = null) => {
-    ;[data] = addBeat(data, { arcId, title, description, chapterId })
+  const beat = (arcId: string, title: string, description: string, chapterId: string | null = null, done = false) => {
+    let id: string
+    ;[data, id] = addBeat(data, { arcId, title, description, chapterId, done })
+    return id
   }
 
   const mara = character('Mara', 'Teal', 'The keeper’s daughter, back in Gull Point for the first time in ten years.', [
@@ -75,13 +88,70 @@ export function buildSampleStory(): StoryData {
   beat(mystery, 'No bodies on the beach', 'Only cargo crates, all of them empty.', ch2)
   beat(village, 'Emergency council meeting', '@Harrow moves to decommission the lighthouse.', ch2)
   beat(romance, 'Argument on the pier', '', ch2)
-  beat(secret, 'The locked drawer', '@Mara finds the logbook under a false bottom.', ch3)
-  beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3)
+  const drawer = beat(secret, 'The locked drawer', '@Mara finds the logbook under a false bottom.', ch3, true)
+  const margin = beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3, true)
   beat(village, '@Harrow buys the old boathouse', '', ch4)
   beat(mystery, 'A survivor in the sea caves', 'Someone was waiting for the tide to drop.')
   beat(romance, '@Theo admits he stayed for her', '')
   beat(secret, '@Elias confesses', 'He has been guiding smugglers past the reef for years.')
   beat(village, 'The vote', 'The lighthouse is saved by a single voice.')
+
+  // Chapter 3 is already written, with its beats linked to the text.
+  const text = (value: string, beatId?: string): RichNode => ({
+    type: 'text',
+    text: value,
+    ...(beatId ? { marks: [{ type: 'beatLink', attrs: { beatId } }] } : {}),
+  })
+  const who = (id: string): RichNode => ({ type: 'mention', attrs: { id, label: null } })
+  const para = (...content: (string | RichNode)[]): RichNode => ({
+    type: 'paragraph',
+    content: content.map((c) => (typeof c === 'string' ? text(c) : c)),
+  })
+  const logbook: RichNode = {
+    type: 'doc',
+    content: [
+      para(
+        'The keeper’s cottage had not changed, which was the worst thing about it. The same brass barometer, stuck on Change. The same kettle with the dent where ',
+        who(mara),
+        ' had dropped it at nine. Her father’s chair still faced the window, as if he were only out on the gallery and would be back for his tea.',
+      ),
+      para('She started with the desk, because the desk was where he had always told her not to look.'),
+      para(
+        text(
+          'The bottom drawer stuck. When she forced it, it came out too easily, lighter than it should have been, and she saw why: someone had fitted a false floor, a plank of old ship’s timber cut to size.',
+          drawer,
+        ),
+        ' Under it, wrapped in oilcloth, was a logbook with a green cover gone soft as moss.',
+      ),
+      para(
+        'It was not the official log. That one lived in the watch room, all weather and lamp hours in her father’s square capitals. This one was written smaller, faster, in pencil.',
+      ),
+      para(
+        'Most of the pages were tide times. Some were names she didn’t know; some were only initials. ',
+        who(elias),
+        ' had drawn a small fish beside a few of them, the way he used to draw them on her school lunches.',
+      ),
+      para(
+        text(
+          'And in the margin of every October, year after year, the same pair of numbers, circled twice.',
+          margin,
+        ),
+        ' She didn’t need a chart. She had grown up with that reef outside her bedroom window.',
+      ),
+      para('The fourteenth of October. The night the Aurelia went down.'),
+      { type: 'horizontalRule' },
+      para(
+        'She put the book inside her coat and sat for a long time in her father’s chair, watching the beam go round, trying to decide who she was going to show it to.',
+      ),
+    ],
+  }
+  const countWords = (node: RichNode): number =>
+    node.type === 'text'
+      ? (node.text?.match(/\S+/g)?.length ?? 0)
+      : node.type === 'mention'
+        ? 1
+        : (node.content ?? []).reduce((n, c) => n + countWords(c), 0)
+  data = setChapterText(data, ch3, { doc: logbook, words: countWords(logbook), updatedAt: Date.now() })
 
   // A small mind map: who's who, and an open question.
   const place = (node: NewMapNode) => {
@@ -100,6 +170,7 @@ export function buildSampleStory(): StoryData {
   const nElias = place({ kind: 'character', refId: elias, x: -360, y: 40 })
   const nHarrow = place({ kind: 'character', refId: harrow, x: -250, y: 380 })
   const nSecret = place({ kind: 'arc', refId: secret, x: -700, y: 120 })
+  const nLogbook = place({ kind: 'chapter', refId: ch3, x: -710, y: 470 })
   place({
     kind: 'note',
     x: 360,
@@ -113,6 +184,7 @@ export function buildSampleStory(): StoryData {
   connect(nMara, nTheo, 'old flame')
   connect(nHarrow, nElias, 'wants his lighthouse')
   connect(nElias, nSecret, 'hides')
+  connect(nSecret, nLogbook, 'comes out in')
 
   return linkMentions(data)
 }

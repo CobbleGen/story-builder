@@ -58,10 +58,41 @@ export const MapContext = createContext<MapContextValue>({
 export const useMap = () => useContext(MapContext)
 
 /**
- * Which side of a selected card its toolbar goes on: above it, unless that
- * would put it off the top of the map.
+ * Where a selected card's toolbar goes so it stays on screen: above the card
+ * unless that's off the top of the map, and lined up with the card's left or
+ * right edge when centring it would run off the side.
  */
-export function useToolbarSide(selected: boolean, y: number): Position {
-  const nearTop = useStore((s) => selected && y * s.transform[2] + s.transform[1] < 56)
-  return nearTop ? Position.Bottom : Position.Top
+export function useToolbarPlacement(id: string, selected: boolean): { position: Position; align: 'start' | 'center' | 'end' } {
+  const key = useStore((s) => {
+    const n = selected ? s.nodeLookup.get(id) : undefined
+    if (!n) return 'top center'
+    const [tx, ty, zoom] = s.transform
+    const { x, y } = n.internals.positionAbsolute
+    const side = y * zoom + ty < 56 ? 'bottom' : 'top'
+    const center = (x + (n.measured.width ?? 0) / 2) * zoom + tx
+    const half = Math.min(440, s.width - 24) / 2
+    const align = center - half < 8 ? 'start' : center + half > s.width - 8 ? 'end' : 'center'
+    return `${side} ${align}`
+  })
+  const [side, align] = key.split(' ') as ['top' | 'bottom', 'start' | 'center' | 'end']
+  return { position: side === 'bottom' ? Position.Bottom : Position.Top, align }
+}
+
+/**
+ * Focuses a field with the caret at the end, once it's on screen: a new card
+ * stays hidden until React Flow has measured it, and hidden fields can't take
+ * focus. Returns a function that stops trying.
+ */
+export function focusSoon(get: () => HTMLTextAreaElement | null): () => void {
+  let frame = 0
+  let tries = 0
+  const run = () => {
+    const el = get()
+    if (!el) return
+    el.focus({ preventScroll: true })
+    if (document.activeElement === el) el.setSelectionRange(el.value.length, el.value.length)
+    else if (tries++ < 20) frame = requestAnimationFrame(run)
+  }
+  run()
+  return () => cancelAnimationFrame(frame)
 }

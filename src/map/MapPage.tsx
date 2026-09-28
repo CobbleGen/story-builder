@@ -12,6 +12,7 @@ import {
   applyNodeChanges,
   useReactFlow,
   type EdgeChange,
+  type FitViewOptions,
   type NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -44,6 +45,16 @@ const nodeTypes = {
 }
 const edgeTypes = { story: StoryEdge }
 
+// Fitting the story into view leaves the bottom clear for the minimap and
+// zoom buttons (phones don't show the minimap).
+const FIT_VIEW: FitViewOptions = {
+  maxZoom: 1,
+  padding:
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches
+      ? { x: '20px', top: '20px', bottom: '70px' }
+      : { x: '48px', top: '40px', bottom: '150px' },
+}
+
 /** Story map nodes as React Flow nodes, keeping React Flow's own state (selection, sizes). */
 function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
   const old = new Map(prev.map((n) => [n.id, n]))
@@ -56,8 +67,8 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
       data: { node: n },
       selected: was?.selected ?? false,
       measured: was?.measured,
-      // Notes sit under the other cards.
-      zIndex: n.kind === 'note' ? 0 : 1,
+      // Notes sit under the other cards; an opened-up card sits over its neighbours.
+      zIndex: n.kind === 'note' ? 0 : 'expanded' in n && n.expanded ? 2 : 1,
     }
     if (n.kind === 'note') return { ...node, width: n.width, height: n.height }
     if (n.kind === 'text') return { ...node, width: n.width }
@@ -252,14 +263,16 @@ function MapCanvas() {
             }
             onNodesDelete={(deleted) => removeMapNodes(deleted.map((n) => n.id))}
             onConnect={(c) => addMapEdge(c.source, c.target)}
-            onNodeDoubleClick={(_, n) => {
+            onNodeDoubleClick={(e, n) => {
+              // Not from inside an opened-up card (its lists and pages have their own clicks).
+              if ((e.target as Element).closest('.nodrag')) return
               if (n.data.node.kind !== 'note' && n.data.node.kind !== 'text') openItem(n.data.node)
             }}
             onMoveEnd={(_, viewport) => setMapViewport(viewport)}
             onPaneClick={() => setEditingId(null)}
             defaultViewport={savedViewport ?? undefined}
             fitView={!savedViewport}
-            fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
+            fitViewOptions={FIT_VIEW}
             connectionMode={ConnectionMode.Loose}
             connectionRadius={36}
             zoomOnDoubleClick={false}
@@ -269,7 +282,7 @@ function MapCanvas() {
             attributionPosition="top-right"
           >
             <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cfc9bd" />
-            <Controls showInteractive={false} position="bottom-right" />
+            <Controls showInteractive={false} position="bottom-right" fitViewOptions={FIT_VIEW} />
             <MiniMap
               pannable
               zoomable

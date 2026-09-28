@@ -474,6 +474,377 @@
   background: var(--column);
 }
 
+/* ---------- Opened-up cards ---------- */
+
+.map-card.expanded {
+  width: 300px;
+}
+
+.chapter-card.expanded.text {
+  width: 340px;
+}
+
+.map-views {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.map-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.map-view-btn:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.map-view-btn.active {
+  border-color: color-mix(in srgb, var(--card) 45%, white);
+  background: color-mix(in srgb, var(--card) 13%, white);
+  color: color-mix(in srgb, var(--card) 75%, black);
+}
+
+.map-view-btn .chevron {
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+
+.map-view-btn.active .chevron {
+  transform: rotate(180deg);
+}
+
+.map-view-count {
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+/* A panel fills the bottom of its card, edge to edge. */
+.map-panel {
+  margin: 10px -13px -12px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 11px 11px;
+  background: var(--column);
+  cursor: default;
+}
+
+.map-pages {
+  padding: 12px;
+}
+
+.map-paper {
+  height: 330px;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fffdf8;
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.6;
+  user-select: text;
+  scrollbar-width: thin;
+}
+
+.map-paper-head {
+  margin: 2px 0 14px;
+  text-align: center;
+}
+
+.map-paper-head span {
+  display: block;
+  color: var(--ink-3);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.map-paper-head strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.map-rich p {
+  margin: 0;
+  text-indent: 1.4em;
+}
+
+.map-rich p.continued,
+.map-paper-head + .map-rich > p:first-child,
+.map-rich hr + p,
+.map-rich h3 + p,
+.map-rich h4 + p,
+.map-rich h5 + p,
+.map-rich li p {
+  text-indent: 0;
+}
+
+.map-rich h3,
+.map-rich h4,
+.map-rich h5 {
+  margin: 1em 0 0.4em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.map-rich h3 {
+  font-size: 1.3em;
+}
+
+.map-rich h4 {
+  font-size: 1.15em;
+}
+
+.map-rich h5 {
+  font-size: 1.05em;
+}
+
+.map-rich > :first-child {
+  margin-top: 0;
+}
+
+.map-rich blockquote {
+  margin: 0.6em 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.map-rich ul,
+.map-rich ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+
+.map-rich hr {
+  margin: 1em 0;
+  border: 0;
+  text-align: center;
+}
+
+.map-rich hr::after {
+  content: '⁂';
+  color: var(--ink-3);
+}
+
+.map-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.map-page-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-page-pick select {
+  padding: 2px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-tool:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.map-pages-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 13px 13px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.map-pages-empty p {
+  margin: 0;
+}
+
+.map-pages-empty .map-tool {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* Beat lists */
+.map-beats {
+  max-height: 360px;
+  padding: 6px 8px 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.map-beat-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.map-beat {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--arc, var(--line-strong));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--arc, white) 8%, white);
+  font-size: 12.5px;
+  line-height: 1.35;
+  cursor: grab;
+}
+
+.map-beat:hover {
+  background: color-mix(in srgb, var(--arc, white) 15%, white);
+}
+
+.map-beat .chapter-tag {
+  margin-top: -1.5px;
+}
+
+.map-beat-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.map-beat-title:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+
+.map-beat.done .map-beat-title {
+  color: var(--ink-2);
+}
+
+/* The gap between beats: hover it to add one there. */
+.map-slot {
+  position: relative;
+  height: 5px;
+}
+
+.map-slot button {
+  position: absolute;
+  inset: -5px 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.map-slot button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--focus);
+}
+
+.map-slot button svg {
+  position: relative;
+  box-sizing: content-box;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--focus);
+  color: #fff;
+}
+
+.map-slot button:hover {
+  opacity: 1;
+}
+
+.map-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 3px 0;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--focus) 60%, white);
+  border-left: 3px solid var(--arc, var(--focus));
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.35;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 12%, transparent);
+}
+
+.map-composer .mention-input::placeholder {
+  color: var(--ink-3);
+}
+
+.map-add-beat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.map-add-beat:hover {
+  border-color: var(--ink-3);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.map-beats-empty {
+  margin: 4px 4px 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
 /* ---------- Connection points ---------- */
 
 .map-canvas .map-handle {
@@ -517,6 +888,9 @@
 .map-toolbar,
 .map-edge-tools {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(460px, calc(100vw - 72px));
   align-items: center;
   gap: 2px;
   padding: 4px;
@@ -552,6 +926,11 @@
   color: color-mix(in srgb, var(--focus) 80%, black);
 }
 
+.map-tool.icon-only {
+  width: 28px;
+  padding: 0;
+}
+
 .map-tool.size-btn {
   width: 28px;
   padding: 0;
@@ -575,6 +954,11 @@
   border: 0;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.map-swatch.none {
+  background: linear-gradient(135deg, transparent 45%, var(--danger) 45% 55%, transparent 55%), var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 
 .map-swatch.active {
@@ -673,6 +1057,93 @@
   letter-spacing: -0.01em;
 }
 
+/* A coloured text box reads as a card of its own. */
+.map-text.has-bg {
+  padding: 10px 14px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(38, 36, 31, 0.08);
+}
+
+.map-text.has-bg.editing {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+/* ---------- Lists in text boxes ---------- */
+
+.map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.map-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45em;
+}
+
+.map-list-marker {
+  flex: none;
+  min-width: 0.9em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.map-list.number .map-list-marker {
+  min-width: 1.4em;
+}
+
+.map-list-text,
+.map-list .mention-field {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.map-list li.done .map-list-text,
+.map-list li.done .mention-backdrop {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ink-3) 70%, transparent);
+}
+
+.map-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 0.95em;
+  height: 0.95em;
+  min-width: 15px;
+  min-height: 15px;
+  /* Sit on the first line of text. */
+  margin-top: calc((1lh - max(0.95em, 15px)) / 2);
+  padding: 0;
+  border: 1.5px solid var(--ink-3);
+  border-radius: 4px;
+  background: var(--surface);
+  color: #fff;
+  cursor: pointer;
+}
+
+.map-check:hover {
+  border-color: var(--ink-2);
+}
+
+.map-check.on {
+  border-color: #3a7d44;
+  background: #3a7d44;
+}
+
+.map-list-input .mention-input::placeholder {
+  color: rgba(38, 36, 31, 0.38);
+}
+
 .map-canvas .map-resize-line {
   border-color: var(--focus);
 }
@@ -687,10 +1158,15 @@
 
 /* ---------- Lines ---------- */
 
+/* Labels sit under cards like their lines do, except the selected line's, whose tools must show. */
 .map-edge-label-wrap {
   position: absolute;
-  z-index: 5;
+  z-index: 0;
   pointer-events: all;
+}
+
+.map-edge-label-wrap.selected {
+  z-index: 2000;
 }
 
 .map-edge-label {
@@ -747,6 +1223,11 @@
   }
 
   .map-canvas .react-flow__minimap {
+    display: none;
+  }
+
+  /* Toolbars wrap onto two rows here; dividers would dangle at the row ends. */
+  .map-tool-sep {
     display: none;
   }
 
