@@ -18,7 +18,16 @@ This first version is the **chapter board**:
   chapter. Hovering an arc dims every other arc's beats on the board.
 - **Arc pages** (the ↗ next to an arc) show all of an arc's beats in order.
   Add new beats (they start unplaced), drag to reorder, and pick a chapter
-  from each beat's chapter pill.
+  from each beat's chapter pill. Assign the characters involved in the arc.
+- **Characters** live in the sidebar's Characters tab. Each has a colour and
+  a page with your own attributes (age, wants, secrets, anything), their
+  arcs, the chapters told from their point of view, and everywhere they're
+  mentioned. Hovering a character dims beats they aren't part of.
+- **Point of view**: pick a chapter's POV character from its header; the
+  chapter takes on that character's colour.
+- **@mentions**: type `@` in any text to mention a character (or create a
+  new one). Mentions are highlighted in the character's colour, and renaming
+  a character updates every mention.
 
 Your story is saved in the browser (localStorage). Use the **⋯** menu
 (top right) to export it as JSON, import it again, or start a blank story.
@@ -46,4 +55,7 @@ any static host or sub-folder.
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
-- `src/components/Sidebar.tsx`: the arcs sidebar
+- `src/pages/CharacterPage.tsx`: a single character's page
+- `src/components/Sidebar.tsx`: the arcs / characters sidebar
+- `src/lib/mentions.ts` and `src/components/MentionTextarea.tsx`: how
+  `@mentions` are stored (as character ids) and edited

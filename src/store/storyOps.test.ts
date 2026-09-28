@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { StoryData } from '../types'
 import {
+  addAttribute,
+  addCharacter,
+  deleteAttribute,
+  deleteCharacter,
+  moveAttribute,
+  setArcCharacter,
+  updateAttribute,
+  updateChapter,
+  updateCharacter,
   addArc,
   addBeat,
   addChapter,
@@ -14,9 +23,10 @@ import {
   setBeatArc,
 } from './storyOps'
 import { buildSampleStory } from './sampleStory'
+import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 
 function setup() {
-  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {} }
+  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [] }
   let ch1: string, ch2: string, ch3: string, main: string, love: string
   ;[data, ch1] = addChapter(data, { title: 'One' })
   ;[data, ch2] = addChapter(data, { title: 'Two' })
@@ -200,6 +210,82 @@ describe('normalizeStory', () => {
   })
 
   it('survives garbage', () => {
-    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {} })
+    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [] })
+  })
+
+  it('upgrades a story saved before characters existed', () => {
+    const data = normalizeStory({
+      title: 'Old',
+      arcs: [{ id: 'a1', name: 'A', color: '#000', description: '', beatIds: [] }],
+      chapters: [{ id: 'c1', title: 'One', summary: '', beatIds: [] }],
+      beats: {},
+    })
+    expect(data.characters).toEqual([])
+    expect(data.arcs[0].characterIds).toEqual([])
+    expect(data.chapters[0].povCharacterId).toBeNull()
+  })
+
+  it('drops links to missing characters and links plain @names', () => {
+    const data = normalizeStory({
+      characters: [{ id: 'chr_1', name: 'Mara', color: '#0a0', attributes: [{ id: 'x', label: 'Age', value: '29' }] }],
+      arcs: [{ id: 'a1', name: '@Mara arc', color: '#000', beatIds: [], characterIds: ['chr_1', 'chr_gone'] }],
+      chapters: [{ id: 'c1', title: 'One', summary: 'Hi @Mara', beatIds: [], povCharacterId: 'chr_gone' }],
+      beats: {},
+    })
+    expect(data.arcs[0].characterIds).toEqual(['chr_1'])
+    expect(data.chapters[0].povCharacterId).toBeNull()
+    expect(data.chapters[0].summary).toBe(`Hi ${mentionToken('chr_1')}`)
+    expect(data.arcs[0].name).toBe(`${mentionToken('chr_1')} arc`)
+    expect(data.characters[0].attributes[0].value).toBe('29')
+  })
+})
+
+describe('characters', () => {
+  it('renames everywhere because mentions store the id', () => {
+    let { data, main, ch1 } = setup()
+    let mara: string, beat: string
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, beat] = addBeat(data, { arcId: main, title: `${mentionToken(mara)} arrives`, chapterId: ch1 })
+    data = updateCharacter(data, mara, { name: 'Mara Quinn' })
+    expect(toDisplay(data.beats[beat].title, lookupOf(data.characters))).toBe('@Mara Quinn arrives')
+  })
+
+  it('assigns arcs and POV, and cleans up when deleted', () => {
+    let { data, main, ch1 } = setup()
+    let mara: string, beat: string
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    data = setArcCharacter(data, main, mara, true)
+    data = setArcCharacter(data, main, mara, true)
+    expect(data.arcs[0].characterIds).toEqual([mara])
+    data = updateChapter(data, ch1, { povCharacterId: mara })
+    expect(data.chapters[0].povCharacterId).toBe(mara)
+    ;[data, beat] = addBeat(data, { arcId: main, title: `Meet ${mentionToken(mara)}` })
+    data = deleteCharacter(data, mara)
+    expect(data.characters).toEqual([])
+    expect(data.arcs[0].characterIds).toEqual([])
+    expect(data.chapters[0].povCharacterId).toBeNull()
+    expect(data.beats[beat].title).toBe('Meet Mara')
+  })
+
+  it('ignores a POV for a character that does not exist', () => {
+    let { data, ch1 } = setup()
+    data = updateChapter(data, ch1, { povCharacterId: 'chr_nobody' })
+    expect(data.chapters[0].povCharacterId).toBeNull()
+  })
+
+  it('edits, reorders and removes attributes', () => {
+    let { data } = setup()
+    let mara: string, age: string, wants: string
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, age] = addAttribute(data, mara, { label: 'Age' })
+    ;[data, wants] = addAttribute(data, mara, { label: 'Wants' })
+    data = updateAttribute(data, mara, age, { value: '29' })
+    data = moveAttribute(data, mara, 1, 0)
+    expect(data.characters[0].attributes.map((a) => [a.label, a.value])).toEqual([
+      ['Wants', ''],
+      ['Age', '29'],
+    ])
+    data = deleteAttribute(data, mara, wants)
+    expect(data.characters[0].attributes.map((a) => a.id)).toEqual([age])
   })
 })

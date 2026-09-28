@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { ArrowUpRight, ChevronRight, CircleDashed, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
-import type { Arc, Beat } from '../types'
-import { useChapterNumbers, useStory } from '../store/storyStore'
-import { useUi } from '../store/uiStore'
+import type { Arc, Beat, Character } from '../types'
+import { useChapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
+import { useUi, type SidebarMode } from '../store/uiStore'
 import { nextArcColor } from '../lib/colors'
+import { displayName, plainText } from '../lib/mentions'
+import type { BeatDragData, UnassignDropData } from '../lib/dnd'
 import { ChapterTag } from './ChapterTag'
 import { ColorSwatches } from './ColorSwatches'
-import type { BeatDragData, UnassignDropData } from '../lib/dnd'
+import { MentionText } from './MentionText'
+import { MentionTextarea } from './MentionTextarea'
+import { CharacterAvatar } from './CharacterAvatar'
 
 interface Props {
   /** Beats can be dragged from the sidebar onto the chapter board. */
@@ -17,12 +21,22 @@ interface Props {
   unassignActive?: boolean
 }
 
+const MODES: { mode: SidebarMode; label: string }[] = [
+  { mode: 'arcs', label: 'Arcs' },
+  { mode: 'characters', label: 'Characters' },
+]
+
 export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) {
   const arcs = useStory((s) => s.arcs)
+  const characters = useStory((s) => s.characters)
   const open = useUi((s) => s.sidebarOpen)
+  const mode = useUi((s) => s.sidebarMode)
+  const setMode = useUi((s) => s.setSidebarMode)
   const toggleSidebar = useUi((s) => s.toggleSidebar)
   const toggleArc = useUi((s) => s.toggleArc)
   const expanded = useUi((s) => s.expandedArcs)
+  const navigate = useNavigate()
+  const lookup = useCharacterLookup()
   const dropData: UnassignDropData = { type: 'unassign' }
   const { setNodeRef, isOver } = useDroppable({
     id: 'sidebar:unassign',
@@ -31,21 +45,26 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   })
 
   if (!open) {
+    const items = mode === 'arcs' ? arcs : characters
     return (
-      <aside className="sidebar collapsed" aria-label="Arcs">
-        <button className="icon-btn" onClick={toggleSidebar} title="Show arcs" aria-label="Show arcs">
+      <aside className="sidebar collapsed" aria-label={mode === 'arcs' ? 'Arcs' : 'Characters'}>
+        <button className="icon-btn" onClick={toggleSidebar} title="Show sidebar" aria-label="Show sidebar">
           <PanelLeftOpen size={18} />
         </button>
         <div className="rail-dots">
-          {arcs.map((arc) => (
+          {items.map((item) => (
             <button
-              key={arc.id}
-              className="rail-dot"
-              style={{ '--arc': arc.color } as React.CSSProperties}
-              title={arc.name}
-              aria-label={`Show arc ${arc.name}`}
+              key={item.id}
+              className={`rail-dot${mode === 'characters' ? ' round' : ''}`}
+              style={{ '--arc': item.color } as React.CSSProperties}
+              title={mode === 'arcs' ? plainText(item.name, lookup) : displayName(item)}
+              aria-label={mode === 'arcs' ? `Show arc ${plainText(item.name, lookup)}` : `Open ${displayName(item)}`}
               onClick={() => {
-                if (!expanded[arc.id]) toggleArc(arc.id)
+                if (mode === 'characters') {
+                  navigate(`/characters/${item.id}`)
+                  return
+                }
+                if (!expanded[item.id]) toggleArc(item.id)
                 toggleSidebar()
               }}
             />
@@ -56,19 +75,50 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   }
 
   return (
-    <aside ref={setNodeRef} className={`sidebar${unassignActive ? ' unassign-active' : ''}${isOver && unassignActive ? ' unassign-over' : ''}`} aria-label="Arcs">
+    <aside
+      ref={setNodeRef}
+      className={`sidebar${unassignActive ? ' unassign-active' : ''}${isOver && unassignActive ? ' unassign-over' : ''}`}
+      aria-label="Sidebar"
+    >
       <div className="sidebar-head">
-        <h2>Arcs</h2>
-        <button className="icon-btn" onClick={toggleSidebar} title="Hide arcs" aria-label="Hide arcs">
+        <div className="mode-switch" role="tablist" aria-label="Sidebar">
+          {MODES.map((m) => (
+            <button
+              key={m.mode}
+              role="tab"
+              aria-selected={mode === m.mode}
+              className={`mode-tab${mode === m.mode ? ' active' : ''}`}
+              onClick={() => setMode(m.mode)}
+            >
+              {m.label}
+              <span className="mode-count">{m.mode === 'arcs' ? arcs.length : characters.length}</span>
+            </button>
+          ))}
+        </div>
+        <button className="icon-btn" onClick={toggleSidebar} title="Hide sidebar" aria-label="Hide sidebar">
           <PanelLeftClose size={18} />
         </button>
       </div>
-      <div className="sidebar-scroll">
-        {arcs.length === 0 && <p className="sidebar-empty">No arcs yet. Create one to start adding beats.</p>}
-        {arcs.map((arc) => (
-          <ArcSection key={arc.id} arc={arc} dragEnabled={dragEnabled} />
-        ))}
-        <NewArcForm />
+      <div className="sidebar-scroll" role="tabpanel">
+        {mode === 'arcs' ? (
+          <>
+            {arcs.length === 0 && <p className="sidebar-empty">No arcs yet. Create one to start adding beats.</p>}
+            {arcs.map((arc) => (
+              <ArcSection key={arc.id} arc={arc} dragEnabled={dragEnabled} />
+            ))}
+            <NewArcForm />
+          </>
+        ) : (
+          <>
+            {characters.length === 0 && (
+              <p className="sidebar-empty">No characters yet. Add one here, or type @ and a new name in any text.</p>
+            )}
+            {characters.map((c) => (
+              <CharacterRow key={c.id} character={c} />
+            ))}
+            <NewCharacterForm />
+          </>
+        )}
       </div>
       {unassignActive && (
         <div className="unassign-zone">
@@ -80,35 +130,46 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   )
 }
 
+/** On phones the sidebar covers the page, so close it after following a link. */
+function closeOnPhone() {
+  const ui = useUi.getState()
+  if (window.innerWidth <= 760 && ui.sidebarOpen) ui.toggleSidebar()
+}
+
+/** Clears the board highlight if the hovered row unmounts without a mouseleave. */
+function useHighlightCleanup(id: string) {
+  const setHighlight = useUi((s) => s.setHighlight)
+  useEffect(
+    () => () => {
+      if (useUi.getState().highlight?.id === id) setHighlight(null)
+    },
+    [id, setHighlight],
+  )
+  return setHighlight
+}
+
 function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
   const beats = useStory((s) => s.beats)
   const numbers = useChapterNumbers()
   const expanded = useUi((s) => !!s.expandedArcs[arc.id])
   const toggleArc = useUi((s) => s.toggleArc)
-  const setHighlight = useUi((s) => s.setHighlightArc)
+  const setHighlight = useHighlightCleanup(arc.id)
   const unplaced = arc.beatIds.filter((id) => !beats[id]?.chapterId).length
-
-  // A row can unmount while hovered (page change, arc deleted) without a
-  // mouseleave; don't leave the board dimmed.
-  useEffect(
-    () => () => {
-      if (useUi.getState().highlightArcId === arc.id) setHighlight(null)
-    },
-    [arc.id, setHighlight],
-  )
 
   return (
     <section
       className={`arc-section${expanded ? ' expanded' : ''}`}
       style={{ '--arc': arc.color } as React.CSSProperties}
-      onMouseEnter={() => setHighlight(arc.id)}
+      onMouseEnter={() => setHighlight({ kind: 'arc', id: arc.id })}
       onMouseLeave={() => setHighlight(null)}
     >
       <div className="arc-row">
         <button className="arc-toggle" onClick={() => toggleArc(arc.id)} aria-expanded={expanded}>
           <ChevronRight size={16} className="chevron" />
           <span className="arc-dot" />
-          <span className="arc-name">{arc.name || 'Untitled arc'}</span>
+          <span className="arc-name">
+            <MentionText text={arc.name} fallback="Untitled arc" />
+          </span>
           <span
             className="arc-count"
             title={`${arc.beatIds.length} beat${arc.beatIds.length === 1 ? '' : 's'}${unplaced ? `, ${unplaced} not in a chapter yet` : ''}`}
@@ -125,8 +186,9 @@ function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
         <NavLink
           to={`/arcs/${arc.id}`}
           className="icon-btn"
-          title={`Open ${arc.name || 'arc'} page`}
-          aria-label={`Open ${arc.name || 'arc'} page`}
+          title="Open arc page"
+          aria-label="Open arc page"
+          onClick={closeOnPhone}
         >
           <ArrowUpRight size={16} />
         </NavLink>
@@ -163,7 +225,9 @@ function SideBeat({ beat, number }: SideBeatProps) {
     <li>
       <button className="side-beat" onClick={() => openBeat(beat.id)}>
         <ChapterTag number={number} />
-        <span className="side-beat-title">{beat.title || 'Untitled beat'}</span>
+        <span className="side-beat-title">
+          <MentionText text={beat.title} fallback="Untitled beat" />
+        </span>
       </button>
     </li>
   )
@@ -181,7 +245,7 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
         {...attributes}
         {...listeners}
         aria-roledescription="draggable beat"
-        title={number ? `Drag to move to another chapter` : 'Drag onto a chapter to place it'}
+        title={number ? 'Drag to move to another chapter' : 'Drag onto a chapter to place it'}
         onClick={() => openBeat(beat.id)}
         onKeyDown={(e) => {
           listeners?.onKeyDown?.(e)
@@ -189,7 +253,9 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
         }}
       >
         <ChapterTag number={number} />
-        <span className="side-beat-title">{beat.title || 'Untitled beat'}</span>
+        <span className="side-beat-title">
+          <MentionText text={beat.title} fallback="Untitled beat" />
+        </span>
       </div>
     </li>
   )
@@ -198,24 +264,24 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
 function QuickAddBeat({ arcId }: { arcId: string }) {
   const addBeat = useStory((s) => s.addBeat)
   const [title, setTitle] = useState('')
+  const submit = () => {
+    if (!title.trim()) return
+    addBeat({ arcId, title: title.trim() })
+    setTitle('')
+  }
   return (
-    <form
-      className="quick-add"
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!title.trim()) return
-        addBeat({ arcId, title: title.trim() })
-        setTitle('')
-      }}
-    >
+    <div className="quick-add">
       <Plus size={14} />
-      <input
+      <MentionTextarea
+        className="quick-add-input"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={setTitle}
         placeholder="Add a beat to this arc"
         aria-label="New beat title"
+        submitOnEnter
+        onSubmit={submit}
       />
-    </form>
+    </div>
   )
 }
 
@@ -226,8 +292,7 @@ function NewArcForm() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [color, setColor] = useState('')
-  const suggested = nextArcColor(arcs.map((a) => a.color))
-  const chosen = color || suggested
+  const chosen = color || nextArcColor(arcs.map((a) => a.color))
 
   if (!open) {
     return (
@@ -242,6 +307,11 @@ function NewArcForm() {
     setName('')
     setColor('')
   }
+  const submit = () => {
+    if (!name.trim()) return
+    toggleArc(addArc({ name: name.trim(), color: chosen }))
+    close()
+  }
 
   return (
     <form
@@ -249,23 +319,116 @@ function NewArcForm() {
       style={{ '--arc': chosen } as React.CSSProperties}
       onSubmit={(e) => {
         e.preventDefault()
-        if (!name.trim()) return
-        toggleArc(addArc({ name: name.trim(), color: chosen }))
-        close()
+        submit()
       }}
     >
-      <input
+      <MentionTextarea
         autoFocus
+        className="field-input"
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={setName}
         placeholder="Arc name, e.g. “The heist”"
         aria-label="Arc name"
-        onKeyDown={(e) => e.key === 'Escape' && close()}
+        submitOnEnter
+        onSubmit={submit}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            close()
+          }
+        }}
       />
       <ColorSwatches value={chosen} onChange={setColor} />
       <div className="form-actions">
         <button type="submit" className="btn primary" disabled={!name.trim()}>
           Create arc
+        </button>
+        <button type="button" className="btn ghost" onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function CharacterRow({ character }: { character: Character }) {
+  const arcs = useStory((s) => s.arcs)
+  const chapters = useStory((s) => s.chapters)
+  const setHighlight = useHighlightCleanup(character.id)
+  const arcCount = arcs.filter((a) => a.characterIds.includes(character.id)).length
+  const povCount = chapters.filter((c) => c.povCharacterId === character.id).length
+  const meta = [povCount ? `${povCount} POV` : '', arcCount ? `${arcCount} arc${arcCount === 1 ? '' : 's'}` : '']
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <NavLink
+      to={`/characters/${character.id}`}
+      className="character-row"
+      style={{ '--char': character.color } as React.CSSProperties}
+      onMouseEnter={() => setHighlight({ kind: 'character', id: character.id })}
+      onMouseLeave={() => setHighlight(null)}
+      onClick={closeOnPhone}
+    >
+      <CharacterAvatar character={character} />
+      <span className="character-row-name">{displayName(character)}</span>
+      {meta && <span className="character-row-meta">{meta}</span>}
+    </NavLink>
+  )
+}
+
+function NewCharacterForm() {
+  const characters = useStory((s) => s.characters)
+  const addCharacter = useStory((s) => s.addCharacter)
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('')
+  const chosen = color || nextArcColor(characters.map((c) => c.color))
+
+  if (!open) {
+    return (
+      <button className="new-arc-btn" onClick={() => setOpen(true)}>
+        <Plus size={16} /> New character
+      </button>
+    )
+  }
+
+  const close = () => {
+    setOpen(false)
+    setName('')
+    setColor('')
+  }
+  const submit = () => {
+    if (!name.trim()) return
+    const id = addCharacter({ name: name.trim(), color: chosen })
+    close()
+    closeOnPhone()
+    navigate(`/characters/${id}`)
+  }
+
+  return (
+    <form
+      className="new-arc-form"
+      style={{ '--arc': chosen } as React.CSSProperties}
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
+      <input
+        autoFocus
+        className="plain-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Name"
+        aria-label="Character name"
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      />
+      <ColorSwatches value={chosen} onChange={setColor} />
+      <div className="form-actions">
+        <button type="submit" className="btn primary" disabled={!name.trim()}>
+          Create character
         </button>
         <button type="button" className="btn ghost" onClick={close}>
           Cancel

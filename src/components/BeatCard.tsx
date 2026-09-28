@@ -3,7 +3,9 @@ import { useDraggable } from '@dnd-kit/core'
 import type { Arc, Beat } from '../types'
 import { useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
+import { involves } from '../lib/highlight'
 import type { BeatDragData } from '../lib/dnd'
+import { MentionText } from './MentionText'
 
 type ViewProps = HTMLAttributes<HTMLDivElement> & {
   beat: Beat
@@ -31,12 +33,18 @@ export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatC
       data-beat-id={beat.id}
       {...rest}
     >
-      <div className="beat-title">{beat.title || <span className="muted">Untitled beat</span>}</div>
-      {beat.description && <div className="beat-desc">{beat.description}</div>}
+      <div className="beat-title">
+        <MentionText text={beat.title} fallback={<span className="muted">Untitled beat</span>} />
+      </div>
+      {beat.description && (
+        <div className="beat-desc">
+          <MentionText text={beat.description} />
+        </div>
+      )}
       <div className="beat-meta">
         <span className="arc-chip">
           <span className="arc-dot" />
-          {arc?.name || 'Untitled arc'}
+          <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />
         </span>
       </div>
     </div>
@@ -52,7 +60,7 @@ interface DraggableProps {
 export function DraggableBeatCard({ beatId, activeBeatId }: DraggableProps) {
   const beat = useStory((s) => s.beats[beatId])
   const arc = useStory((s) => (beat ? s.arcs.find((a) => a.id === beat.arcId) : undefined))
-  const highlight = useUi((s) => s.highlightArcId)
+  const highlight = useUi((s) => s.highlight)
   const openBeat = useUi((s) => s.openBeat)
   const data: BeatDragData = { type: 'beat', beatId, origin: 'board' }
   const { setNodeRef, attributes, listeners } = useDraggable({ id: beatId, data })
@@ -64,11 +72,10 @@ export function DraggableBeatCard({ beatId, activeBeatId }: DraggableProps) {
       beat={beat}
       arc={arc}
       placeholder={activeBeatId === beatId}
-      dimmed={highlight !== null && highlight !== beat.arcId}
+      dimmed={highlight !== null && !involves(beat, arc, highlight)}
       {...attributes}
       {...listeners}
       aria-roledescription="draggable beat"
-      aria-label={`${beat.title || 'Untitled beat'} (${arc?.name ?? 'no arc'})`}
       onClick={() => openBeat(beatId)}
       onKeyDown={(e) => {
         listeners?.onKeyDown?.(e)

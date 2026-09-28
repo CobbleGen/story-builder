@@ -1,9 +1,12 @@
-import type { Arc, Beat, Chapter, StoryData } from '../types'
+import type { Arc, Beat, Chapter, Character, CharacterAttribute, StoryData } from '../types'
 import { makeId } from '../lib/id'
+import { displayName, lookupOf, mentionToken, toDisplay, toStored } from '../lib/mentions'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
 // beatIds of its chapter (and no other chapter) when chapterId is set.
+// References to characters (arc casts, chapter POVs, mentions) only ever
+// point at characters that exist.
 
 export type ChapterLayout = Record<string, string[]>
 
@@ -30,6 +33,51 @@ function mapArcs(data: StoryData, fn: (a: Arc) => Arc): StoryData {
   return { ...data, arcs: data.arcs.map(fn) }
 }
 
+function mapCharacters(data: StoryData, fn: (c: Character) => Character): StoryData {
+  return { ...data, characters: data.characters.map(fn) }
+}
+
+/** Applies fn to every text field that can hold mentions, keeping untouched objects as they are. */
+export function mapStoryText(data: StoryData, fn: (text: string) => string): StoryData {
+  const beats: Record<string, Beat> = {}
+  for (const [id, b] of Object.entries(data.beats)) {
+    const title = fn(b.title)
+    const description = fn(b.description)
+    beats[id] = title === b.title && description === b.description ? b : { ...b, title, description }
+  }
+  return {
+    ...data,
+    beats,
+    chapters: data.chapters.map((c) => {
+      const title = fn(c.title)
+      const summary = fn(c.summary)
+      return title === c.title && summary === c.summary ? c : { ...c, title, summary }
+    }),
+    arcs: data.arcs.map((a) => {
+      const name = fn(a.name)
+      const description = fn(a.description)
+      return name === a.name && description === a.description ? a : { ...a, name, description }
+    }),
+    characters: data.characters.map((c) => {
+      const description = fn(c.description)
+      let changed = description !== c.description
+      const attributes = c.attributes.map((attr) => {
+        const value = fn(attr.value)
+        if (value === attr.value) return attr
+        changed = true
+        return { ...attr, value }
+      })
+      return changed ? { ...c, description, attributes } : c
+    }),
+  }
+}
+
+/** Turns any plain `@Name` text that names a character into a real mention. */
+export function linkMentions(data: StoryData): StoryData {
+  const lookup = lookupOf(data.characters)
+  return mapStoryText(data, (text) => toStored(toDisplay(text, lookup), data.characters))
+}
+
 // ---------- Chapters ----------
 
 export function addChapter(
@@ -41,6 +89,7 @@ export function addChapter(
     title: init.title ?? '',
     summary: init.summary ?? '',
     beatIds: [],
+    povCharacterId: null,
   }
   return [{ ...data, chapters: insertAt(data.chapters, chapter, init.index) }, chapter.id]
 }
@@ -48,8 +97,9 @@ export function addChapter(
 export function updateChapter(
   data: StoryData,
   id: string,
-  patch: Partial<Pick<Chapter, 'title' | 'summary'>>,
+  patch: Partial<Pick<Chapter, 'title' | 'summary' | 'povCharacterId'>>,
 ): StoryData {
+  if (patch.povCharacterId && !data.characters.some((c) => c.id === patch.povCharacterId)) return data
   return mapChapters(data, (c) => (c.id === id ? { ...c, ...patch } : c))
 }
 
@@ -72,7 +122,7 @@ export function moveChapter(data: StoryData, from: number, to: number): StoryDat
 
 export function addArc(
   data: StoryData,
-  init: { name: string; color: string; description?: string },
+  init: { name: string; color: string; description?: string; characterIds?: string[] },
 ): [StoryData, string] {
   const arc: Arc = {
     id: makeId('arc'),
@@ -80,6 +130,7 @@ export function addArc(
     color: init.color,
     description: init.description ?? '',
     beatIds: [],
+    characterIds: (init.characterIds ?? []).filter((id) => data.characters.some((c) => c.id === id)),
   }
   return [{ ...data, arcs: [...data.arcs, arc] }, arc.id]
 }
@@ -113,6 +164,100 @@ export function deleteArc(data: StoryData, id: string): StoryData {
 
 export function moveArc(data: StoryData, from: number, to: number): StoryData {
   return { ...data, arcs: moveItem(data.arcs, from, to) }
+}
+
+/** Adds a character to an arc's cast (on = true) or removes them. */
+export function setArcCharacter(data: StoryData, arcId: string, characterId: string, on: boolean): StoryData {
+  if (!data.characters.some((c) => c.id === characterId)) return data
+  return mapArcs(data, (a) => {
+    if (a.id !== arcId || a.characterIds.includes(characterId) === on) return a
+    return {
+      ...a,
+      characterIds: on ? [...a.characterIds, characterId] : a.characterIds.filter((id) => id !== characterId),
+    }
+  })
+}
+
+// ---------- Characters ----------
+
+export function addCharacter(
+  data: StoryData,
+  init: { name: string; color: string; description?: string; attributes?: { label: string; value: string }[] },
+): [StoryData, string] {
+  const character: Character = {
+    id: makeId('chr'),
+    name: init.name,
+    color: init.color,
+    description: init.description ?? '',
+    attributes: (init.attributes ?? []).map((a) => ({ id: makeId('attr'), label: a.label, value: a.value })),
+  }
+  return [{ ...data, characters: [...data.characters, character] }, character.id]
+}
+
+export function updateCharacter(
+  data: StoryData,
+  id: string,
+  patch: Partial<Pick<Character, 'name' | 'color' | 'description'>>,
+): StoryData {
+  return mapCharacters(data, (c) => (c.id === id ? { ...c, ...patch } : c))
+}
+
+/**
+ * Removes a character: their mentions turn into their plain name, and they
+ * leave every arc cast and chapter POV.
+ */
+export function deleteCharacter(data: StoryData, id: string): StoryData {
+  const character = data.characters.find((c) => c.id === id)
+  if (!character) return data
+  const token = mentionToken(id)
+  const name = displayName(character)
+  const next = mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text))
+  return {
+    ...next,
+    characters: next.characters.filter((c) => c.id !== id),
+    arcs: next.arcs.map((a) =>
+      a.characterIds.includes(id) ? { ...a, characterIds: a.characterIds.filter((c) => c !== id) } : a,
+    ),
+    chapters: next.chapters.map((c) => (c.povCharacterId === id ? { ...c, povCharacterId: null } : c)),
+  }
+}
+
+export function moveCharacter(data: StoryData, from: number, to: number): StoryData {
+  return { ...data, characters: moveItem(data.characters, from, to) }
+}
+
+function mapAttributes(
+  data: StoryData,
+  characterId: string,
+  fn: (attributes: CharacterAttribute[]) => CharacterAttribute[],
+): StoryData {
+  return mapCharacters(data, (c) => (c.id === characterId ? { ...c, attributes: fn(c.attributes) } : c))
+}
+
+export function addAttribute(
+  data: StoryData,
+  characterId: string,
+  init: { label?: string; value?: string } = {},
+): [StoryData, string] {
+  const attribute: CharacterAttribute = { id: makeId('attr'), label: init.label ?? '', value: init.value ?? '' }
+  return [mapAttributes(data, characterId, (list) => [...list, attribute]), attribute.id]
+}
+
+export function updateAttribute(
+  data: StoryData,
+  characterId: string,
+  attributeId: string,
+  patch: Partial<Pick<CharacterAttribute, 'label' | 'value'>>,
+): StoryData {
+  return mapAttributes(data, characterId, (list) => list.map((a) => (a.id === attributeId ? { ...a, ...patch } : a)))
+}
+
+export function deleteAttribute(data: StoryData, characterId: string, attributeId: string): StoryData {
+  return mapAttributes(data, characterId, (list) => list.filter((a) => a.id !== attributeId))
+}
+
+export function moveAttribute(data: StoryData, characterId: string, from: number, to: number): StoryData {
+  return mapAttributes(data, characterId, (list) => moveItem(list, from, to))
 }
 
 export function moveArcBeat(data: StoryData, arcId: string, from: number, to: number): StoryData {
@@ -298,21 +443,34 @@ const ids = (value: unknown): string[] =>
  */
 export function normalizeStory(input: unknown): StoryData {
   const raw = isRecord(input) ? input : {}
-  const arcs: Arc[] = (Array.isArray(raw.arcs) ? raw.arcs : []).filter(isRecord).map((a) => ({
+  const list = (value: unknown) => (Array.isArray(value) ? value : []).filter(isRecord)
+  const characters: Character[] = list(raw.characters).map((c) => ({
+    id: str(c.id) || makeId('chr'),
+    name: str(c.name),
+    color: str(c.color, '#6f7480'),
+    description: str(c.description),
+    attributes: list(c.attributes).map((a) => ({
+      id: str(a.id) || makeId('attr'),
+      label: str(a.label),
+      value: str(a.value),
+    })),
+  }))
+  const characterIds = new Set(characters.map((c) => c.id))
+  const arcs: Arc[] = list(raw.arcs).map((a) => ({
     id: str(a.id) || makeId('arc'),
     name: str(a.name, 'Untitled arc'),
     color: str(a.color, '#6f7480'),
     description: str(a.description),
     beatIds: ids(a.beatIds),
+    characterIds: [...new Set(ids(a.characterIds).filter((id) => characterIds.has(id)))],
   }))
-  const chapters: Chapter[] = (Array.isArray(raw.chapters) ? raw.chapters : [])
-    .filter(isRecord)
-    .map((c) => ({
-      id: str(c.id) || makeId('ch'),
-      title: str(c.title),
-      summary: str(c.summary),
-      beatIds: ids(c.beatIds),
-    }))
+  const chapters: Chapter[] = list(raw.chapters).map((c) => ({
+    id: str(c.id) || makeId('ch'),
+    title: str(c.title),
+    summary: str(c.summary),
+    beatIds: ids(c.beatIds),
+    povCharacterId: characterIds.has(str(c.povCharacterId)) ? str(c.povCharacterId) : null,
+  }))
   const arcIds = new Set(arcs.map((a) => a.id))
   const chapterIds = new Set(chapters.map((c) => c.id))
 
@@ -361,5 +519,5 @@ export function normalizeStory(input: unknown): StoryData {
     }
   }
 
-  return { title: str(raw.title, 'Untitled story'), arcs, chapters, beats }
+  return linkMentions({ title: str(raw.title, 'Untitled story'), arcs, chapters, beats, characters })
 }

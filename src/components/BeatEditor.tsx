@@ -1,12 +1,13 @@
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, Trash2 } from 'lucide-react'
-import { useStory } from '../store/storyStore'
+import { useCharacterLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
+import { askConfirm } from '../lib/confirm'
+import { plainText } from '../lib/mentions'
 import { Modal } from './Modal'
 import { ArcPicker } from './ArcPicker'
-import { AutoTextarea } from './AutoTextarea'
-import { askConfirm } from '../lib/confirm'
+import { MentionTextarea } from './MentionTextarea'
 
 /** Dialog for editing the beat selected in the UI store. Changes save as you type. */
 export function BeatEditor() {
@@ -19,6 +20,7 @@ export function BeatEditor() {
   const setBeatArc = useStory((s) => s.setBeatArc)
   const placeBeat = useStory((s) => s.placeBeat)
   const deleteBeat = useStory((s) => s.deleteBeat)
+  const lookup = useCharacterLookup()
   const close = useCallback(() => openBeat(null), [openBeat])
 
   if (!beat) return null
@@ -27,7 +29,7 @@ export function BeatEditor() {
   const remove = async () => {
     const ok = await askConfirm({
       title: 'Delete this beat?',
-      message: `“${beat.title || 'Untitled beat'}” will be removed from its arc${beat.chapterId ? ' and chapter' : ''}.`,
+      message: `“${plainText(beat.title, lookup) || 'Untitled beat'}” will be removed from its arc${beat.chapterId ? ' and chapter' : ''}.`,
       confirmLabel: 'Delete beat',
       danger: true,
     })
@@ -59,14 +61,14 @@ export function BeatEditor() {
       }
     >
       <div className="editor">
-        <AutoTextarea
+        <MentionTextarea
           autoFocus
           className="editor-title"
           value={beat.title}
           placeholder="Untitled beat"
           aria-label="Beat title"
           submitOnEnter
-          onChange={(e) => updateBeat(beat.id, { title: e.target.value })}
+          onChange={(title) => updateBeat(beat.id, { title })}
         />
         <div className="field">
           <span className="field-label">Arc</span>
@@ -83,20 +85,21 @@ export function BeatEditor() {
             {chapters.map((c, i) => (
               <option key={c.id} value={c.id}>
                 Chapter {i + 1}
-                {c.title ? `: ${c.title}` : ''}
+                {c.title ? `: ${plainText(c.title, lookup)}` : ''}
               </option>
             ))}
           </select>
         </label>
-        <label className="field">
+        <div className="field">
           <span className="field-label">Notes</span>
-          <AutoTextarea
+          <MentionTextarea
             className="editor-desc"
             value={beat.description}
-            placeholder="What happens, who is there, why it matters…"
-            onChange={(e) => updateBeat(beat.id, { description: e.target.value })}
+            placeholder="What happens, who is there, why it matters… Type @ to mention a character."
+            aria-label="Notes"
+            onChange={(description) => updateBeat(beat.id, { description })}
           />
-        </label>
+        </div>
       </div>
     </Modal>
   )

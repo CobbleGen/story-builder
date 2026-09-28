@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
@@ -13,18 +13,23 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeft, BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import type { Arc, Beat } from '../types'
-import { chapterNumbers, useStory } from '../store/storyStore'
+import { chapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { Sidebar } from '../components/Sidebar'
-import { AutoTextarea } from '../components/AutoTextarea'
+import { MentionTextarea } from '../components/MentionTextarea'
+import { MentionText } from '../components/MentionText'
+import { CharacterAvatar } from '../components/CharacterAvatar'
+import { displayName, plainText } from '../lib/mentions'
 import { ColorSwatches } from '../components/ColorSwatches'
 import { askConfirm } from '../lib/confirm'
 
 export function ArcPage() {
   const { arcId } = useParams()
   const arc = useStory((s) => s.arcs.find((a) => a.id === arcId))
+  const setSidebarMode = useUi((s) => s.setSidebarMode)
+  useEffect(() => setSidebarMode('arcs'), [setSidebarMode])
 
   return (
     <div className="workspace">
@@ -52,6 +57,7 @@ function ArcView({ arc }: { arc: Arc }) {
   const deleteArc = useStory((s) => s.deleteArc)
   const moveArcBeat = useStory((s) => s.moveArcBeat)
   const navigate = useNavigate()
+  const lookup = useCharacterLookup()
   const [showColors, setShowColors] = useState(false)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -70,7 +76,7 @@ function ArcView({ arc }: { arc: Arc }) {
   const remove = async () => {
     const n = arc.beatIds.length
     const ok = await askConfirm({
-      title: `Delete the arc “${arc.name || 'Untitled arc'}”?`,
+      title: `Delete the arc “${plainText(arc.name, lookup) || 'Untitled arc'}”?`,
       message: n ? `This also deletes its ${n} beat${n === 1 ? '' : 's'}, including any placed in chapters.` : undefined,
       confirmLabel: 'Delete arc',
       danger: true,
@@ -98,13 +104,13 @@ function ArcView({ arc }: { arc: Arc }) {
             <span className="arc-dot big" />
             <ChevronDown size={14} />
           </button>
-          <AutoTextarea
+          <MentionTextarea
             className="arc-name-input"
             value={arc.name}
             placeholder="Untitled arc"
             aria-label="Arc name"
             submitOnEnter
-            onChange={(e) => updateArc(arc.id, { name: e.target.value })}
+            onChange={(name) => updateArc(arc.id, { name })}
           />
           <button className="icon-btn danger" onClick={remove} title="Delete arc" aria-label="Delete arc">
             <Trash2 size={18} />
@@ -115,13 +121,14 @@ function ArcView({ arc }: { arc: Arc }) {
             <ColorSwatches value={arc.color} onChange={(color) => updateArc(arc.id, { color })} />
           </div>
         )}
-        <AutoTextarea
+        <MentionTextarea
           className="arc-desc-input"
           value={arc.description}
           placeholder="What is this arc about?"
           aria-label="Arc description"
-          onChange={(e) => updateArc(arc.id, { description: e.target.value })}
+          onChange={(description) => updateArc(arc.id, { description })}
         />
+        <ArcCast arc={arc} />
         <p className="arc-stats">
           {arc.beatIds.length} beat{arc.beatIds.length === 1 ? '' : 's'} · {placed} in chapters
           {unplaced > 0 && (
@@ -163,6 +170,7 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
   const openBeat = useUi((s) => s.openBeat)
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: beat.id })
+  const lookup = useCharacterLookup()
   const number = beat.chapterId ? chapterNumbers(chapters)[beat.chapterId] : null
   const chapter = chapters.find((c) => c.id === beat.chapterId)
 
@@ -177,14 +185,20 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
         className="grip-btn"
         {...attributes}
         {...listeners}
-        aria-label={`Reorder “${beat.title || 'Untitled beat'}”`}
+        aria-label={`Reorder “${plainText(beat.title, lookup) || 'Untitled beat'}”`}
       >
         <GripVertical size={16} />
       </button>
       <span className="arc-beat-index">{index + 1}</span>
       <button className="arc-beat-body" onClick={() => openBeat(beat.id)}>
-        <span className="beat-title">{beat.title || <span className="muted">Untitled beat</span>}</span>
-        {beat.description && <span className="beat-desc">{beat.description}</span>}
+        <span className="beat-title">
+          <MentionText text={beat.title} fallback={<span className="muted">Untitled beat</span>} />
+        </span>
+        {beat.description && (
+          <span className="beat-desc">
+            <MentionText text={beat.description} />
+          </span>
+        )}
       </button>
       <label
         className={`chapter-pill${number ? '' : ' unplaced'}`}
@@ -195,7 +209,7 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
             <BookOpen size={13} />
             <span>
               Ch {number}
-              {chapter?.title ? <span className="pill-sub"> · {chapter.title}</span> : null}
+              {chapter?.title ? <span className="pill-sub"> · {plainText(chapter.title, lookup)}</span> : null}
             </span>
           </>
         ) : (
@@ -214,7 +228,7 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
           {chapters.map((c, i) => (
             <option key={c.id} value={c.id}>
               Chapter {i + 1}
-              {c.title ? `: ${c.title}` : ''}
+              {c.title ? `: ${plainText(c.title, lookup)}` : ''}
             </option>
           ))}
         </select>
@@ -244,16 +258,20 @@ function ArcBeatComposer({ arcId }: { arcId: string }) {
       }}
     >
       <div className="arc-composer-fields">
-        <input
+        <MentionTextarea
+          className="arc-composer-title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="New beat — what happens next in this arc?"
+          onChange={setTitle}
+          placeholder="New beat: what happens next in this arc?"
           aria-label="New beat title"
+          submitOnEnter
+          onSubmit={submit}
         />
-        <AutoTextarea
+        <MentionTextarea
+          className="arc-composer-details"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Details (optional)"
+          onChange={setDescription}
+          placeholder="Details (optional). Type @ to mention a character."
           aria-label="New beat details"
         />
       </div>
@@ -261,5 +279,57 @@ function ArcBeatComposer({ arcId }: { arcId: string }) {
         <Plus size={16} /> Add beat
       </button>
     </form>
+  )
+}
+
+/** The characters involved in an arc, with a picker to add more. */
+function ArcCast({ arc }: { arc: Arc }) {
+  const characters = useStory((s) => s.characters)
+  const setArcCharacter = useStory((s) => s.setArcCharacter)
+  const cast = arc.characterIds
+    .map((id) => characters.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => !!c)
+  const others = characters.filter((c) => !arc.characterIds.includes(c.id))
+
+  return (
+    <div className="cast">
+      <span className="cast-label">Characters</span>
+      {cast.map((c) => (
+        <span key={c.id} className="cast-chip" style={{ '--char': c.color } as React.CSSProperties}>
+          <Link to={`/characters/${c.id}`} className="cast-link">
+            <CharacterAvatar character={c} size="xs" />
+            {displayName(c)}
+          </Link>
+          <button
+            className="cast-remove"
+            onClick={() => setArcCharacter(arc.id, c.id, false)}
+            aria-label={`Remove ${displayName(c)} from this arc`}
+            title="Remove from arc"
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+      {others.length > 0 ? (
+        <label className="cast-add">
+          <UserPlus size={13} />
+          <span>Add</span>
+          <select
+            value=""
+            onChange={(e) => e.target.value && setArcCharacter(arc.id, e.target.value, true)}
+            aria-label="Add a character to this arc"
+          >
+            <option value="">Add a character…</option>
+            {others.map((c) => (
+              <option key={c.id} value={c.id}>
+                {displayName(c)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        characters.length === 0 && <span className="cast-hint">Create characters in the sidebar’s Characters tab.</span>
+      )}
+    </div>
   )
 }

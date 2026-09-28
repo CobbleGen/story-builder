@@ -3,9 +3,12 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeftToLine, ArrowRightToLine, GripHorizontal, Plus, Trash2, X } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useStory } from '../store/storyStore'
+import { useCharacterLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
-import { AutoTextarea } from '../components/AutoTextarea'
+import { MentionTextarea } from '../components/MentionTextarea'
+import { MentionText } from '../components/MentionText'
+import { PovPicker } from '../components/PovPicker'
+import { plainText } from '../lib/mentions'
 import { ArcPicker } from '../components/ArcPicker'
 import { BeatCardView, DraggableBeatCard } from '../components/BeatCard'
 import { Menu } from '../components/Menu'
@@ -39,6 +42,8 @@ export function ChapterColumn({
 }: Props) {
   const updateChapter = useStory((s) => s.updateChapter)
   const deleteChapter = useStory((s) => s.deleteChapter)
+  const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
+  const lookup = useCharacterLookup()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const data: ChapterDragData = { type: 'chapter', chapterId: chapter.id }
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
@@ -54,7 +59,7 @@ export function ChapterColumn({
   const remove = async () => {
     const count = chapter.beatIds.length
     const ok = await askConfirm({
-      title: `Delete chapter ${number}${chapter.title ? `, “${chapter.title}”` : ''}?`,
+      title: `Delete chapter ${number}${chapter.title ? `, “${plainText(chapter.title, lookup)}”` : ''}?`,
       message: count
         ? `Its ${count} beat${count === 1 ? '' : 's'} will stay on ${count === 1 ? 'its arc' : 'their arcs'}, unplaced.`
         : undefined,
@@ -67,8 +72,8 @@ export function ChapterColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}`}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}`}
+      style={{ transform: CSS.Translate.toString(transform), transition, '--pov': pov?.color } as React.CSSProperties}
       aria-label={`Chapter ${number}`}
     >
       <header className="chapter-head">
@@ -84,6 +89,7 @@ export function ChapterColumn({
             <span className="chapter-number">Chapter {number}</span>
             <GripHorizontal size={16} className="grip" />
           </button>
+          <PovPicker chapter={chapter} />
           <Menu
             label="Chapter options"
             items={[
@@ -93,21 +99,21 @@ export function ChapterColumn({
             ]}
           />
         </div>
-        <AutoTextarea
+        <MentionTextarea
           ref={titleRef}
           className="chapter-title"
           value={chapter.title}
           placeholder="Untitled chapter"
           aria-label={`Chapter ${number} title`}
           submitOnEnter
-          onChange={(e) => updateChapter(chapter.id, { title: e.target.value })}
+          onChange={(title) => updateChapter(chapter.id, { title })}
         />
-        <AutoTextarea
+        <MentionTextarea
           className="chapter-summary"
           value={chapter.summary}
           placeholder="What happens in this chapter?"
           aria-label={`Chapter ${number} summary`}
-          onChange={(e) => updateChapter(chapter.id, { summary: e.target.value })}
+          onChange={(summary) => updateChapter(chapter.id, { summary })}
         />
       </header>
       <div className="chapter-beats" data-chapter-list={chapter.id}>
@@ -125,8 +131,12 @@ export function ChapterColumn({
 export function ChapterOverlay({ chapter, number }: { chapter: Chapter; number: number }) {
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
+  const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
   return (
-    <section className="chapter overlay">
+    <section
+      className={`chapter overlay${pov ? ' has-pov' : ''}`}
+      style={{ '--pov': pov?.color } as React.CSSProperties}
+    >
       <header className="chapter-head">
         <div className="chapter-top">
           <div className="chapter-handle">
@@ -134,8 +144,14 @@ export function ChapterOverlay({ chapter, number }: { chapter: Chapter; number: 
             <GripHorizontal size={16} className="grip" />
           </div>
         </div>
-        <div className="chapter-title static">{chapter.title || <span className="muted">Untitled chapter</span>}</div>
-        {chapter.summary && <div className="chapter-summary static">{chapter.summary}</div>}
+        <div className="chapter-title static">
+          <MentionText text={chapter.title} fallback={<span className="muted">Untitled chapter</span>} />
+        </div>
+        {chapter.summary && (
+          <div className="chapter-summary static">
+            <MentionText text={chapter.summary} />
+          </div>
+        )}
       </header>
       <div className="chapter-beats">
         {chapter.beatIds.map((id) =>
@@ -204,15 +220,15 @@ function BeatComposer({ chapterId }: { chapterId: string }) {
         submit()
       }}
     >
-      <AutoTextarea
+      <MentionTextarea
         autoFocus
         className="composer-input"
         value={title}
-        placeholder="What happens?"
+        placeholder="What happens? Type @ to mention a character"
         aria-label="New beat"
         submitOnEnter
         onSubmit={submit}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={setTitle}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.preventDefault()

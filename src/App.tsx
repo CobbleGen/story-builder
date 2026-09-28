@@ -4,6 +4,7 @@ import { BeatEditor } from './components/BeatEditor'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
+import { CharacterPage } from './pages/CharacterPage'
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<BoardPage />} />
           <Route path="/arcs/:arcId" element={<ArcPage />} />
+          <Route path="/characters/:characterId" element={<CharacterPage />} />
           <Route path="*" element={<BoardPage />} />
         </Routes>
         <BeatEditor />

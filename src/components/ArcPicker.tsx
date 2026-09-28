@@ -1,4 +1,7 @@
 import type { Arc } from '../types'
+import { plainText } from '../lib/mentions'
+import { useCharacterLookup } from '../store/storyStore'
+import { MentionText } from './MentionText'
 
 interface Props {
   arcs: Arc[]
@@ -10,6 +13,7 @@ interface Props {
 
 export function ArcPicker({ arcs, value, onChange, compact }: Props) {
   const selected = arcs.find((a) => a.id === value)
+  const lookup = useCharacterLookup()
   return (
     <div className={`arc-picker${compact ? ' compact' : ''}`} role="radiogroup" aria-label="Arc">
       {arcs.map((arc) => (
@@ -20,14 +24,22 @@ export function ArcPicker({ arcs, value, onChange, compact }: Props) {
           aria-checked={arc.id === value}
           className={`arc-option${arc.id === value ? ' selected' : ''}`}
           style={{ '--arc': arc.color } as React.CSSProperties}
-          title={arc.name}
+          title={plainText(arc.name, lookup)}
           onClick={() => onChange(arc.id)}
         >
           <span className="arc-dot" />
-          {!compact && <span className="arc-option-name">{arc.name || 'Untitled arc'}</span>}
+          {!compact && (
+            <span className="arc-option-name">
+              <MentionText text={arc.name} fallback="Untitled arc" />
+            </span>
+          )}
         </button>
       ))}
-      {compact && selected && <span className="arc-picker-label">{selected.name}</span>}
+      {compact && selected && (
+        <span className="arc-picker-label">
+          <MentionText text={selected.name} fallback="Untitled arc" />
+        </span>
+      )}
     </div>
   )
 }
