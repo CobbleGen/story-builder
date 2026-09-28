@@ -21,6 +21,10 @@ interface UiState {
   beatsPanelOpen: boolean
   /** Chapter last opened in the manuscript. */
   lastChapterId: string | null
+  /** Where the mind map was last scrolled and zoomed to. */
+  mapViewport: { x: number; y: number; zoom: number } | null
+  /** Mind map: the "add to map" panel is open. */
+  mapPaletteOpen: boolean
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -30,6 +34,8 @@ interface UiState {
   toggleArcColors: () => void
   toggleBeatsPanel: () => void
   setLastChapterId: (chapterId: string) => void
+  setMapViewport: (viewport: { x: number; y: number; zoom: number }) => void
+  toggleMapPalette: () => void
 }
 
 export const useUi = create<UiState>()(
@@ -45,6 +51,8 @@ export const useUi = create<UiState>()(
       showArcColors: true,
       beatsPanelOpen: typeof window === 'undefined' || window.innerWidth > 760,
       lastChapterId: null,
+      mapViewport: null,
+      mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -55,6 +63,8 @@ export const useUi = create<UiState>()(
       toggleArcColors: () => set((s) => ({ showArcColors: !s.showArcColors })),
       toggleBeatsPanel: () => set((s) => ({ beatsPanelOpen: !s.beatsPanelOpen })),
       setLastChapterId: (lastChapterId) => set({ lastChapterId }),
+      setMapViewport: (mapViewport) => set({ mapViewport }),
+      toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
     }),
     {
       name: 'story-builder:ui',
@@ -67,6 +77,8 @@ export const useUi = create<UiState>()(
         showArcColors: s.showArcColors,
         beatsPanelOpen: s.beatsPanelOpen,
         lastChapterId: s.lastChapterId,
+        mapViewport: s.mapViewport,
+        mapPaletteOpen: s.mapPaletteOpen,
       }),
     },
   ),

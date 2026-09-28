@@ -89,6 +89,10 @@ export function TopBar() {
           <span className="nav-short-cap">board</span>
         </NavLink>
         <NavLink to="/write">Manuscript</NavLink>
+        <NavLink to="/map">
+          <span className="nav-long">Mind </span>
+          <span className="nav-short-cap">map</span>
+        </NavLink>
       </nav>
       <div className="topbar-actions">
         <Menu

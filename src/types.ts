@@ -62,6 +62,30 @@ export interface ChapterText {
   updatedAt: number
 }
 
+/** Story items that can be placed on the mind map; the card shows the live item. */
+export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'beat'
+export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange'
+export type TextSize = 'sm' | 'md' | 'lg'
+
+export type MapNode =
+  | { id: string; kind: MapEntityKind; refId: string; x: number; y: number }
+  | { id: string; kind: 'note'; x: number; y: number; width: number; height: number; text: string; color: NoteColor }
+  | { id: string; kind: 'text'; x: number; y: number; width: number; text: string; size: TextSize }
+
+/** A line between two things on the mind map. */
+export interface MapEdge {
+  id: string
+  source: string
+  target: string
+  label: string
+  arrow: boolean
+}
+
+export interface MindMap {
+  nodes: MapNode[]
+  edges: MapEdge[]
+}
+
 export interface StoryData {
   title: string
   /** Chapters in reading order; a chapter's number is its position + 1. */
@@ -71,4 +95,5 @@ export interface StoryData {
   characters: Character[]
   /** Chapter id -> the chapter's written text. */
   texts: Record<string, ChapterText>
+  mindMap: MindMap
 }

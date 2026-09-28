@@ -3,7 +3,8 @@
 A planning board for writers. Lay your book out chapter by chapter and drag
 colour-coded story beats into place, Trello-style.
 
-This first version is the **chapter board**:
+It has three views: the **chapter board**, the **manuscript** and the
+**mind map**.
 
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
@@ -35,6 +36,15 @@ This first version is the **chapter board**:
   first and tick it to colour that text in the beat's arc. A switch turns the
   arc colours on and off. Select text and choose **New beat** to make a beat
   from it. Arrows on either side move to the previous and next chapter.
+- **Mind map** (third tab) is an endless board to think on. Drag chapters,
+  arcs, characters and beats onto it from the panel on the left (or click
+  one to drop it in the middle); the cards show the live item and open it on
+  double-click. Add sticky notes (double-click the empty board, pick a colour,
+  resize them) and text boxes in three sizes, both with `@` mentions. Drag
+  from the dot on a card's edge to another card to draw a line, then select
+  the line to label it or give it an arrow. Pan by dragging the board, zoom
+  with the wheel, a pinch or the buttons. Delete removes a card from the map
+  only; the story item stays.
 
 Your story saves automatically in the browser (IndexedDB) as you type, and
 stays when the app is updated. Copies are also kept in the browser before each app
@@ -61,13 +71,16 @@ npm run build    # type-check and build to dist/
 ```
 
 Built with React, TypeScript and Vite. Drag and drop uses
-[dnd-kit](https://dndkit.com), state uses [zustand](https://zustand.docs.pmnd.rs).
+[dnd-kit](https://dndkit.com), state uses [zustand](https://zustand.docs.pmnd.rs),
+the manuscript editor uses [TipTap](https://tiptap.dev) and the mind map uses
+[React Flow](https://reactflow.dev).
 The build uses hash routing and relative paths, so `dist/` can be served from
 any static host or sub-folder.
 
 ### Layout
 
-- `src/types.ts`: the data model (story → chapters, arcs, beats)
+- `src/types.ts`: the data model (story → chapters, arcs, beats, characters,
+  chapter texts, mind map)
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
@@ -76,6 +89,8 @@ any static host or sub-folder.
 - `src/pages/CharacterPage.tsx`: a single character's page
 - `src/pages/WritePage.tsx` and `src/editor/`: the manuscript editor (TipTap),
   its beat links, mentions and beats checklist
+- `src/map/`: the mind map (React Flow canvas, its cards, notes, lines and
+  the add-to-map panel)
 - `src/store/persistence.ts`: saving to IndexedDB (batched writes, migration
   from older saves); `src/store/backups.ts`: automatic backups
 - `src/components/Sidebar.tsx`: the arcs / characters sidebar

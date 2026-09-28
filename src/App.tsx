@@ -11,6 +11,7 @@ import { useSaveStatus } from './store/persistence'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
+const MapPage = lazy(() => import('./map/MapPage'))
 
 export default function App() {
   const loaded = useStoryLoaded()
@@ -29,6 +30,14 @@ export default function App() {
             element={
               <Suspense fallback={<div className="boot">Opening the manuscript…</div>}>
                 <WritePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/map"
+            element={
+              <Suspense fallback={<div className="boot">Opening the mind map…</div>}>
+                <MapPage />
               </Suspense>
             }
           />

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { StoryData } from '../types'
 import type { RichNode } from '../types'
 import {
+  addMapEdge,
+  addMapNode,
+  moveMapNodes,
+  removeMapNodes,
   addAttribute,
   setChapterText,
   addCharacter,
@@ -28,7 +32,7 @@ import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 
 function setup() {
-  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
+  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
   let ch1: string, ch2: string, ch3: string, main: string, love: string
   ;[data, ch1] = addChapter(data, { title: 'One' })
   ;[data, ch2] = addChapter(data, { title: 'Two' })
@@ -212,7 +216,7 @@ describe('normalizeStory', () => {
   })
 
   it('survives garbage', () => {
-    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [], texts: {} })
+    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } })
   })
 
   it('upgrades a story saved before characters existed', () => {
@@ -345,5 +349,76 @@ describe('chapter texts', () => {
     expect(data.texts.c1.words).toBe(12)
     expect(data.beats.b1.done).toBe(true)
     expect(data.beats.b2.done).toBe(false)
+  })
+})
+
+describe('mind map', () => {
+  it('places story items, notes and lines; removing a card keeps the item', () => {
+    let { data, ch1, main } = setup()
+    let a: string | null, b: string | null, e: string | null
+    ;[data, a] = addMapNode(data, { kind: 'chapter', refId: ch1, x: 0, y: 0 })
+    ;[data, b] = addMapNode(data, { kind: 'note', x: 300, y: 0, width: 200, height: 150, text: 'Idea', color: 'yellow' })
+    ;[data, e] = addMapEdge(data, a!, b!)
+    expect(e).not.toBeNull()
+    expect(addMapEdge(data, b!, a!)[1]).toBeNull()
+    expect(addMapEdge(data, a!, a!)[1]).toBeNull()
+    expect(addMapNode(data, { kind: 'arc', refId: 'arc_missing', x: 0, y: 0 })[1]).toBeNull()
+    data = moveMapNodes(data, { [a!]: { x: 50, y: 60 } })
+    expect(data.mindMap.nodes[0]).toMatchObject({ x: 50, y: 60 })
+    data = removeMapNodes(data, [a!])
+    expect(data.mindMap.nodes.map((n) => n.id)).toEqual([b])
+    expect(data.mindMap.edges).toEqual([])
+    expect(data.chapters.map((c) => c.id)).toContain(ch1)
+    void main
+  })
+
+  it('drops cards of deleted items, with their lines', () => {
+    let { data, main, ch1 } = setup()
+    let beat: string, mara: string, nBeat: string | null, nArc: string | null, nMara: string | null
+    ;[data, beat] = addBeat(data, { arcId: main, title: 'B', chapterId: ch1 })
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, nBeat] = addMapNode(data, { kind: 'beat', refId: beat, x: 0, y: 0 })
+    ;[data, nArc] = addMapNode(data, { kind: 'arc', refId: main, x: 0, y: 0 })
+    ;[data, nMara] = addMapNode(data, { kind: 'character', refId: mara, x: 0, y: 0 })
+    ;[data] = addMapEdge(data, nMara!, nArc!)
+    data = deleteCharacter(data, mara)
+    expect(data.mindMap.nodes.map((n) => n.id)).toEqual([nBeat, nArc])
+    expect(data.mindMap.edges).toEqual([])
+    data = deleteArc(data, main)
+    expect(data.mindMap.nodes).toEqual([])
+  })
+
+  it('follows renames in notes and turns deleted characters into plain names', () => {
+    let { data } = setup()
+    let mara: string, note: string | null
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, note] = addMapNode(data, {
+      kind: 'note', x: 0, y: 0, width: 200, height: 150, color: 'pink', text: `Ask ${mentionToken(mara)}`,
+    })
+    data = deleteCharacter(data, mara)
+    expect(data.mindMap.nodes.find((n) => n.id === note)).toMatchObject({ text: 'Ask Mara' })
+  })
+
+  it('repairs a loaded map', () => {
+    const data = normalizeStory({
+      chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
+      mindMap: {
+        nodes: [
+          { id: 'n1', kind: 'chapter', refId: 'c1', x: 10, y: 'x' },
+          { id: 'n2', kind: 'chapter', refId: 'gone', x: 0, y: 0 },
+          { id: 'n3', kind: 'note', x: 0, y: 0, color: 'neon', text: 'Hi @Nobody' },
+          { id: 'n4', kind: 'blob' },
+        ],
+        edges: [
+          { id: 'e1', source: 'n1', target: 'n3', label: 'why' },
+          { id: 'e2', source: 'n1', target: 'n2' },
+          { id: 'e3', source: 'n1', target: 'n1' },
+        ],
+      },
+    })
+    expect(data.mindMap.nodes.map((n) => n.id)).toEqual(['n1', 'n3'])
+    expect(data.mindMap.nodes[0]).toMatchObject({ x: 10, y: 0 })
+    expect(data.mindMap.nodes[1]).toMatchObject({ color: 'yellow', width: 220, height: 160 })
+    expect(data.mindMap.edges).toEqual([{ id: 'e1', source: 'n1', target: 'n3', label: 'why', arrow: false }])
   })
 })

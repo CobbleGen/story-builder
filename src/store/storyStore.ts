@@ -36,6 +36,13 @@ interface StoryActions {
   deleteAttribute: (...args: Tail<Parameters<typeof ops.deleteAttribute>>) => void
   moveAttribute: (...args: Tail<Parameters<typeof ops.moveAttribute>>) => void
   setChapterText: (...args: Tail<Parameters<typeof ops.setChapterText>>) => void
+  addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
+  updateMapNode: (...args: Tail<Parameters<typeof ops.updateMapNode>>) => void
+  moveMapNodes: (...args: Tail<Parameters<typeof ops.moveMapNodes>>) => void
+  removeMapNodes: (...args: Tail<Parameters<typeof ops.removeMapNodes>>) => void
+  addMapEdge: (...args: Tail<Parameters<typeof ops.addMapEdge>>) => string | null
+  updateMapEdge: (...args: Tail<Parameters<typeof ops.updateMapEdge>>) => void
+  removeMapEdges: (...args: Tail<Parameters<typeof ops.removeMapEdges>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
 }
@@ -50,6 +57,7 @@ export const pickData = (s: StoryData): StoryData => ({
   beats: s.beats,
   characters: s.characters,
   texts: s.texts,
+  mindMap: s.mindMap,
 })
 
 export const useStory = create<StoryStore>()(
@@ -57,7 +65,7 @@ export const useStory = create<StoryStore>()(
     (set, get) => {
       const apply = (next: StoryData) => set(pickData(next))
       const data = () => pickData(get())
-      const withId = ([next, id]: [StoryData, string]) => {
+      const withId = <Id extends string | null>([next, id]: [StoryData, Id]) => {
         apply(next)
         return id
       }
@@ -89,6 +97,13 @@ export const useStory = create<StoryStore>()(
         deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a)),
         moveAttribute: (...a) => apply(ops.moveAttribute(data(), ...a)),
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
+        addMapNode: (...a) => withId(ops.addMapNode(data(), ...a)),
+        updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a)),
+        moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a)),
+        removeMapNodes: (...a) => apply(ops.removeMapNodes(data(), ...a)),
+        addMapEdge: (...a) => withId(ops.addMapEdge(data(), ...a)),
+        updateMapEdge: (...a) => apply(ops.updateMapEdge(data(), ...a)),
+        removeMapEdges: (...a) => apply(ops.removeMapEdges(data(), ...a)),
         replaceStory: (input) => apply(ops.normalizeStory(input)),
       }
     },

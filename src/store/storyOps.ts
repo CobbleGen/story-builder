@@ -1,4 +1,17 @@
-import type { Arc, Beat, Chapter, ChapterText, Character, CharacterAttribute, RichNode, StoryData } from '../types'
+import type {
+  Arc,
+  Beat,
+  Chapter,
+  ChapterText,
+  Character,
+  CharacterAttribute,
+  MapEdge,
+  MapNode,
+  NoteColor,
+  RichNode,
+  StoryData,
+  TextSize,
+} from '../types'
 import { makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
@@ -83,6 +96,17 @@ export function mapStoryText(data: StoryData, fn: (text: string) => string): Sto
       })
       return changed ? { ...c, description, attributes } : c
     }),
+    mindMap: (() => {
+      let changed = false
+      const nodes = data.mindMap.nodes.map((n) => {
+        if (n.kind !== 'note' && n.kind !== 'text') return n
+        const text = fn(n.text)
+        if (text === n.text) return n
+        changed = true
+        return { ...n, text }
+      })
+      return changed ? { ...data.mindMap, nodes } : data.mindMap
+    })(),
   }
 }
 
@@ -126,7 +150,7 @@ export function deleteChapter(data: StoryData, id: string): StoryData {
     if (beats[beatId]) beats[beatId] = { ...beats[beatId], chapterId: null }
   }
   const { [id]: _removed, ...texts } = data.texts
-  return { ...data, beats, texts, chapters: data.chapters.filter((c) => c.id !== id) }
+  return dropMapRefs({ ...data, beats, texts, chapters: data.chapters.filter((c) => c.id !== id) }, new Set([id]))
 }
 
 /** Saves a chapter's written text. */
@@ -171,7 +195,7 @@ export function deleteArc(data: StoryData, id: string): StoryData {
   const doomed = new Set(arc.beatIds)
   const beats = { ...data.beats }
   for (const beatId of doomed) delete beats[beatId]
-  return {
+  const next = {
     ...mapTexts(data, (doc) => stripBeatLinks(doc, doomed)),
     beats,
     arcs: data.arcs.filter((a) => a.id !== id),
@@ -181,6 +205,7 @@ export function deleteArc(data: StoryData, id: string): StoryData {
         : c,
     ),
   }
+  return dropMapRefs(next, new Set([id, ...doomed]))
 }
 
 export function moveArc(data: StoryData, from: number, to: number): StoryData {
@@ -236,14 +261,17 @@ export function deleteCharacter(data: StoryData, id: string): StoryData {
     mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
     (doc) => unlinkMentions(doc, id, name),
   )
-  return {
-    ...next,
-    characters: next.characters.filter((c) => c.id !== id),
-    arcs: next.arcs.map((a) =>
-      a.characterIds.includes(id) ? { ...a, characterIds: a.characterIds.filter((c) => c !== id) } : a,
-    ),
-    chapters: next.chapters.map((c) => (c.povCharacterId === id ? { ...c, povCharacterId: null } : c)),
-  }
+  return dropMapRefs(
+    {
+      ...next,
+      characters: next.characters.filter((c) => c.id !== id),
+      arcs: next.arcs.map((a) =>
+        a.characterIds.includes(id) ? { ...a, characterIds: a.characterIds.filter((c) => c !== id) } : a,
+      ),
+      chapters: next.chapters.map((c) => (c.povCharacterId === id ? { ...c, povCharacterId: null } : c)),
+    },
+    new Set([id]),
+  )
 }
 
 export function moveCharacter(data: StoryData, from: number, to: number): StoryData {
@@ -441,19 +469,124 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
   if (!beat) return data
   const beats = { ...data.beats }
   delete beats[id]
-  return {
-    ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
-    beats,
-    arcs: data.arcs.map((a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a)),
-    chapters: beat.chapterId
-      ? data.chapters.map((c) =>
-          c.id === beat.chapterId ? { ...c, beatIds: c.beatIds.filter((b) => b !== id) } : c,
-        )
-      : data.chapters,
+  return dropMapRefs(
+    {
+      ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
+      beats,
+      arcs: data.arcs.map((a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a)),
+      chapters: beat.chapterId
+        ? data.chapters.map((c) =>
+            c.id === beat.chapterId ? { ...c, beatIds: c.beatIds.filter((b) => b !== id) } : c,
+          )
+        : data.chapters,
+    },
+    new Set([id]),
+  )
+}
+
+// ---------- Mind map ----------
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+export type NewMapNode = DistributiveOmit<MapNode, 'id'>
+export type MapNodePatch = Partial<{
+  x: number
+  y: number
+  width: number
+  height: number
+  text: string
+  color: NoteColor
+  size: TextSize
+}>
+
+const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refId' in n
+
+function refExists(data: StoryData, node: NewMapNode): boolean {
+  if (!('refId' in node)) return true
+  switch (node.kind) {
+    case 'arc':
+      return data.arcs.some((a) => a.id === node.refId)
+    case 'chapter':
+      return data.chapters.some((c) => c.id === node.refId)
+    case 'character':
+      return data.characters.some((c) => c.id === node.refId)
+    case 'beat':
+      return !!data.beats[node.refId]
   }
 }
 
+/** Removes mind map cards for deleted story items, with their lines. */
+function dropMapRefs(data: StoryData, refIds: Set<string>): StoryData {
+  const gone = new Set(data.mindMap.nodes.filter((n) => isEntity(n) && refIds.has(n.refId)).map((n) => n.id))
+  return gone.size ? removeMapNodes(data, [...gone]) : data
+}
+
+export function addMapNode(data: StoryData, node: NewMapNode): [StoryData, string | null] {
+  if (!refExists(data, node)) return [data, null]
+  const full = { ...node, id: makeId('node') } as MapNode
+  return [{ ...data, mindMap: { ...data.mindMap, nodes: [...data.mindMap.nodes, full] } }, full.id]
+}
+
+export function updateMapNode(data: StoryData, id: string, patch: MapNodePatch): StoryData {
+  return {
+    ...data,
+    mindMap: {
+      ...data.mindMap,
+      nodes: data.mindMap.nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as MapNode) : n)),
+    },
+  }
+}
+
+/** Sets new positions for several cards at once (the end of a drag). */
+export function moveMapNodes(data: StoryData, moves: Record<string, { x: number; y: number }>): StoryData {
+  let changed = false
+  const nodes = data.mindMap.nodes.map((n) => {
+    const m = moves[n.id]
+    if (!m || (m.x === n.x && m.y === n.y)) return n
+    changed = true
+    return { ...n, x: m.x, y: m.y }
+  })
+  return changed ? { ...data, mindMap: { ...data.mindMap, nodes } } : data
+}
+
+/** Takes cards off the map (never deletes the story items), with their lines. */
+export function removeMapNodes(data: StoryData, ids: string[]): StoryData {
+  const gone = new Set(ids)
+  return {
+    ...data,
+    mindMap: {
+      nodes: data.mindMap.nodes.filter((n) => !gone.has(n.id)),
+      edges: data.mindMap.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
+    },
+  }
+}
+
+/** Connects two cards; ignores loops and repeats of an existing line. */
+export function addMapEdge(data: StoryData, source: string, target: string): [StoryData, string | null] {
+  const ids = new Set(data.mindMap.nodes.map((n) => n.id))
+  if (source === target || !ids.has(source) || !ids.has(target)) return [data, null]
+  const exists = data.mindMap.edges.some(
+    (e) => (e.source === source && e.target === target) || (e.source === target && e.target === source),
+  )
+  if (exists) return [data, null]
+  const edge: MapEdge = { id: makeId('edge'), source, target, label: '', arrow: false }
+  return [{ ...data, mindMap: { ...data.mindMap, edges: [...data.mindMap.edges, edge] } }, edge.id]
+}
+
+export function updateMapEdge(data: StoryData, id: string, patch: Partial<Pick<MapEdge, 'label' | 'arrow'>>): StoryData {
+  return {
+    ...data,
+    mindMap: { ...data.mindMap, edges: data.mindMap.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) },
+  }
+}
+
+export function removeMapEdges(data: StoryData, ids: string[]): StoryData {
+  const gone = new Set(ids)
+  return { ...data, mindMap: { ...data.mindMap, edges: data.mindMap.edges.filter((e) => !gone.has(e.id)) } }
+}
+
 // ---------- Integrity ----------
+
+export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -556,5 +689,67 @@ export function normalizeStory(input: unknown): StoryData {
     }
   }
 
-  return linkMentions({ title: str(raw.title, 'Untitled story'), arcs, chapters, beats, characters, texts })
+  const refs: Record<string, Set<string>> = {
+    arc: new Set(arcs.map((a) => a.id)),
+    chapter: chapterIds,
+    character: characterIds,
+    beat: new Set(Object.keys(beats)),
+  }
+  const num = (v: unknown, fallback: number, min = -1e7, max = 1e7) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
+  const rawMap = isRecord(raw.mindMap) ? raw.mindMap : {}
+  const nodes: MapNode[] = []
+  for (const n of list(rawMap.nodes)) {
+    const id = str(n.id) || makeId('node')
+    const x = num(n.x, 0)
+    const y = num(n.y, 0)
+    const kind = str(n.kind)
+    if (kind in refs) {
+      const refId = str(n.refId)
+      if (refs[kind].has(refId)) nodes.push({ id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y })
+    } else if (kind === 'note') {
+      const color = str(n.color) as NoteColor
+      nodes.push({
+        id,
+        kind,
+        x,
+        y,
+        width: num(n.width, 220, 80, 2000),
+        height: num(n.height, 160, 60, 2000),
+        text: str(n.text),
+        color: NOTE_COLORS.includes(color) ? color : 'yellow',
+      })
+    } else if (kind === 'text') {
+      const size = str(n.size) as TextSize
+      nodes.push({
+        id,
+        kind,
+        x,
+        y,
+        width: num(n.width, 280, 60, 3000),
+        text: str(n.text),
+        size: size === 'sm' || size === 'lg' ? size : 'md',
+      })
+    }
+  }
+  const nodeIds = new Set(nodes.map((n) => n.id))
+  const edges: MapEdge[] = list(rawMap.edges)
+    .map((e) => ({
+      id: str(e.id) || makeId('edge'),
+      source: str(e.source),
+      target: str(e.target),
+      label: str(e.label),
+      arrow: e.arrow === true,
+    }))
+    .filter((e) => e.source !== e.target && nodeIds.has(e.source) && nodeIds.has(e.target))
+
+  return linkMentions({
+    title: str(raw.title, 'Untitled story'),
+    arcs,
+    chapters,
+    beats,
+    characters,
+    texts,
+    mindMap: { nodes, edges },
+  })
 }

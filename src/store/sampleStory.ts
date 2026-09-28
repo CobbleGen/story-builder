@@ -1,6 +1,7 @@
 import type { StoryData } from '../types'
 import { ARC_COLORS } from '../lib/colors'
-import { addArc, addBeat, addChapter, addCharacter, linkMentions, updateChapter } from './storyOps'
+import type { NewMapNode } from './storyOps'
+import { addArc, addBeat, addChapter, addCharacter, addMapEdge, addMapNode, linkMentions, updateChapter, updateMapEdge } from './storyOps'
 
 const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
 
@@ -10,7 +11,7 @@ const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
  * real character links at the end.
  */
 export function buildSampleStory(): StoryData {
-  let data: StoryData = { title: 'The Lighthouse at Gull Point', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
+  let data: StoryData = { title: 'The Lighthouse at Gull Point', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
 
   const character = (
     name: string,
@@ -82,11 +83,42 @@ export function buildSampleStory(): StoryData {
   beat(secret, '@Elias confesses', 'He has been guiding smugglers past the reef for years.')
   beat(village, 'The vote', 'The lighthouse is saved by a single voice.')
 
+  // A small mind map: who's who, and an open question.
+  const place = (node: NewMapNode) => {
+    let id: string | null
+    ;[data, id] = addMapNode(data, node)
+    return id!
+  }
+  const connect = (a: string, b: string, label: string) => {
+    let id: string | null
+    ;[data, id] = addMapEdge(data, a, b)
+    if (id) data = updateMapEdge(data, id, { label })
+  }
+  place({ kind: 'text', x: -40, y: -230, width: 360, text: 'Who knows what at Gull Point', size: 'lg' })
+  const nMara = place({ kind: 'character', refId: mara, x: 0, y: 0 })
+  const nTheo = place({ kind: 'character', refId: theo, x: 340, y: -40 })
+  const nElias = place({ kind: 'character', refId: elias, x: -360, y: 40 })
+  const nHarrow = place({ kind: 'character', refId: harrow, x: -250, y: 380 })
+  const nSecret = place({ kind: 'arc', refId: secret, x: -700, y: 120 })
+  place({
+    kind: 'note',
+    x: 360,
+    y: 250,
+    width: 220,
+    height: 150,
+    color: 'yellow',
+    text: 'What if @Theo already knows about the smuggling?',
+  })
+  connect(nElias, nMara, 'father of')
+  connect(nMara, nTheo, 'old flame')
+  connect(nHarrow, nElias, 'wants his lighthouse')
+  connect(nElias, nSecret, 'hides')
+
   return linkMentions(data)
 }
 
 export function buildBlankStory(): StoryData {
-  let data: StoryData = { title: 'Untitled story', chapters: [], arcs: [], beats: {}, characters: [], texts: {} }
+  let data: StoryData = { title: 'Untitled story', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
   ;[data] = addChapter(data, { title: '' })
   ;[data] = addArc(data, { name: 'Main plot', color: ARC_COLORS[6].value })
   return data
