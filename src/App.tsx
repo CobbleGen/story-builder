@@ -4,6 +4,8 @@ import { TopBar } from './components/TopBar'
 import { BeatEditor } from './components/BeatEditor'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ProgressDialog } from './components/ProgressDialog'
+import { UndoNotice } from './components/UndoControls'
+import { useUndoShortcuts } from './lib/undoShortcuts'
 import { useUi } from './store/uiStore'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
@@ -18,6 +20,7 @@ const MapPage = lazy(() => import('./map/MapPage'))
 
 export default function App() {
   useApplyTheme()
+  useUndoShortcuts()
   const loaded = useStoryLoaded()
   const saveFailed = useSaveStatus((s) => s.status === 'error')
   const progressOpen = useUi((s) => s.progressOpen)
@@ -52,6 +55,7 @@ export default function App() {
         </Routes>
         <BeatEditor />
         {progressOpen && <ProgressDialog />}
+        <UndoNotice />
         <ConfirmDialog />
         {saveFailed && (
           <div className="save-banner" role="alert">

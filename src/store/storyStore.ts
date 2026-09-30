@@ -6,6 +6,7 @@ import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
+import { remember, travel } from './history'
 
 type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
 
@@ -46,9 +47,13 @@ interface StoryActions {
   removeMapEdges: (...args: Tail<Parameters<typeof ops.removeMapEdges>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
+  undo: () => void
+  redo: () => void
 }
 
 export type StoryStore = StoryData & StoryActions
+
+const STORY_KEYS = ['title', 'chapters', 'arcs', 'beats', 'characters', 'texts', 'mindMap', 'goals', 'wordLog'] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
 export const pickData = (s: StoryData): StoryData => ({
@@ -66,49 +71,58 @@ export const pickData = (s: StoryData): StoryData => ({
 export const useStory = create<StoryStore>()(
   persist(
     (set, get) => {
-      const apply = (next: StoryData) => set(pickData(next))
       const data = () => pickData(get())
-      const withId = <Id extends string | null>([next, id]: [StoryData, Id]) => {
-        apply(next)
+      /** Saves a change; `name` (the action) puts it in the undo history. */
+      const apply = (next: StoryData, name?: string, target?: unknown) => {
+        const before = data()
+        if (next === before || STORY_KEYS.every((k) => next[k] === before[k])) return
+        if (name) remember(before, name, target)
+        set(pickData(next))
+      }
+      const withId = <Id extends string | null>([next, id]: [StoryData, Id], name: string, target?: unknown) => {
+        apply(next, name, target)
         return id
       }
       return {
         ...buildSampleStory(),
-        setTitle: (title) => set({ title }),
-        addChapter: (...a) => withId(ops.addChapter(data(), ...a)),
-        updateChapter: (...a) => apply(ops.updateChapter(data(), ...a)),
-        deleteChapter: (...a) => apply(ops.deleteChapter(data(), ...a)),
-        moveChapter: (...a) => apply(ops.moveChapter(data(), ...a)),
-        addArc: (...a) => withId(ops.addArc(data(), ...a)),
-        updateArc: (...a) => apply(ops.updateArc(data(), ...a)),
-        deleteArc: (...a) => apply(ops.deleteArc(data(), ...a)),
-        moveArc: (...a) => apply(ops.moveArc(data(), ...a)),
-        moveArcBeat: (...a) => apply(ops.moveArcBeat(data(), ...a)),
-        addBeat: (...a) => withId(ops.addBeat(data(), ...a)),
-        updateBeat: (...a) => apply(ops.updateBeat(data(), ...a)),
-        setBeatArc: (...a) => apply(ops.setBeatArc(data(), ...a)),
-        placeBeat: (...a) => apply(ops.placeBeat(data(), ...a)),
-        applyChapterLayout: (...a) => apply(ops.applyChapterLayout(data(), ...a)),
-        deleteBeat: (...a) => apply(ops.deleteBeat(data(), ...a)),
-        setArcCharacter: (...a) => apply(ops.setArcCharacter(data(), ...a)),
-        addCharacter: (...a) => withId(ops.addCharacter(data(), ...a)),
-        updateCharacter: (...a) => apply(ops.updateCharacter(data(), ...a)),
-        deleteCharacter: (...a) => apply(ops.deleteCharacter(data(), ...a)),
-        moveCharacter: (...a) => apply(ops.moveCharacter(data(), ...a)),
-        addAttribute: (...a) => withId(ops.addAttribute(data(), ...a)),
-        updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a)),
-        deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a)),
-        moveAttribute: (...a) => apply(ops.moveAttribute(data(), ...a)),
+        setTitle: (title) => apply({ ...data(), title }, 'setTitle'),
+        addChapter: (...a) => withId(ops.addChapter(data(), ...a), 'addChapter', a[0]),
+        updateChapter: (...a) => apply(ops.updateChapter(data(), ...a), 'updateChapter', a[0]),
+        deleteChapter: (...a) => apply(ops.deleteChapter(data(), ...a), 'deleteChapter', a[0]),
+        moveChapter: (...a) => apply(ops.moveChapter(data(), ...a), 'moveChapter', a[0]),
+        addArc: (...a) => withId(ops.addArc(data(), ...a), 'addArc', a[0]),
+        updateArc: (...a) => apply(ops.updateArc(data(), ...a), 'updateArc', a[0]),
+        deleteArc: (...a) => apply(ops.deleteArc(data(), ...a), 'deleteArc', a[0]),
+        moveArc: (...a) => apply(ops.moveArc(data(), ...a), 'moveArc', a[0]),
+        moveArcBeat: (...a) => apply(ops.moveArcBeat(data(), ...a), 'moveArcBeat', a[0]),
+        addBeat: (...a) => withId(ops.addBeat(data(), ...a), 'addBeat', a[0]),
+        updateBeat: (...a) => apply(ops.updateBeat(data(), ...a), 'updateBeat', a[0]),
+        setBeatArc: (...a) => apply(ops.setBeatArc(data(), ...a), 'setBeatArc', a[0]),
+        placeBeat: (...a) => apply(ops.placeBeat(data(), ...a), 'placeBeat', a[0]),
+        applyChapterLayout: (...a) => apply(ops.applyChapterLayout(data(), ...a), 'applyChapterLayout', a[0]),
+        deleteBeat: (...a) => apply(ops.deleteBeat(data(), ...a), 'deleteBeat', a[0]),
+        setArcCharacter: (...a) => apply(ops.setArcCharacter(data(), ...a), 'setArcCharacter', a[0]),
+        addCharacter: (...a) => withId(ops.addCharacter(data(), ...a), 'addCharacter', a[0]),
+        updateCharacter: (...a) => apply(ops.updateCharacter(data(), ...a), 'updateCharacter', a[0]),
+        deleteCharacter: (...a) => apply(ops.deleteCharacter(data(), ...a), 'deleteCharacter', a[0]),
+        moveCharacter: (...a) => apply(ops.moveCharacter(data(), ...a), 'moveCharacter', a[0]),
+        addAttribute: (...a) => withId(ops.addAttribute(data(), ...a), 'addAttribute', a[0]),
+        updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a), 'updateAttribute', a[0]),
+        deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a), 'deleteAttribute', a[0]),
+        moveAttribute: (...a) => apply(ops.moveAttribute(data(), ...a), 'moveAttribute', a[0]),
+        // Not in the undo history: the manuscript editor has its own undo.
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
-        setGoals: (...a) => apply(ops.setGoals(data(), ...a)),
-        addMapNode: (...a) => withId(ops.addMapNode(data(), ...a)),
-        updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a)),
-        moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a)),
-        removeMapNodes: (...a) => apply(ops.removeMapNodes(data(), ...a)),
-        addMapEdge: (...a) => withId(ops.addMapEdge(data(), ...a)),
-        updateMapEdge: (...a) => apply(ops.updateMapEdge(data(), ...a)),
-        removeMapEdges: (...a) => apply(ops.removeMapEdges(data(), ...a)),
-        replaceStory: (input) => apply(ops.normalizeStory(input)),
+        setGoals: (...a) => apply(ops.setGoals(data(), ...a), 'setGoals', a[0]),
+        addMapNode: (...a) => withId(ops.addMapNode(data(), ...a), 'addMapNode', a[0]),
+        updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0]),
+        moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a), 'moveMapNodes', a[0]),
+        removeMapNodes: (...a) => apply(ops.removeMapNodes(data(), ...a), 'removeMapNodes', a[0]),
+        addMapEdge: (...a) => withId(ops.addMapEdge(data(), ...a), 'addMapEdge', a[0]),
+        updateMapEdge: (...a) => apply(ops.updateMapEdge(data(), ...a), 'updateMapEdge', a[0]),
+        removeMapEdges: (...a) => apply(ops.removeMapEdges(data(), ...a), 'removeMapEdges', a[0]),
+        replaceStory: (input) => apply(ops.normalizeStory(input), 'replaceStory'),
+        undo: () => travel('undo', data(), (next) => set(pickData(next))),
+        redo: () => travel('redo', data(), (next) => set(pickData(next))),
       }
     },
     {

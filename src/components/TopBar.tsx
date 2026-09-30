@@ -7,6 +7,7 @@ import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
 import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
+import { UndoButtons } from './UndoControls'
 import { useUi } from '../store/uiStore'
 import { totalWords } from '../lib/progress'
 
@@ -102,6 +103,7 @@ export function TopBar() {
         </NavLink>
       </nav>
       <div className="topbar-actions">
+        <UndoButtons />
         <button
           className="topbar-progress"
           onClick={() => setProgressOpen(true)}

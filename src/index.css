@@ -3024,6 +3024,43 @@ a {
   color: var(--ink-3);
 }
 
+/* ---------- Undo ---------- */
+
+.undo-buttons {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.undo-notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 150;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: notice-in 0.16s ease-out;
+  pointer-events: none;
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
 /* ---------- Progress: word counts and goals ---------- */
 
 .visually-hidden {
