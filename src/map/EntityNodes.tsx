@@ -8,6 +8,8 @@ import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 import { BeatList, ChapterPages, CharacterDetails } from './CardPanels'
+import { Anchor } from './Anchor'
+import { itemAnchor } from '../lib/anchors'
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 
@@ -273,11 +275,12 @@ export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
       {!open && attributes.length > 0 && (
         <dl className="map-attrs">
           {attributes.slice(0, 3).map((a) => (
-            <div key={a.id}>
+            <div key={a.id} className="map-anchor-row" data-anchor={itemAnchor('attr', a.id)}>
               <dt>{a.label || 'Note'}</dt>
               <dd>
                 <MentionText text={a.value} fallback="–" />
               </dd>
+              <Anchor ids={[itemAnchor('attr', a.id)]} />
             </div>
           ))}
         </dl>

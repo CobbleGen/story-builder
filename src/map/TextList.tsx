@@ -5,7 +5,9 @@ import { useStory } from '../store/storyStore'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { insertItem, listItems, listPatch, removeItem, setItem, toggleItem, type ListState } from './listLines'
-import { focusSoon } from './mapShared'
+import { focusSoon, useSavedAnchors } from './mapShared'
+import { Anchor } from './Anchor'
+import { resolveTextAnchors, textAnchor } from '../lib/anchors'
 
 /** Sticky notes and text boxes can both be lists. */
 type ListNode = Extract<MapNode, { kind: 'note' | 'text' }>
@@ -48,12 +50,19 @@ export function TextList({ node }: { node: ListNode }) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const style = node.list ?? 'bullet'
   const checked = node.checked ?? []
+  const items = listItems(node.text)
+  // Lines can be drawn from each item; saved ones find their item again by its words.
+  const saved = useSavedAnchors('item:')
+  const leading = resolveTextAnchors(saved, 'item', items)
   return (
     <ul className={`map-list ${style}`}>
-      {listItems(node.text).map((text, i) => {
+      {items.map((text, i) => {
         const done = style === 'check' && checked.includes(i)
+        const own = textAnchor('item', i, text)
+        const anchors = [own, ...(leading.get(i) ?? []).filter((a) => a !== own)]
         return (
-          <li key={i} className={done ? 'done' : undefined}>
+          <li key={i} className={`map-anchor-row${done ? ' done' : ''}`} data-anchor={own}>
+            <Anchor ids={anchors} />
             <Marker
               style={style}
               index={i}

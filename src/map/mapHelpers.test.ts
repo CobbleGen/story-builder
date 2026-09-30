@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RichNode } from '../types'
 import { insertItem, listPatch, removeItem, setItem, toggleItem, toItems } from './listLines'
 import { countWords, paginate } from './pages'
+import { anchorHandle, anchorOfHandle, resolveTextAnchors, textAnchor } from '../lib/anchors'
 
 describe('list text boxes', () => {
   const start = { text: 'Rope\nLantern\nLogbook', checked: [1, 2] }
@@ -83,5 +84,30 @@ describe('the first page', () => {
   it('can hold fewer words than the rest', () => {
     const doc: RichNode = { type: 'doc', content: [para(words(150))] }
     expect(paginate(doc, 100, 60).map((p) => p.map((b) => countWords(b.node)))).toEqual([[60], [90]])
+  })
+})
+
+describe('anchors for lines', () => {
+  it('finds paragraphs again by their opening words, then by position', () => {
+    const texts = ['The keeper’s cottage had not changed.', 'She started with the desk.', 'The bottom drawer stuck.']
+    const desk = textAnchor('para', 1, texts[1])
+    const drawer = textAnchor('para', 2, texts[2])
+    // A new paragraph at the top moves everything down one; the lines follow.
+    const moved = ['A new opening line.', ...texts]
+    expect(resolveTextAnchors([desk, drawer], 'para', moved)).toEqual(new Map([[2, [desk]], [3, [drawer]]]))
+    // Rewritten from the start: found by where it was.
+    const rewritten = [texts[0], 'At first she ignored the desk.', texts[2]]
+    expect(resolveTextAnchors([desk], 'para', rewritten)).toEqual(new Map([[1, [desk]]]))
+    // Gone altogether (the text got shorter): not found.
+    expect(resolveTextAnchors([drawer], 'para', ['Something else entirely.'])).toEqual(new Map())
+    // Only the asked-for kind.
+    expect(resolveTextAnchors([textAnchor('item', 0, 'Rope')], 'para', ['Rope'])).toEqual(new Map())
+  })
+
+  it('names both sides of an anchored row', () => {
+    expect(anchorOfHandle(anchorHandle('beat:beat_1', 'l'))).toBe('beat:beat_1')
+    expect(anchorOfHandle(anchorHandle('para:3:abc', 'r'))).toBe('para:3:abc')
+    expect(anchorOfHandle('top')).toBeUndefined()
+    expect(anchorOfHandle(null)).toBeUndefined()
   })
 })

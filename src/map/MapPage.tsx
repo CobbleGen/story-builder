@@ -20,6 +20,7 @@ import './map.css'
 import { PanelLeftOpen } from 'lucide-react'
 import type { MapNode } from '../types'
 import { useStory } from '../store/storyStore'
+import { anchorOfHandle } from '../lib/anchors'
 import { useUi } from '../store/uiStore'
 import { ArcNode, BeatNode, ChapterNode, CharacterNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
@@ -128,6 +129,7 @@ function MapCanvas() {
   const wrapper = useRef<HTMLDivElement>(null)
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [connecting, setConnecting] = useState(false)
   const [edgeSelection, setEdgeSelection] = useState<Record<string, boolean>>({})
 
   // React Flow keeps its own copy of the nodes for dragging and selection; it
@@ -234,7 +236,7 @@ function MapCanvas() {
         )}
         <div
           ref={wrapper}
-          className="map-canvas"
+          className={`map-canvas${connecting ? ' connecting' : ''}`}
           onDragOver={(e) => {
             if (!e.dataTransfer.types.includes(DRAG_MIME)) return
             e.preventDefault()
@@ -264,7 +266,25 @@ function MapCanvas() {
               )
             }
             onNodesDelete={(deleted) => removeMapNodes(deleted.map((n) => n.id))}
-            onConnect={(c) => addMapEdge(c.source, c.target)}
+            onConnect={(c) =>
+              addMapEdge(c.source, c.target, { source: anchorOfHandle(c.sourceHandle), target: anchorOfHandle(c.targetHandle) })
+            }
+            onConnectStart={() => setConnecting(true)}
+            onConnectEnd={(event, state) => {
+              setConnecting(false)
+              // Not dropped on a connection point: join whatever card, or row in a card, is under the pointer.
+              if (state.isValid || !state.fromNode) return
+              const point = 'changedTouches' in event ? event.changedTouches[0] : event
+              const hit = document.elementFromPoint(point.clientX, point.clientY)
+              const card = hit?.closest<HTMLElement>('.react-flow__node')
+              const toId = card?.dataset.id
+              if (!toId) return
+              const row = hit?.closest<HTMLElement>('[data-anchor]')
+              addMapEdge(state.fromNode.id, toId, {
+                source: anchorOfHandle(state.fromHandle?.id),
+                target: row && card.contains(row) ? row.dataset.anchor : undefined,
+              })
+            }}
             onNodeDoubleClick={(e, n) => {
               // Not from inside an opened-up card (its lists and pages have their own clicks).
               if ((e.target as Element).closest('.nodrag')) return
@@ -276,7 +296,8 @@ function MapCanvas() {
             fitView={!savedViewport}
             fitViewOptions={FIT_VIEW}
             connectionMode={ConnectionMode.Loose}
-            connectionRadius={36}
+            // In map units: near a dot snaps to it; anywhere else on a card or row joins that.
+            connectionRadius={24}
             zoomOnDoubleClick={false}
             deleteKeyCode={['Backspace', 'Delete']}
             minZoom={0.1}

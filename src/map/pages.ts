@@ -13,7 +13,28 @@ const MIN_ROOM = 25
 /** A block on a page; `continued` when it's the rest of a paragraph from the page before. */
 export interface PageBlock {
   node: RichNode
+  /** Which of the chapter's blocks it is (both halves of a split paragraph share it). */
+  index: number
   continued?: boolean
+}
+
+/** A block's text, with mentions as their ids: enough to recognise it again. */
+export function plainOf(node: RichNode): string {
+  if (node.type === 'text') return node.text ?? ''
+  if (node.type === MENTION_NODE) return `@${String(node.attrs?.id ?? '')}`
+  return (node.content ?? []).map(plainOf).join(node.type === 'doc' ? '\n' : '')
+}
+
+/**
+ * Whether a paragraph starts flush left rather than indented: the chapter's
+ * first, the rest of one from the page before, or one after a heading or a
+ * scene break.
+ */
+export function startsFlush(node: RichNode, continued: boolean | undefined, prev: RichNode | undefined, firstPage: boolean) {
+  if (node.type !== 'paragraph') return false
+  if (continued) return true
+  if (!prev) return firstPage
+  return prev.type === 'heading' || prev.type === 'horizontalRule'
 }
 
 const WORDS = /\S+/g
@@ -71,7 +92,7 @@ export function paginate(doc: RichNode | undefined, perPage = WORDS_PER_PAGE, fi
     page = []
     count = 0
   }
-  for (const block of doc?.content ?? []) {
+  for (const [index, block] of (doc?.content ?? []).entries()) {
     let rest: RichNode | null = block
     let continued = false
     while (rest) {
@@ -79,7 +100,7 @@ export function paginate(doc: RichNode | undefined, perPage = WORDS_PER_PAGE, fi
       // Blank lines at the top of a page would only push the text down.
       if (!page.length && n === 0 && rest.type === 'paragraph') break
       if (count + n <= limit || (count === 0 && rest.type !== 'paragraph')) {
-        page.push({ node: rest, continued })
+        page.push({ node: rest, index, continued })
         count += n
         rest = null
         if (count >= limit) turn()
@@ -88,13 +109,13 @@ export function paginate(doc: RichNode | undefined, perPage = WORDS_PER_PAGE, fi
       const room = limit - count
       if (rest.type === 'paragraph' && room >= MIN_ROOM) {
         const [head, tail]: [RichNode, RichNode | null] = splitParagraph(rest, room)
-        page.push({ node: head, continued })
+        page.push({ node: head, index, continued })
         turn()
         rest = tail
         continued = true
       } else if (count === 0) {
         // A paragraph that can't be split any further (one enormous word).
-        page.push({ node: rest, continued })
+        page.push({ node: rest, index, continued })
         turn()
         rest = null
       } else {

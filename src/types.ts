@@ -123,6 +123,9 @@ export interface MapEdge {
   target: string
   label: string
   arrow: boolean
+  /** Where inside each card the line attaches (see lib/anchors); the card itself when absent. */
+  sourceAnchor?: string
+  targetAnchor?: string
 }
 
 export interface MindMap {

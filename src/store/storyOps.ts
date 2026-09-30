@@ -19,6 +19,7 @@ import type {
 import { makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
+import { anchorItemId, cleanAnchor } from '../lib/anchors'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -274,7 +275,7 @@ export function deleteCharacter(data: StoryData, id: string): StoryData {
       ),
       chapters: next.chapters.map((c) => (c.povCharacterId === id ? { ...c, povCharacterId: null } : c)),
     },
-    new Set([id]),
+    new Set([id, ...character.attributes.map((a) => a.id)]),
   )
 }
 
@@ -309,7 +310,10 @@ export function updateAttribute(
 }
 
 export function deleteAttribute(data: StoryData, characterId: string, attributeId: string): StoryData {
-  return mapAttributes(data, characterId, (list) => list.filter((a) => a.id !== attributeId))
+  return dropMapRefs(
+    mapAttributes(data, characterId, (list) => list.filter((a) => a.id !== attributeId)),
+    new Set([attributeId]),
+  )
 }
 
 export function moveAttribute(data: StoryData, characterId: string, from: number, to: number): StoryData {
@@ -526,7 +530,14 @@ function refExists(data: StoryData, node: NewMapNode): boolean {
 /** Removes mind map cards for deleted story items, with their lines. */
 function dropMapRefs(data: StoryData, refIds: Set<string>): StoryData {
   const gone = new Set(data.mindMap.nodes.filter((n) => isEntity(n) && refIds.has(n.refId)).map((n) => n.id))
-  return gone.size ? removeMapNodes(data, [...gone]) : data
+  const next = gone.size ? removeMapNodes(data, [...gone]) : data
+  // Lines drawn from a deleted beat, attribute, arc or chapter inside a card go too.
+  const anchoredToGone = (anchor?: string) => {
+    const id = anchor ? anchorItemId(anchor) : null
+    return !!id && refIds.has(id)
+  }
+  const edges = next.mindMap.edges.filter((e) => !anchoredToGone(e.sourceAnchor) && !anchoredToGone(e.targetAnchor))
+  return edges.length === next.mindMap.edges.length ? next : { ...next, mindMap: { ...next.mindMap, edges } }
 }
 
 export function addMapNode(data: StoryData, node: NewMapNode): [StoryData, string | null] {
@@ -569,15 +580,41 @@ export function removeMapNodes(data: StoryData, ids: string[]): StoryData {
   }
 }
 
-/** Connects two cards; ignores loops and repeats of an existing line. */
-export function addMapEdge(data: StoryData, source: string, target: string): [StoryData, string | null] {
+/** Where inside each card a new line attaches (see lib/anchors). */
+export interface EdgeAnchors {
+  source?: string
+  target?: string
+}
+
+/** A line joining a card to itself only makes sense between two different spots in it. */
+const isLoop = (source: string, target: string, a: EdgeAnchors) =>
+  source === target && (!a.source || !a.target || a.source === a.target)
+
+/** Connects two cards, or spots inside them; ignores loops and repeats of an existing line. */
+export function addMapEdge(
+  data: StoryData,
+  source: string,
+  target: string,
+  anchors: EdgeAnchors = {},
+): [StoryData, string | null] {
   const ids = new Set(data.mindMap.nodes.map((n) => n.id))
-  if (source === target || !ids.has(source) || !ids.has(target)) return [data, null]
+  const a = { source: cleanAnchor(anchors.source), target: cleanAnchor(anchors.target) }
+  if (isLoop(source, target, a) || !ids.has(source) || !ids.has(target)) return [data, null]
   const exists = data.mindMap.edges.some(
-    (e) => (e.source === source && e.target === target) || (e.source === target && e.target === source),
+    (e) =>
+      (e.source === source && e.target === target && e.sourceAnchor === a.source && e.targetAnchor === a.target) ||
+      (e.source === target && e.target === source && e.sourceAnchor === a.target && e.targetAnchor === a.source),
   )
   if (exists) return [data, null]
-  const edge: MapEdge = { id: makeId('edge'), source, target, label: '', arrow: false }
+  const edge: MapEdge = {
+    id: makeId('edge'),
+    source,
+    target,
+    label: '',
+    arrow: false,
+    ...(a.source ? { sourceAnchor: a.source } : {}),
+    ...(a.target ? { targetAnchor: a.target } : {}),
+  }
   return [{ ...data, mindMap: { ...data.mindMap, edges: [...data.mindMap.edges, edge] } }, edge.id]
 }
 
@@ -782,14 +819,26 @@ export function normalizeStory(input: unknown): StoryData {
   }
   const nodeIds = new Set(nodes.map((n) => n.id))
   const edges: MapEdge[] = list(rawMap.edges)
-    .map((e) => ({
-      id: str(e.id) || makeId('edge'),
-      source: str(e.source),
-      target: str(e.target),
-      label: str(e.label),
-      arrow: e.arrow === true,
-    }))
-    .filter((e) => e.source !== e.target && nodeIds.has(e.source) && nodeIds.has(e.target))
+    .map((e) => {
+      const edge: MapEdge = {
+        id: str(e.id) || makeId('edge'),
+        source: str(e.source),
+        target: str(e.target),
+        label: str(e.label),
+        arrow: e.arrow === true,
+      }
+      const sourceAnchor = cleanAnchor(e.sourceAnchor)
+      const targetAnchor = cleanAnchor(e.targetAnchor)
+      if (sourceAnchor) edge.sourceAnchor = sourceAnchor
+      if (targetAnchor) edge.targetAnchor = targetAnchor
+      return edge
+    })
+    .filter(
+      (e) =>
+        !isLoop(e.source, e.target, { source: e.sourceAnchor, target: e.targetAnchor }) &&
+        nodeIds.has(e.source) &&
+        nodeIds.has(e.target),
+    )
 
   return linkMentions({
     title: str(raw.title, 'Untitled story'),

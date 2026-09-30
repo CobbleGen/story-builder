@@ -1,5 +1,7 @@
-import { createContext, useContext } from 'react'
-import { Position, useStore, type Node } from '@xyflow/react'
+import { createContext, useCallback, useContext } from 'react'
+import { Position, useNodeId, useStore, useUpdateNodeInternals, type Node } from '@xyflow/react'
+import { useShallow } from 'zustand/react/shallow'
+import { useStory } from '../store/storyStore'
 import type { MapNode, NoteColor } from '../types'
 import type { NewMapNode } from '../store/storyOps'
 
@@ -96,4 +98,41 @@ export function focusSoon(get: () => HTMLTextAreaElement | null): () => void {
   }
   run()
   return () => cancelAnimationFrame(frame)
+}
+
+// React Flow measures a card's connection points when the card changes size.
+// Points inside a card also move when a list scrolls or a page turns, so those
+// ask for a fresh measurement; requests are gathered into one per frame.
+const waiting = new Set<string>()
+let frame = 0
+
+/** Asks React Flow to measure this card's connection points again. */
+export function useRefreshHandles(): () => void {
+  const nodeId = useNodeId()
+  const update = useUpdateNodeInternals()
+  return useCallback(() => {
+    if (!nodeId) return
+    waiting.add(nodeId)
+    if (frame) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      const ids = [...waiting]
+      waiting.clear()
+      update(ids)
+    })
+  }, [nodeId, update])
+}
+
+/** Anchors (starting with `prefix`) that saved lines use on this card. */
+export function useSavedAnchors(prefix: string): string[] {
+  const nodeId = useNodeId()
+  return useStory(
+    useShallow((s) =>
+      s.mindMap.edges.flatMap((e) =>
+        [e.source === nodeId ? e.sourceAnchor : undefined, e.target === nodeId ? e.targetAnchor : undefined].filter(
+          (a): a is string => !!a && a.startsWith(prefix),
+        ),
+      ),
+    ),
+  )
 }

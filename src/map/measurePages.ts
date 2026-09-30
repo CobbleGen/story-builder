@@ -1,6 +1,6 @@
 import type { RichNode } from '../types'
 import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
-import { countWords, splitParagraph, type PageBlock } from './pages'
+import { countWords, splitParagraph, startsFlush, type PageBlock } from './pages'
 
 // Splits a chapter into pages that exactly fill the paper on screen: each
 // block is laid out in a hidden copy of the page, and a paragraph that runs
@@ -65,36 +65,37 @@ export function measurePages(doc: RichNode | undefined, host: HTMLElement, room:
   const pages: PageBlock[][] = []
   let page: PageBlock[] = []
   let limit = room.first
-  const setFirst = (first: boolean) => host.classList.toggle('first-page', first)
   const fits = () => host.offsetHeight <= limit
+  // Each block sits in a wrapper, as on the page (where it carries the block's connection points).
   const put = (b: PageBlock) => {
+    const wrap = document.createElement('div')
+    wrap.className = 'map-block'
     const el = toDom(b.node, name) as HTMLElement
-    if (b.continued) el.classList?.add('continued')
-    host.append(el)
-    return el
+    if (startsFlush(b.node, b.continued, page[page.length - 1]?.node, pages.length === 0)) el.classList.add('flush')
+    wrap.append(el)
+    host.append(wrap)
+    return wrap
   }
   const turn = () => {
     if (page.length) {
       pages.push(page)
       limit = room.rest
-      setFirst(false)
     }
     page = []
     host.replaceChildren()
   }
   host.replaceChildren()
-  setFirst(true)
 
-  for (const block of doc?.content ?? []) {
+  for (const [index, block] of (doc?.content ?? []).entries()) {
     let rest: RichNode | null = block
     let continued = false
     while (rest) {
       // Blank lines at the top of a page would only push the text down.
       if (!page.length && isBlank(rest)) break
       const current: RichNode = rest
-      const el = put({ node: current, continued })
+      const el = put({ node: current, index, continued })
       if (fits()) {
-        page.push({ node: current, continued })
+        page.push({ node: current, index, continued })
         rest = null
         continue
       }
@@ -105,7 +106,7 @@ export function measurePages(doc: RichNode | undefined, host: HTMLElement, room:
         let hi = countWords(current) - 1
         while (lo < hi) {
           const mid = Math.ceil((lo + hi) / 2)
-          const probe = put({ node: splitParagraph(current, mid)[0], continued })
+          const probe = put({ node: splitParagraph(current, mid)[0], index, continued })
           const ok = fits()
           probe.remove()
           if (ok) lo = mid
@@ -113,7 +114,7 @@ export function measurePages(doc: RichNode | undefined, host: HTMLElement, room:
         }
         const [head, tail] = lo > 0 ? splitParagraph(current, lo) : [current, null]
         if (tail) {
-          page.push({ node: head, continued })
+          page.push({ node: head, index, continued })
           turn()
           rest = tail
           continued = true
@@ -122,7 +123,7 @@ export function measurePages(doc: RichNode | undefined, host: HTMLElement, room:
       }
       if (!page.length) {
         // Taller than a whole page on its own: it gets a page and scrolls.
-        page.push({ node: current, continued })
+        page.push({ node: current, index, continued })
         turn()
         rest = null
         continue

@@ -5,7 +5,8 @@ import { useUi } from '../store/uiStore'
 import { displayName } from '../lib/mentions'
 import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
 import { MentionName } from '../components/MentionText'
-import type { PageBlock } from './pages'
+import { startsFlush, type PageBlock } from './pages'
+import { Anchor } from './Anchor'
 
 interface Context {
   lookup: ReturnType<typeof useCharacterLookup>
@@ -85,8 +86,16 @@ function renderNode(node: RichNode, key: number, ctx: Context, className?: strin
   }
 }
 
+interface Props {
+  blocks: PageBlock[]
+  /** The chapter's first page (its first paragraph isn't indented). */
+  first?: boolean
+  /** Anchors for a block's connection points: its own first, then saved ones that now lead to it. */
+  anchorsFor?: (index: number) => string[]
+}
+
 /** A page of a chapter's text, read-only, looking like the manuscript. */
-export function RichView({ blocks, first }: { blocks: PageBlock[]; first?: boolean }) {
+export function RichView({ blocks, first, anchorsFor }: Props) {
   const lookup = useCharacterLookup()
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
@@ -100,8 +109,21 @@ export function RichView({ blocks, first }: { blocks: PageBlock[]; first?: boole
     },
   }
   return (
-    <div className={`map-rich${first ? ' first-page' : ''}`}>
-      {blocks.map((b, i) => renderNode(b.node, i, ctx, b.continued ? 'continued' : undefined))}
+    <div className="map-rich">
+      {blocks.map((b, i) => {
+        const anchors = b.node.type === 'horizontalRule' ? undefined : anchorsFor?.(b.index)
+        const flush = startsFlush(b.node, b.continued, blocks[i - 1]?.node, !!first)
+        return (
+          <div
+            key={`${b.index}${b.continued ? 'c' : ''}`}
+            className={`map-block${anchors ? ' map-anchor-row' : ''}`}
+            data-anchor={anchors?.[0]}
+          >
+            {renderNode(b.node, i, ctx, flush ? 'flush' : undefined)}
+            {anchors && <Anchor ids={anchors} />}
+          </div>
+        )
+      })}
     </div>
   )
 }

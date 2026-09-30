@@ -12,25 +12,53 @@ import {
 } from '@xyflow/react'
 import { ArrowRight, Tag, Trash2 } from 'lucide-react'
 import type { MapEdge } from '../types'
+import { anchorHandle } from '../lib/anchors'
 import { useStory } from '../store/storyStore'
 
 export type StoryFlowEdge = Edge<{ edge: MapEdge }, 'story'>
 
-/** Middle of a card's side, facing the other card. */
-function anchor(node: InternalNode, toward: InternalNode): { x: number; y: number; position: Position } {
+type End = { x: number; y: number; position: Position }
+type Point = { x: number; y: number }
+
+const centre = (node: InternalNode): Point => ({
+  x: node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2,
+  y: node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2,
+})
+
+/** Middle of a card's side, facing a point. */
+function cardEnd(node: InternalNode, toward: Point): End {
   const w = node.measured.width ?? 0
   const h = node.measured.height ?? 0
   const { x, y } = node.internals.positionAbsolute
   const cx = x + w / 2
   const cy = y + h / 2
-  const tw = toward.measured.width ?? 0
-  const th = toward.measured.height ?? 0
-  const dx = toward.internals.positionAbsolute.x + tw / 2 - cx
-  const dy = toward.internals.positionAbsolute.y + th / 2 - cy
+  const dx = toward.x - cx
+  const dy = toward.y - cy
   if (Math.abs(dx) * h > Math.abs(dy) * w) {
     return dx > 0 ? { x: x + w, y: cy, position: Position.Right } : { x, y: cy, position: Position.Left }
   }
   return dy > 0 ? { x: cx, y: y + h, position: Position.Bottom } : { x: cx, y, position: Position.Top }
+}
+
+/**
+ * The side of an anchored row (a beat, an attribute, a paragraph) facing the
+ * other end, or null while the row isn't on show (card closed, scrolled away,
+ * on another page), when the line attaches to the card instead.
+ */
+function rowEnd(node: InternalNode, anchor: string | undefined, toward: Point, loop: boolean): End | null {
+  if (!anchor) return null
+  const handles = node.internals.handleBounds?.source ?? []
+  const left = handles.find((h) => h.id === anchorHandle(anchor, 'l'))
+  const right = handles.find((h) => h.id === anchorHandle(anchor, 'r'))
+  if (!left || !right) return null
+  const { x, y } = node.internals.positionAbsolute
+  const lx = x + left.x + left.width / 2
+  const rx = x + right.x + right.width / 2
+  const ry = y + left.y + left.height / 2
+  // Two rows of the same card join with a loop out of the right-hand side.
+  return !loop && toward.x < (lx + rx) / 2
+    ? { x: lx, y: ry, position: Position.Left }
+    : { x: rx, y: ry, position: Position.Right }
 }
 
 /** A curved line with an optional label; when selected it offers label, arrow and delete. */
@@ -43,9 +71,13 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
   const targetNode = useInternalNode(target)
   const edge = data?.edge
   if (!edge || !sourceNode || !targetNode) return null
-  // Lines attach to whichever sides of the two cards face each other.
-  const from = anchor(sourceNode, targetNode)
-  const to = anchor(targetNode, sourceNode)
+  // Lines attach to the rows they were drawn from, else to whichever sides
+  // of the two cards face each other.
+  const loop = source === target
+  const fromRow = rowEnd(sourceNode, edge.sourceAnchor, centre(targetNode), loop)
+  const toRow = rowEnd(targetNode, edge.targetAnchor, fromRow ?? centre(sourceNode), loop)
+  const from = fromRow ?? cardEnd(sourceNode, toRow ?? centre(targetNode))
+  const to = toRow ?? cardEnd(targetNode, from)
   const [path, labelX, labelY] = getBezierPath({
     sourceX: from.x,
     sourceY: from.y,

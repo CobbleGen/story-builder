@@ -43,7 +43,12 @@ It has three views: the **chapter board**, the **manuscript** and the
   resize them) and text boxes in three sizes, both with `@` mentions. Notes
   and text boxes can become a bulleted, numbered or tick-box list, and text
   boxes can have a background colour (white included). Drag from the dot on a card's edge to another card to draw a
-  line, then select the line to label it or give it an arrow. Pan by dragging
+  line, then select the line to label it or give it an arrow. Lines can also
+  start from, or end on, a single row inside a card: hover a beat, an
+  attribute, a paragraph on a chapter's page or a list item, and drag from the
+  dot at its side. Let go anywhere on a card or row to join it. While that row
+  isn't showing (card closed, scrolled away, another page) its lines attach to
+  the card, and a paragraph's lines follow it when text is added above it. Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button

@@ -587,14 +587,13 @@
   text-indent: 1.4em;
 }
 
-.map-rich p.continued,
-.map-rich.first-page > p:first-child,
-.map-rich hr + p,
-.map-rich h3 + p,
-.map-rich h4 + p,
-.map-rich h5 + p,
+.map-rich p.flush,
 .map-rich li p {
   text-indent: 0;
+}
+
+.map-block {
+  position: relative;
 }
 
 .map-rich h3,
@@ -617,7 +616,7 @@
   font-size: 1.05em;
 }
 
-.map-rich > :first-child {
+.map-rich > .map-block:first-child > * {
   margin-top: 0;
 }
 
@@ -1029,11 +1028,65 @@
   border-radius: 50%;
 }
 
-.map-canvas .react-flow__node:hover .map-handle,
-.map-canvas .react-flow__node.selected .map-handle,
+.map-canvas .react-flow__node:hover .map-handle:not(.map-anchor-handle),
+.map-canvas .react-flow__node.selected .map-handle:not(.map-anchor-handle),
 .map-canvas .map-handle.connectingfrom,
-.map-canvas .react-flow__node:has(.connectingto) .map-handle {
+.map-canvas .react-flow__node:has(.connectingto) .map-handle:not(.map-anchor-handle) {
   opacity: 1;
+}
+
+/* Rows inside cards (beats, attributes, paragraphs, list items) have their
+   own smaller points, which show while the row is hovered. */
+.map-anchor-row {
+  position: relative;
+}
+
+.map-anchor {
+  display: contents;
+}
+
+.map-canvas .map-anchor-handle {
+  z-index: 3;
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+}
+
+.map-canvas .map-anchor-handle::after {
+  inset: -6px;
+}
+
+.map-canvas .map-anchor-row:hover .map-anchor-handle,
+.map-canvas .map-anchor-row:has(.connectingto) .map-anchor-handle {
+  opacity: 1;
+}
+
+/* Drawing a line: show what it would join when let go. */
+.map-canvas.connecting .map-anchor-row:hover {
+  border-radius: 6px;
+  outline: 2px solid color-mix(in srgb, var(--focus) 70%, transparent);
+  outline-offset: 1px;
+}
+
+.map-canvas.connecting .react-flow__node:hover > .map-card,
+.map-canvas.connecting .react-flow__node:hover > .map-note,
+.map-canvas.connecting .react-flow__node:hover > .map-text {
+  box-shadow: 0 0 0 2px var(--focus), 0 3px 10px rgba(38, 36, 31, 0.1);
+}
+
+/* A list item's points sit in the margin beside it, clear of its tick box. */
+.map-canvas .map-list .map-anchor-handle.react-flow__handle-left {
+  left: -9px;
+}
+
+.map-canvas .map-list .map-anchor-handle.react-flow__handle-right {
+  right: -9px;
+}
+
+/* Room at the sides of a note's text for those points. */
+.map-note-text {
+  margin: 0 -12px;
+  padding: 0 12px;
 }
 
 .map-canvas .map-handle:hover,
@@ -1405,14 +1458,16 @@
     display: none;
   }
 
-  /* No hover on touch screens, so connection points always show. */
-  .map-canvas .map-handle {
+  /* No hover on touch screens, so connection points always show (a row's once its card is selected). */
+  .map-canvas .map-handle:not(.map-anchor-handle),
+  .map-canvas .react-flow__node.selected .map-anchor-handle {
     opacity: 0.55;
   }
 }
 
 @media (hover: none) {
-  .map-canvas .map-handle {
+  .map-canvas .map-handle:not(.map-anchor-handle),
+  .map-canvas .react-flow__node.selected .map-anchor-handle {
     opacity: 0.55;
   }
 }

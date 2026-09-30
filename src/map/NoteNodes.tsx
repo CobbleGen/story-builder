@@ -96,7 +96,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
           )}
         </div>
       ) : (
-        <div className="map-note-text">
+        <div className="map-note-text map-scroll">
           {node.text && node.list ? (
             <TextList node={node} />
           ) : node.text ? (

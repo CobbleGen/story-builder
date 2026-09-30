@@ -399,6 +399,34 @@ describe('mind map', () => {
     expect(data.mindMap.nodes.find((n) => n.id === note)).toMatchObject({ text: 'Ask Mara' })
   })
 
+  it('draws lines between spots inside cards, and drops them with the item', () => {
+    let { data, ch1, main } = setup()
+    let beat: string, mara: string, attr: string
+    ;[data, beat] = addBeat(data, { arcId: main, title: 'Storm', chapterId: ch1 })
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, attr] = addAttribute(data, mara, { label: 'Fears', value: 'Water' })
+    let arcCard: string | null, maraCard: string | null
+    ;[data, arcCard] = addMapNode(data, { kind: 'arc', refId: main, x: 0, y: 0 })
+    ;[data, maraCard] = addMapNode(data, { kind: 'character', refId: mara, x: 400, y: 0 })
+    const fromBeat = { source: `beat:${beat}`, target: `attr:${attr}` }
+    const [withLine, line] = addMapEdge(data, arcCard!, maraCard!, fromBeat)
+    expect(withLine.mindMap.edges[0]).toMatchObject({ id: line, sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
+    // The same line again (either way round) is a repeat; card to card is a different line.
+    expect(addMapEdge(withLine, maraCard!, arcCard!, { source: `attr:${attr}`, target: `beat:${beat}` })[1]).toBeNull()
+    expect(addMapEdge(withLine, arcCard!, maraCard!)[1]).not.toBeNull()
+    // Two spots in one card can be joined; a card can't be joined to itself.
+    expect(addMapEdge(withLine, arcCard!, arcCard!, { source: `beat:${beat}`, target: 'beat:other' })[1]).not.toBeNull()
+    expect(addMapEdge(withLine, arcCard!, arcCard!)[1]).toBeNull()
+    expect(addMapEdge(withLine, arcCard!, arcCard!, { source: `beat:${beat}`, target: `beat:${beat}` })[1]).toBeNull()
+    // Deleting the attribute or the beat takes the line with it; the cards stay.
+    expect(deleteAttribute(withLine, mara, attr).mindMap.edges).toEqual([])
+    expect(deleteBeat(withLine, beat).mindMap.edges).toEqual([])
+    expect(deleteCharacter(withLine, mara).mindMap.edges).toEqual([])
+    expect(deleteBeat(withLine, beat).mindMap.nodes).toHaveLength(2)
+    // Anchors survive a reload.
+    expect(normalizeStory(withLine).mindMap.edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
+  })
+
   it('repairs a loaded map', () => {
     const data = normalizeStory({
       chapters: [{ id: 'c1', title: 'One', beatIds: [] }],

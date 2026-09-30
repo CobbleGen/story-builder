@@ -9,9 +9,11 @@ import { MentionTextarea } from '../components/MentionTextarea'
 import { ArcPicker } from '../components/ArcPicker'
 import { ChapterTag } from '../components/ChapterTag'
 import { RichView } from './RichView'
-import { paginate, type PageBlock } from './pages'
+import { paginate, plainOf, type PageBlock } from './pages'
 import { measurePages } from './measurePages'
-import { DRAG_MIME, focusSoon } from './mapShared'
+import { DRAG_MIME, focusSoon, useRefreshHandles, useSavedAnchors } from './mapShared'
+import { Anchor } from './Anchor'
+import { itemAnchor, resolveTextAnchors, textAnchor } from '../lib/anchors'
 
 // How many words a page holds follows the size of the paper, so a bigger card
 // shows more of the chapter at once. Tuned by measuring the page's type.
@@ -134,6 +136,17 @@ export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) 
 
   const pages = doc ? (measured ?? estimate) : []
   const [page, setPage] = useState(0)
+
+  // Each paragraph can have lines drawn from it; saved lines find their
+  // paragraph again by its opening words, even after edits above it.
+  const saved = useSavedAnchors('para:')
+  const blockAnchors = useMemo(() => {
+    const texts = (doc?.content ?? []).map(plainOf)
+    const own = texts.map((t, i) => textAnchor('para', i, t))
+    const leading = resolveTextAnchors(saved, 'para', texts)
+    return own.map((a, i) => [a, ...(leading.get(i) ?? []).filter((x) => x !== a)])
+  }, [doc, saved])
+  const refresh = useRefreshHandles()
   const scrolls = useScrolls(paper)
   const at = Math.max(0, Math.min(page, pages.length - 1))
 
@@ -154,7 +167,7 @@ export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) 
 
   return (
     <div className="map-panel map-pages nodrag">
-      <div ref={paper} className={`map-paper${scrolls ? ' nowheel' : ''}`}>
+      <div ref={paper} className={`map-paper map-scroll${scrolls ? ' nowheel' : ''}`} onScroll={refresh}>
         {at === 0 && (
           <div className="map-paper-head">
             <span>Chapter {number}</span>
@@ -163,7 +176,7 @@ export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) 
             </strong>
           </div>
         )}
-        <RichView blocks={pages[at]} first={at === 0} />
+        <RichView blocks={pages[at]} first={at === 0} anchorsFor={(i) => blockAnchors[i]} />
       </div>
       <div className="map-paper map-measure" style={{ width: size.width }} aria-hidden>
         <div ref={measureHead} className="map-paper-head">
@@ -304,18 +317,27 @@ interface RowProps {
 function BeatRow({ beat, color, chapter, showChapter }: RowProps) {
   const updateBeat = useStory((s) => s.updateBeat)
   const openBeat = useUi((s) => s.openBeat)
+  const anchor = itemAnchor('beat', beat.id)
+  // Dragging from a connection point draws a line; from anywhere else, the beat itself moves.
+  const fromPoint = useRef(false)
   return (
     <li
-      className={`map-beat${beat.done ? ' done' : ''}`}
+      className={`map-beat map-anchor-row${beat.done ? ' done' : ''}`}
       style={{ '--arc': color } as React.CSSProperties}
+      data-anchor={anchor}
       draggable
+      onPointerDown={(e) => {
+        fromPoint.current = !!(e.target as Element).closest('.react-flow__handle')
+      }}
       onDragStart={(e) => {
+        if (fromPoint.current) return e.preventDefault()
         // Drop it on the board to give the beat its own card.
         e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'beat', refId: beat.id }))
         e.dataTransfer.effectAllowed = 'copy'
       }}
-      title="Click to edit, or drag onto the map"
+      title="Click to edit, drag onto the map, or draw a line from the dot at its side"
     >
+      <Anchor ids={[anchor]} />
       <button
         type="button"
         role="checkbox"
@@ -345,6 +367,7 @@ export function BeatList({ beatIds, scope }: { beatIds: string[]; scope: BeatSco
   const [adding, setAdding] = useState<number | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const scrolls = useScrolls(scroller)
+  const refresh = useRefreshHandles()
   const numbers = chapterNumbers(chapters)
   const colorOf = (arcId: string) => arcs.find((a) => a.id === arcId)?.color
   const canAdd = arcs.length > 0
@@ -374,7 +397,7 @@ export function BeatList({ beatIds, scope }: { beatIds: string[]; scope: BeatSco
 
   const rows = beatIds.flatMap((id, index) => (beats[id] ? [{ beat: beats[id], index }] : []))
   return (
-    <div ref={scroller} className={`map-panel map-beats nodrag${scrolls ? ' nowheel' : ''}`}>
+    <div ref={scroller} className={`map-panel map-beats map-scroll nodrag${scrolls ? ' nowheel' : ''}`} onScroll={refresh}>
       <ol className="map-beat-list" aria-label="Beats">
         {rows.map(({ beat, index }) => (
           <Fragment key={beat.id}>
@@ -427,19 +450,21 @@ export function CharacterDetails({ character }: { character: Character }) {
       .filter((b): b is Beat => !!b && (mentions(b.title, character.id) || mentions(b.description, character.id))),
   )
   const colorOf = (arcId: string) => arcs.find((a) => a.id === arcId)?.color
+  const refresh = useRefreshHandles()
 
   return (
-    <div ref={scroller} className={`map-panel map-details nodrag${scrolls ? ' nowheel' : ''}`}>
+    <div ref={scroller} className={`map-panel map-details map-scroll nodrag${scrolls ? ' nowheel' : ''}`} onScroll={refresh}>
       <section>
         <h4>Attributes</h4>
         {attributes.length ? (
           <dl className="map-attr-list">
             {attributes.map((a) => (
-              <div key={a.id}>
+              <div key={a.id} className="map-anchor-row" data-anchor={itemAnchor('attr', a.id)}>
                 <dt>{a.label || 'Note'}</dt>
                 <dd>
                   <MentionText text={a.value} fallback="–" />
                 </dd>
+                <Anchor ids={[itemAnchor('attr', a.id)]} />
               </div>
             ))}
           </dl>
@@ -452,7 +477,13 @@ export function CharacterDetails({ character }: { character: Character }) {
           <h4>Arcs</h4>
           <ul className="map-chips">
             {inArcs.map((a) => (
-              <li key={a.id} style={{ '--arc': a.color } as React.CSSProperties}>
+              <li
+                key={a.id}
+                className="map-anchor-row"
+                data-anchor={itemAnchor('arc', a.id)}
+                style={{ '--arc': a.color } as React.CSSProperties}
+              >
+                <Anchor ids={[itemAnchor('arc', a.id)]} />
                 <span className="arc-dot" />
                 <span className="map-chip-text">
                   <MentionText text={a.name} fallback="Untitled arc" />
@@ -467,7 +498,8 @@ export function CharacterDetails({ character }: { character: Character }) {
           <h4>Point of view in</h4>
           <ul className="map-chips">
             {pov.map((c) => (
-              <li key={c.id}>
+              <li key={c.id} className="map-anchor-row" data-anchor={itemAnchor('chapter', c.id)}>
+                <Anchor ids={[itemAnchor('chapter', c.id)]} />
                 <span className="map-chip-num">{numbers[c.id]}</span>
                 <span className="map-chip-text">
                   <MentionText text={c.title} fallback="Untitled chapter" />
@@ -482,7 +514,13 @@ export function CharacterDetails({ character }: { character: Character }) {
           <h4>In {inBeats.length === 1 ? 'one beat' : `${inBeats.length} beats`}</h4>
           <ol className="map-beat-list">
             {inBeats.map((b) => (
-              <li key={b.id} className="map-beat" style={{ '--arc': colorOf(b.arcId) } as React.CSSProperties}>
+              <li
+                key={b.id}
+                className="map-beat map-anchor-row"
+                data-anchor={itemAnchor('beat', b.id)}
+                style={{ '--arc': colorOf(b.arcId) } as React.CSSProperties}
+              >
+                <Anchor ids={[itemAnchor('beat', b.id)]} />
                 {b.chapterId && <ChapterTag number={numbers[b.chapterId]} />}
                 <button type="button" className="map-beat-title" onClick={() => openBeat(b.id)}>
                   <MentionText text={b.title} fallback={<span className="muted">Untitled beat</span>} />
