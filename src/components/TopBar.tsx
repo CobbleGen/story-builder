@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import {
   BookDown,
+  ChartGantt,
   Download,
   FilePlus2,
   Feather,
@@ -122,6 +123,10 @@ export function TopBar() {
             <span className="nav-short-cap">map</span>
           </span>
         </NavLink>
+        <NavLink to="/timeline" aria-label="Timeline" title="Timeline">
+          <ChartGantt size={18} className="nav-icon" aria-hidden />
+          <span className="nav-text">Timeline</span>
+        </NavLink>
       </nav>
       <div className="topbar-actions">
         <button className="topbar-search" onClick={() => setSearchOpen(true)} aria-label="Search your story" title={`Search your story (${SEARCH_KEYS})`}>
@@ -147,7 +152,8 @@ export function TopBar() {
         <Menu
           label="Story options"
           items={[
-            { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true) },
+            { label: 'Word count and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
+            { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: exportStory },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },

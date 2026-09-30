@@ -8,6 +8,8 @@ export interface Beat {
   chapterId: string | null
   /** Ticked off in the manuscript: the beat has been written. */
   done: boolean
+  /** When it happens in the story's world ("Day 3, evening"), if the writer has said. */
+  when?: string
 }
 
 /** How far along a chapter is. */
@@ -174,6 +176,12 @@ export interface StoryData {
   elements: StoryElement[]
   /** Chapter id -> the chapter's written text. */
   texts: Record<string, ChapterText>
+  /**
+   * Beats in the order they happen in the story's world, once the writer has
+   * arranged them on the timeline; empty until then (story order follows
+   * reading order). Beats missing from it slot in by reading order.
+   */
+  timeline: string[]
   /** A story can have several mind maps (card and line ids are unique across them). */
   mindMaps: MindMap[]
   goals: StoryGoals

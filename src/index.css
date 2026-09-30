@@ -410,7 +410,7 @@ a {
 }
 
 @media (max-width: 640px) {
-  .topnav a {
+  .topbar .topnav a {
     display: inline-flex;
     padding: 7px 8px;
   }
@@ -424,6 +424,12 @@ a {
   }
 }
 
+@media (max-width: 900px) {
+  .brand span {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .topbar {
     gap: 4px;
@@ -433,6 +439,28 @@ a {
   .story-title {
     min-width: 5ch;
     padding: 4px;
+  }
+}
+
+/* The narrowest phones: the Board tab stands in for the logo, which also goes to the board. */
+@media (max-width: 420px) {
+  .topbar .brand {
+    display: none;
+  }
+
+  .topbar .topnav {
+    margin-left: 0;
+  }
+
+  .topbar .topnav a {
+    padding: 7px 6px;
+  }
+}
+
+/* The word count stays in the ⋯ menu when there's no room for it here. */
+@media (max-width: 380px) {
+  .topbar-actions .topbar-progress {
+    display: none;
   }
 }
 
@@ -3175,6 +3203,265 @@ a {
 
 .modal.wide {
   width: min(760px, 100%);
+}
+
+/* ---------- Timeline ---------- */
+
+.timeline-page {
+  --tl-head: 168px;
+  --tl-col: 172px;
+  --tl-row: 96px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--board);
+}
+
+.tl-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.tl-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.tl-hint {
+  flex: 1;
+  min-width: 240px;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.tl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tl-grid {
+  display: grid;
+  column-gap: 8px;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 24px 24px 0;
+}
+
+/* The top edge and the lane names stay in view while the timeline scrolls. */
+.tl-corner,
+.tl-axis,
+.tl-span {
+  position: sticky;
+  top: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--board);
+}
+
+.tl-corner {
+  left: 0;
+  z-index: 5;
+  padding: 12px 12px 8px 20px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tl-axis {
+  z-index: 2;
+}
+
+.tl-span {
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  padding: 10px 0 8px;
+}
+
+.tl-span span {
+  overflow: hidden;
+  padding: 1px 8px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-lane-head {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--board);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tl-lane-head .arc-dot {
+  flex: none;
+}
+
+.tl-lane-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tl-lane {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--arc) 6%, transparent);
+}
+
+.tl-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  align-self: center;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--arc);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tl-card:hover {
+  border-color: var(--line-strong);
+  border-left-color: var(--arc);
+}
+
+.tl-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tl-card.draggable {
+  cursor: grab;
+}
+
+.tl-card.dragging {
+  z-index: 6;
+  box-shadow: var(--shadow-lg);
+  cursor: grabbing;
+}
+
+.tl-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tl-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 20px;
+}
+
+.tl-when {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-jump {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--focus) 13%, var(--tint));
+  color: color-mix(in srgb, var(--focus) 82%, var(--shade));
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tl-jump.flash-forward {
+  background: color-mix(in srgb, #c2410c 13%, var(--tint));
+  color: color-mix(in srgb, #c2410c 82%, var(--shade));
+}
+
+.tl-done {
+  flex: none;
+  margin-left: auto;
+  color: var(--success);
+}
+
+.tl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: auto;
+  padding: 40px 20px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.tl-empty strong {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+@media (max-width: 760px) {
+  .timeline-page {
+    --tl-head: 100px;
+    --tl-col: 146px;
+    --tl-row: 90px;
+  }
+
+  .tl-bar {
+    padding: 10px 12px;
+  }
+
+  .tl-hint {
+    min-width: 100%;
+    font-size: 12.5px;
+  }
+
+  .tl-corner,
+  .tl-lane-head {
+    padding-left: 12px;
+  }
+
+  .tl-lane-head {
+    font-size: 12px;
+  }
 }
 
 /* ---------- Manuscript export ---------- */

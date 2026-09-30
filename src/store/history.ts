@@ -64,6 +64,8 @@ const LABELS: Record<string, string> = {
   setBeatArc: 'change beat’s arc',
   placeBeat: 'move beat',
   applyChapterLayout: 'move beat',
+  moveInTimeline: 'move beat in time',
+  resetTimeline: 'reset the timeline',
   deleteBeat: 'delete beat',
   setArcCharacter: 'change arc’s cast',
   addCharacter: 'add character',

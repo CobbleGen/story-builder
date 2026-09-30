@@ -25,6 +25,7 @@ import { makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
+import { timeJumps } from '../lib/timeline'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -240,6 +241,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     characters: [],
     elements: [],
     texts: {},
+    timeline: [],
     mindMaps: [defaultMindMap()],
     goals: {},
     wordLog: {},
@@ -289,6 +291,7 @@ export function deleteArc(data: StoryData, id: string): StoryData {
   const next = {
     ...mapTexts(data, (doc) => stripBeatLinks(doc, doomed)),
     beats,
+    timeline: data.timeline.filter((b) => !doomed.has(b)),
     arcs: data.arcs.filter((a) => a.id !== id),
     chapters: data.chapters.map((c) =>
       c.beatIds.some((b) => doomed.has(b))
@@ -537,11 +540,24 @@ export function addBeat(data: StoryData, init: NewBeat): [StoryData, string] {
 export function updateBeat(
   data: StoryData,
   id: string,
-  patch: Partial<Pick<Beat, 'title' | 'description' | 'done'>>,
+  patch: Partial<Pick<Beat, 'title' | 'description' | 'done' | 'when'>>,
 ): StoryData {
   const beat = data.beats[id]
   if (!beat) return data
-  return { ...data, beats: { ...data.beats, [id]: { ...beat, ...patch } } }
+  const next: Beat = { ...beat, ...patch }
+  if ('when' in patch) {
+    const when = cleanWhen(patch.when)
+    if (when) next.when = when
+    else delete next.when
+  }
+  return { ...data, beats: { ...data.beats, [id]: next } }
+}
+
+/** A "when" label as kept: at most a line, and nothing when it's blank. */
+function cleanWhen(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const line = value.replace(/[\r\n]+/g, ' ').slice(0, 120)
+  return line.trim() ? line : undefined
 }
 
 /** Moves a beat to another arc, slotting it in by chapter order. */
@@ -616,6 +632,7 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
     {
       ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
       beats,
+      timeline: data.timeline.includes(id) ? data.timeline.filter((b) => b !== id) : data.timeline,
       arcs: data.arcs.map((a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a)),
       chapters: beat.chapterId
         ? data.chapters.map((c) =>
@@ -625,6 +642,54 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
     },
     new Set([id]),
   )
+}
+
+// ---------- Timeline ----------
+
+/** Beats in the order they're read: chapter by chapter, then those in no chapter, arc by arc. */
+export function readingOrder(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats'>): string[] {
+  return [
+    ...data.chapters.flatMap((c) => c.beatIds),
+    ...data.arcs.flatMap((a) => a.beatIds.filter((b) => !data.beats[b]?.chapterId)),
+  ].filter((b) => data.beats[b])
+}
+
+/**
+ * Beats in the order they happen in the story's world: as arranged on the
+ * timeline. Until it's arranged, that's the reading order. A beat not
+ * arranged yet (a new one, say) happens just after everything read before it,
+ * leaving out flashbacks and flash-forwards, which don't say when the story
+ * around them is.
+ */
+export function storyOrder(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats' | 'timeline'>): string[] {
+  const reading = readingOrder(data)
+  const seen = new Set<string>()
+  const order = data.timeline.filter((b) => data.beats[b] && !seen.has(b) && !!seen.add(b))
+  if (!order.length) return reading
+  const jumps = timeJumps(order, data.chapters.flatMap((c) => c.beatIds))
+  let latest: string | null = null
+  for (const id of reading) {
+    if (!seen.has(id)) {
+      order.splice(latest ? order.indexOf(latest) + 1 : 0, 0, id)
+      seen.add(id)
+    }
+    if (!jumps.has(id) && (!latest || order.indexOf(id) > order.indexOf(latest))) latest = id
+  }
+  return order
+}
+
+/** Moves a beat to another place in story time (an index in storyOrder). */
+export function moveInTimeline(data: StoryData, beatId: string, to: number): StoryData {
+  const order = storyOrder(data)
+  const from = order.indexOf(beatId)
+  if (from === -1) return data
+  const moved = moveItem(order, from, to)
+  return moved === order ? data : { ...data, timeline: moved }
+}
+
+/** Story time goes back to following the reading order. */
+export function resetTimeline(data: StoryData): StoryData {
+  return data.timeline.length ? { ...data, timeline: [] } : data
 }
 
 // ---------- Mind map ----------
@@ -913,6 +978,8 @@ export function normalizeStory(input: unknown): StoryData {
       chapterId: chapterIds.has(chapterId) ? chapterId : null,
       done: b.done === true,
     }
+    const when = cleanWhen(b.when)
+    if (when) beats[id].when = when
   }
 
   // Each beat appears once, in its own arc, keeping the stored order.
@@ -1107,6 +1174,7 @@ export function normalizeStory(input: unknown): StoryData {
     characters,
     elements,
     texts,
+    timeline: [...new Set(ids(raw.timeline))].filter((b) => beats[b]),
     mindMaps,
     goals,
     wordLog,

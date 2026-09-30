@@ -185,7 +185,9 @@ export function buildIndex(data: Searchable, lookup: Lookup): SearchIndex {
   for (const id of beatIds) {
     const b = data.beats[id]
     if (!b) continue
-    entries.push({ kind: 'beat', id, key: `beat:${id}`, title: field(plain(b.title)), fields: [field(plain(b.description))] })
+    const fields = [field(plain(b.description))]
+    if (b.when) fields.push(field(b.when, 'When'))
+    entries.push({ kind: 'beat', id, key: `beat:${id}`, title: field(plain(b.title)), fields })
   }
 
   for (const c of data.characters) {

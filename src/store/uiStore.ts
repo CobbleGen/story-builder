@@ -3,6 +3,8 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { DEFAULT_EXPORT, type ExportOptions } from '../lib/manuscript'
 
 export type SidebarMode = 'arcs' | 'characters' | 'world'
+/** The timeline in the order things happen, or in the order they're read. */
+export type TimelineMode = 'story' | 'reading'
 /** Light or dark colours, or whichever the device is set to. */
 export type ThemeSetting = 'system' | 'light' | 'dark'
 
@@ -43,6 +45,7 @@ interface UiState {
   searchOpen: boolean
   /** How the manuscript was last exported. */
   exportOptions: ExportOptions
+  timelineMode: TimelineMode
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -59,6 +62,7 @@ interface UiState {
   setProgressOpen: (open: boolean) => void
   setSearchOpen: (open: boolean) => void
   setExportOptions: (patch: Partial<ExportOptions>) => void
+  setTimelineMode: (mode: TimelineMode) => void
 }
 
 export const useUi = create<UiState>()(
@@ -81,6 +85,7 @@ export const useUi = create<UiState>()(
       progressOpen: false,
       searchOpen: false,
       exportOptions: DEFAULT_EXPORT,
+      timelineMode: 'story',
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -98,6 +103,7 @@ export const useUi = create<UiState>()(
       setProgressOpen: (progressOpen) => set({ progressOpen }),
       setSearchOpen: (searchOpen) => set({ searchOpen }),
       setExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
+      setTimelineMode: (timelineMode) => set({ timelineMode }),
     }),
     {
       name: 'story-builder:ui',
@@ -123,6 +129,7 @@ export const useUi = create<UiState>()(
         mapPaletteOpen: s.mapPaletteOpen,
         theme: s.theme,
         exportOptions: s.exportOptions,
+        timelineMode: s.timelineMode,
       }),
     },
   ),

@@ -26,6 +26,8 @@ interface StoryActions {
   setBeatArc: (...args: Tail<Parameters<typeof ops.setBeatArc>>) => void
   placeBeat: (...args: Tail<Parameters<typeof ops.placeBeat>>) => void
   applyChapterLayout: (...args: Tail<Parameters<typeof ops.applyChapterLayout>>) => void
+  moveInTimeline: (...args: Tail<Parameters<typeof ops.moveInTimeline>>) => void
+  resetTimeline: () => void
   deleteBeat: (...args: Tail<Parameters<typeof ops.deleteBeat>>) => void
   setArcCharacter: (...args: Tail<Parameters<typeof ops.setArcCharacter>>) => void
   addCharacter: (...args: Tail<Parameters<typeof ops.addCharacter>>) => string
@@ -67,6 +69,7 @@ const STORY_KEYS = [
   'characters',
   'elements',
   'texts',
+  'timeline',
   'mindMaps',
   'goals',
   'wordLog',
@@ -81,6 +84,7 @@ export const pickData = (s: StoryData): StoryData => ({
   characters: s.characters,
   elements: s.elements,
   texts: s.texts,
+  timeline: s.timeline,
   mindMaps: s.mindMaps,
   goals: s.goals,
   wordLog: s.wordLog,
@@ -118,6 +122,8 @@ export const useStory = create<StoryStore>()(
         setBeatArc: (...a) => apply(ops.setBeatArc(data(), ...a), 'setBeatArc', a[0]),
         placeBeat: (...a) => apply(ops.placeBeat(data(), ...a), 'placeBeat', a[0]),
         applyChapterLayout: (...a) => apply(ops.applyChapterLayout(data(), ...a), 'applyChapterLayout', a[0]),
+        moveInTimeline: (...a) => apply(ops.moveInTimeline(data(), ...a), 'moveInTimeline', a[0]),
+        resetTimeline: () => apply(ops.resetTimeline(data()), 'resetTimeline'),
         deleteBeat: (...a) => apply(ops.deleteBeat(data(), ...a), 'deleteBeat', a[0]),
         setArcCharacter: (...a) => apply(ops.setArcCharacter(data(), ...a), 'setArcCharacter', a[0]),
         addCharacter: (...a) => withId(ops.addCharacter(data(), ...a), 'addCharacter', a[0]),

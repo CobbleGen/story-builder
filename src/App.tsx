@@ -13,6 +13,7 @@ import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
 import { CharacterPage } from './pages/CharacterPage'
 import { ElementPage } from './pages/ElementPage'
+import { TimelinePage } from './pages/TimelinePage'
 import { useStoryLoaded } from './store/storyStore'
 import { useSaveStatus } from './store/persistence'
 import { useApplyTheme } from './lib/theme'
@@ -54,6 +55,7 @@ export default function App() {
               </Suspense>
             }
           />
+          <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/arcs/:arcId" element={<ArcPage />} />
           <Route path="/characters/:characterId" element={<CharacterPage />} />
           <Route path="/elements/:elementId" element={<ElementPage />} />

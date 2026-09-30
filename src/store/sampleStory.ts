@@ -11,8 +11,10 @@ import {
   addMapNode,
   emptyStory,
   linkMentions,
+  moveInTimeline,
   renameMindMap,
   setChapterText,
+  updateBeat,
   updateChapter,
   updateMapEdge,
 } from './storyOps'
@@ -70,9 +72,10 @@ export function buildSampleStory(): StoryData {
     ;[data, id] = addArc(data, { name, color: color(colorName), description, characterIds })
     return id
   }
-  const beat = (arcId: string, title: string, description: string, chapterId: string | null = null, done = false) => {
+  const beat = (arcId: string, title: string, description: string, chapterId: string | null = null, done = false, when?: string) => {
     let id: string
     ;[data, id] = addBeat(data, { arcId, title, description, chapterId, done })
+    if (when) data = updateBeat(data, id, { when })
     return id
   }
 
@@ -116,15 +119,18 @@ export function buildSampleStory(): StoryData {
   const secret = arc('The keeper’s secret', 'Plum', '@Elias has been lying for twenty years.', [elias, mara])
   const village = arc('Village politics', 'Bronze', 'The @Harbour Council wants @Gull Point Light closed.', [harrow])
 
-  beat(mystery, 'The Aurelia signals from the reef', 'A flash of lantern light, then nothing.', ch1)
-  beat(secret, 'The lamp goes dark', '@Elias refuses to explain why the light failed.', ch1)
-  beat(romance, '@Theo meets the bus', 'He is the last person @Mara wanted to see.', ch1)
-  beat(mystery, 'No bodies on the beach', 'Only cargo crates, all of them empty.', ch2)
-  beat(village, 'Emergency council meeting', '@Harrow moves to decommission @Gull Point Light.', ch2)
-  beat(romance, 'Argument on the pier', '', ch2)
-  const drawer = beat(secret, 'The locked drawer', '@Mara finds the @Green Logbook under a false bottom.', ch3, true)
-  const margin = beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3, true)
-  beat(village, '@Harrow buys the old boathouse', '', ch4)
+  beat(mystery, 'The Aurelia signals from the reef', 'A flash of lantern light, then nothing.', ch1, false, 'The night of the storm')
+  beat(secret, 'The lamp goes dark', '@Elias refuses to explain why the light failed.', ch1, false, 'The night of the storm')
+  beat(romance, '@Theo meets the bus', 'He is the last person @Mara wanted to see.', ch1, false, 'The night of the storm')
+  beat(mystery, 'No bodies on the beach', 'Only cargo crates, all of them empty.', ch2, false, 'The next morning')
+  beat(village, 'Emergency council meeting', '@Harrow moves to decommission @Gull Point Light.', ch2, false, 'The next morning')
+  beat(romance, 'Argument on the pier', '', ch2, false, 'The next morning')
+  const drawer = beat(secret, 'The locked drawer', '@Mara finds the @Green Logbook under a false bottom.', ch3, true, 'That evening')
+  const margin = beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3, true, 'That evening')
+  // Read in chapter 3, but it happened first: the timeline shows it as a flashback.
+  const firstRun = beat(secret, '@Elias’s first run', 'He guides a boat with no lights past the reef, and is paid in cash.', ch3, false, 'Twenty years earlier')
+  data = moveInTimeline(data, firstRun, 0)
+  beat(village, '@Harrow buys the old boathouse', '', ch4, false, 'Two days later')
   beat(mystery, 'A survivor in the @Sea Caves', 'Someone was waiting for the tide to drop.')
   beat(romance, '@Theo admits he stayed for her', '')
   beat(secret, '@Elias confesses', 'He has been guiding smugglers past the reef for years.')
@@ -207,7 +213,7 @@ export function buildSampleStory(): StoryData {
   const nHarrow = place({ kind: 'character', refId: harrow, x: -250, y: 380 })
   const nLight = place({ kind: 'element', refId: light, x: 100, y: 330 })
   const nSecret = place({ kind: 'arc', refId: secret, x: -700, y: 120 })
-  const nLogbook = place({ kind: 'chapter', refId: ch3, x: -710, y: 470 })
+  const nLogbook = place({ kind: 'chapter', refId: ch3, x: -710, y: 600 })
   place({
     kind: 'note',
     x: 410,

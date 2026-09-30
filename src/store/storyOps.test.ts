@@ -38,7 +38,13 @@ import {
   deleteElement,
   linkMentions,
   mentionables,
+  moveInTimeline,
+  readingOrder,
+  resetTimeline,
+  storyOrder,
+  updateBeat,
 } from './storyOps'
+import { timeJumps } from '../lib/timeline'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 import { mentionPlaces, placeCount } from '../lib/mentionedIn'
@@ -710,5 +716,77 @@ describe('places and other elements', () => {
     expect(placeCount(places)).toBe(5)
     // Its own description doesn't count.
     expect(mentionPlaces(data, gang).elements).toEqual([])
+  })
+})
+
+describe('timeline', () => {
+  function story() {
+    let { data, ch1, ch2, main, love } = setup()
+    const add = (arcId: string, title: string, chapterId: string | null) => {
+      let id: string
+      ;[data, id] = addBeat(data, { arcId, title, chapterId })
+      return id
+    }
+    const a = add(main, 'a', ch1)
+    const b = add(love, 'b', ch1)
+    const c = add(main, 'c', ch2)
+    const loose = add(love, 'loose', null)
+    return { data, a, b, c, loose, ch1, ch2, main }
+  }
+
+  it('follows the reading order until the timeline is arranged', () => {
+    const { data, a, b, c, loose } = story()
+    expect(readingOrder(data)).toEqual([a, b, c, loose])
+    expect(storyOrder(data)).toEqual([a, b, c, loose])
+    expect(data.timeline).toEqual([])
+  })
+
+  it('moves a beat in time, and back to the reading order', () => {
+    const { data, a, b, c, loose } = story()
+    const moved = moveInTimeline(data, c, 0)
+    expect(storyOrder(moved)).toEqual([c, a, b, loose])
+    // The reading order doesn't change.
+    expect(readingOrder(moved)).toEqual([a, b, c, loose])
+    expect(moveInTimeline(moved, c, 0)).toBe(moved)
+    expect(storyOrder(resetTimeline(moved))).toEqual([a, b, c, loose])
+    expect(resetTimeline(data)).toBe(data)
+  })
+
+  it('puts a new beat after everything read before it, leaving flashbacks out of it', () => {
+    let { data, a, b, c, loose, ch2, main } = story()
+    // c becomes a flashback: read in chapter 2, happened first.
+    data = moveInTimeline(data, c, 0)
+    expect(timeJumps(storyOrder(data), data.chapters.flatMap((ch) => ch.beatIds)).get(c)).toBe('flashback')
+    let d: string
+    ;[data, d] = addBeat(data, { arcId: main, title: 'd', chapterId: ch2 })
+    // Read after c, but c is a flashback, so d follows b (and a), not c.
+    expect(storyOrder(data)).toEqual([c, a, b, d, loose])
+    // A deleted beat leaves the timeline.
+    data = deleteBeat(data, a)
+    expect(data.timeline).not.toContain(a)
+    expect(storyOrder(data)).toEqual([c, b, d, loose])
+  })
+
+  it('keeps a beat’s “when”, tidied', () => {
+    const { data, a } = story()
+    expect(updateBeat(data, a, { when: '  Day 3,\nevening ' }).beats[a].when).toBe('  Day 3, evening ')
+    expect(updateBeat(data, a, { when: '   ' }).beats[a]).not.toHaveProperty('when')
+    const loaded = normalizeStory({ ...moveInTimeline(updateBeat(data, a, { when: 'Day 3' }), a, 2), timeline: ['nope', a, a] })
+    expect(loaded.beats[a].when).toBe('Day 3')
+    expect(loaded.timeline).toEqual([a])
+    expect(normalizeStory({ title: 'Old' }).timeline).toEqual([])
+  })
+
+  it('shows the example story’s flashback', () => {
+    const data = buildSampleStory()
+    const order = storyOrder(data)
+    const first = data.beats[order[0]]
+    expect(first.when).toBe('Twenty years earlier')
+    const jumps = timeJumps(order, data.chapters.flatMap((c) => c.beatIds))
+    expect([...jumps]).toEqual([[order[0], 'flashback']])
+    // Chapter 4, added after the timeline was arranged, still comes after chapter 3.
+    const chapterOf = (id: string) => data.chapters.findIndex((c) => c.id === data.beats[id].chapterId)
+    const placed = order.filter((id) => data.beats[id].chapterId && id !== order[0]).map(chapterOf)
+    expect(placed).toEqual([...placed].sort((x, y) => x - y))
   })
 })

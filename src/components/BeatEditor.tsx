@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, Trash2 } from 'lucide-react'
 import { useMentionLookup, useStory } from '../store/storyStore'
@@ -22,6 +22,13 @@ export function BeatEditor() {
   const deleteBeat = useStory((s) => s.deleteBeat)
   const lookup = useMentionLookup()
   const close = useCallback(() => openBeat(null), [openBeat])
+  const beats = useStory((s) => s.beats)
+  // "When" labels already used, to pick from.
+  const whens = useMemo(
+    () => [...new Set(Object.values(beats).flatMap((b) => (b.when?.trim() ? [b.when.trim()] : [])))].slice(0, 50),
+    [beats],
+  )
+  const whenList = useId()
 
   if (!beat) return null
   const arc = arcs.find((a) => a.id === beat.arcId)
@@ -89,6 +96,22 @@ export function BeatEditor() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="field">
+          <span className="field-label">When it happens</span>
+          <input
+            className="plain-input"
+            value={beat.when ?? ''}
+            placeholder="In the story’s own time, e.g. “Day 3, evening”"
+            list={whenList}
+            maxLength={120}
+            onChange={(e) => updateBeat(beat.id, { when: e.target.value })}
+          />
+          <datalist id={whenList}>
+            {whens.map((w) => (
+              <option key={w} value={w} />
+            ))}
+          </datalist>
         </label>
         <div className="field">
           <span className="field-label">Notes</span>
