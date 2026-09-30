@@ -7,8 +7,10 @@ import type {
   CharacterAttribute,
   MapCardView,
   MapEdge,
+  MapEntityKind,
   MapListStyle,
   MapNode,
+  MapSize,
   NoteColor,
   RichNode,
   StoryData,
@@ -502,6 +504,7 @@ export type MapNodePatch = Partial<{
   list: MapListStyle | undefined
   checked: number[]
   expanded: MapCardView | undefined
+  sizes: Partial<Record<MapCardView, MapSize>>
 }>
 
 const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refId' in n
@@ -592,8 +595,15 @@ export function removeMapEdges(data: StoryData, ids: string[]): StoryData {
 
 // ---------- Integrity ----------
 
-export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange']
+export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange', 'white']
 export const MAP_LIST_STYLES: MapListStyle[] = ['bullet', 'number', 'check']
+/** The ways each kind of card can open up on the mind map. */
+export const MAP_CARD_VIEWS: Record<MapEntityKind, MapCardView[]> = {
+  chapter: ['text', 'beats'],
+  arc: ['beats'],
+  character: ['details'],
+  beat: [],
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -704,6 +714,18 @@ export function normalizeStory(input: unknown): StoryData {
   }
   const num = (v: unknown, fallback: number, min = -1e7, max = 1e7) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
+  /** A note's or text box's list style, and its ticked lines that still exist. */
+  const listOf = (n: Record<string, unknown>, text: string): { list?: MapListStyle; checked?: number[] } => {
+    const out: { list?: MapListStyle; checked?: number[] } = {}
+    const style = str(n.list) as MapListStyle
+    if (MAP_LIST_STYLES.includes(style)) out.list = style
+    const lines = text.split('\n').length
+    const checked = [...new Set(Array.isArray(n.checked) ? n.checked : [])]
+      .filter((i): i is number => Number.isInteger(i) && i >= 0 && i < lines)
+      .sort((a, b) => a - b)
+    if (checked.length) out.checked = checked
+    return out
+  }
   const rawMap = isRecord(raw.mindMap) ? raw.mindMap : {}
   const nodes: MapNode[] = []
   for (const n of list(rawMap.nodes)) {
@@ -715,12 +737,21 @@ export function normalizeStory(input: unknown): StoryData {
       const refId = str(n.refId)
       if (!refs[kind].has(refId)) continue
       const node: MapNode = { id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y }
-      if ((kind === 'chapter' && (n.expanded === 'text' || n.expanded === 'beats')) || (kind === 'arc' && n.expanded === 'beats')) {
-        node.expanded = n.expanded
+      const views = MAP_CARD_VIEWS[kind as MapEntityKind]
+      if (views.includes(n.expanded as MapCardView)) node.expanded = n.expanded as MapCardView
+      const rawSizes = isRecord(n.sizes) ? n.sizes : {}
+      const sizes: Partial<Record<MapCardView, MapSize>> = {}
+      for (const view of views) {
+        const size = rawSizes[view]
+        if (isRecord(size) && typeof size.width === 'number' && typeof size.height === 'number') {
+          sizes[view] = { width: num(size.width, 300, 160, 4000), height: num(size.height, 300, 120, 4000) }
+        }
       }
+      if (Object.keys(sizes).length) node.sizes = sizes
       nodes.push(node)
     } else if (kind === 'note') {
       const color = str(n.color) as NoteColor
+      const text = str(n.text)
       nodes.push({
         id,
         kind,
@@ -728,8 +759,9 @@ export function normalizeStory(input: unknown): StoryData {
         y,
         width: num(n.width, 220, 80, 2000),
         height: num(n.height, 160, 60, 2000),
-        text: str(n.text),
+        text,
         color: NOTE_COLORS.includes(color) ? color : 'yellow',
+        ...listOf(n, text),
       })
     } else if (kind === 'text') {
       const size = str(n.size) as TextSize
@@ -745,14 +777,7 @@ export function normalizeStory(input: unknown): StoryData {
       }
       const bg = str(n.bg) as NoteColor
       if (NOTE_COLORS.includes(bg)) node.bg = bg
-      const listStyle = str(n.list) as MapListStyle
-      if (MAP_LIST_STYLES.includes(listStyle)) node.list = listStyle
-      const lines = text.split('\n').length
-      const checked = [...new Set(Array.isArray(n.checked) ? n.checked : [])]
-        .filter((i): i is number => Number.isInteger(i) && i >= 0 && i < lines)
-        .sort((a, b) => a - b)
-      if (checked.length) node.checked = checked
-      nodes.push(node)
+      nodes.push({ ...node, ...listOf(n, text) })
     }
   }
   const nodeIds = new Set(nodes.map((n) => n.id))

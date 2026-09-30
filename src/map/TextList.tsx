@@ -1,13 +1,14 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { Check } from 'lucide-react'
+import { Check, List, ListChecks, ListOrdered } from 'lucide-react'
 import type { MapListStyle, MapNode } from '../types'
 import { useStory } from '../store/storyStore'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
-import { insertItem, listItems, removeItem, setItem, toggleItem, type ListState } from './listLines'
+import { insertItem, listItems, listPatch, removeItem, setItem, toggleItem, type ListState } from './listLines'
 import { focusSoon } from './mapShared'
 
-type TextMapNode = Extract<MapNode, { kind: 'text' }>
+/** Sticky notes and text boxes can both be lists. */
+type ListNode = Extract<MapNode, { kind: 'note' | 'text' }>
 
 interface MarkerProps {
   style: MapListStyle
@@ -42,8 +43,8 @@ function Marker({ style, index, checked, onToggle }: MarkerProps) {
   )
 }
 
-/** A text box's lines shown as a list. */
-export function TextList({ node }: { node: TextMapNode }) {
+/** A note's or text box's lines shown as a list. */
+export function TextList({ node }: { node: ListNode }) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const style = node.list ?? 'bullet'
   const checked = node.checked ?? []
@@ -71,7 +72,7 @@ export function TextList({ node }: { node: TextMapNode }) {
  * Typing in a list, one field per item: Enter adds the next item, Backspace
  * in an empty one removes it, and the arrow keys move between items.
  */
-export function ListEditor({ node, onDone }: { node: TextMapNode; onDone: () => void }) {
+export function ListEditor({ node, onDone }: { node: ListNode; onDone: () => void }) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const style = node.list ?? 'bullet'
   const items = listItems(node.text)
@@ -94,7 +95,9 @@ export function ListEditor({ node, onDone }: { node: TextMapNode; onDone: () => 
   // Read the saved list at the moment of the edit, so quick keystrokes build on each other.
   const current = (): ListState => {
     const saved = useStory.getState().mindMap.nodes.find((n) => n.id === node.id)
-    return saved?.kind === 'text' ? { text: saved.text, checked: saved.checked ?? [] } : { text: node.text, checked }
+    return saved && (saved.kind === 'text' || saved.kind === 'note')
+      ? { text: saved.text, checked: saved.checked ?? [] }
+      : { text: node.text, checked }
   }
   const save = (s: ListState) => updateMapNode(node.id, { text: s.text, checked: s.checked })
   const focusItem = (i: number) => {
@@ -166,5 +169,32 @@ export function ListEditor({ node, onDone }: { node: TextMapNode; onDone: () => 
         )
       })}
     </ul>
+  )
+}
+
+const LISTS: { style: MapListStyle; label: string; icon: React.ReactNode }[] = [
+  { style: 'bullet', label: 'Bulleted list', icon: <List size={15} /> },
+  { style: 'number', label: 'Numbered list', icon: <ListOrdered size={15} /> },
+  { style: 'check', label: 'Checklist', icon: <ListChecks size={15} /> },
+]
+
+/** Toolbar buttons that turn a note or text box into a list, or back. */
+export function ListButtons({ node }: { node: ListNode }) {
+  const updateMapNode = useStory((s) => s.updateMapNode)
+  return (
+    <>
+      {LISTS.map((l) => (
+        <button
+          key={l.style}
+          className={`map-tool icon-only${node.list === l.style ? ' active' : ''}`}
+          onClick={() => updateMapNode(node.id, listPatch(node, l.style))}
+          aria-pressed={node.list === l.style}
+          aria-label={l.label}
+          title={l.label}
+        >
+          {l.icon}
+        </button>
+      ))}
+    </>
   )
 }

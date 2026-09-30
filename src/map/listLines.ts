@@ -1,6 +1,8 @@
-// A text box shown as a list keeps its items as lines of its text, and the
-// ticked items of a checklist by line number. These edits keep the ticks on
-// the right items as lines come and go.
+import type { MapListStyle } from '../types'
+
+// A note or text box shown as a list keeps its items as lines of its text,
+// and the ticked items of a checklist by line number. These edits keep the
+// ticks on the right items as lines come and go.
 
 export interface ListState {
   text: string
@@ -44,4 +46,18 @@ export function toggleItem(checked: number[], i: number): number[] {
 export function toItems(text: string): string {
   const items = listItems(text).filter((line) => line.trim())
   return items.length ? items.join('\n') : ''
+}
+
+/**
+ * The change for picking a list style: the same style again turns the list
+ * off (its ticks go, since plain text can be edited freely); turning a list
+ * on drops blank lines, so paragraphs become items.
+ */
+export function listPatch(
+  node: { text: string; list?: MapListStyle },
+  style: MapListStyle,
+): { list: MapListStyle | undefined; checked?: undefined; text?: string } {
+  if (node.list === style) return { list: undefined, checked: undefined }
+  if (node.list) return { list: style }
+  return { list: style, text: toItems(node.text) }
 }

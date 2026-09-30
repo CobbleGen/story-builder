@@ -72,7 +72,9 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
     }
     if (n.kind === 'note') return { ...node, width: n.width, height: n.height }
     if (n.kind === 'text') return { ...node, width: n.width }
-    return node
+    // An opened-up card keeps the size it was given for that view.
+    const size = n.expanded ? n.sizes?.[n.expanded] : undefined
+    return size ? { ...node, width: size.width, height: size.height } : node
   })
 }
 
@@ -290,7 +292,8 @@ function MapCanvas() {
               style={{ width: 168, height: 112 }}
               nodeColor={(n) => {
                 const node = (n as StoryFlowNode).data.node
-                return node.kind === 'note' ? NOTE_COLOR_VALUES[node.color] : node.kind === 'text' ? 'transparent' : '#d6d1c6'
+                if (node.kind === 'note') return node.color === 'white' ? '#e4e0d7' : NOTE_COLOR_VALUES[node.color]
+                return node.kind === 'text' ? 'transparent' : '#d6d1c6'
               }}
               maskColor="rgba(239, 236, 229, 0.7)"
             />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RichNode } from '../types'
-import { insertItem, removeItem, setItem, toggleItem, toItems } from './listLines'
+import { insertItem, listPatch, removeItem, setItem, toggleItem, toItems } from './listLines'
 import { countWords, paginate } from './pages'
 
 describe('list text boxes', () => {
@@ -24,6 +24,12 @@ describe('list text boxes', () => {
     expect(toggleItem([0, 2], 2)).toEqual([0])
     expect(toItems('First\n\n  \nSecond\n')).toBe('First\nSecond')
     expect(toItems('\n')).toBe('')
+  })
+
+  it('turns lists on, switches their style and turns them off', () => {
+    expect(listPatch({ text: 'Rope\n\nLantern' }, 'check')).toEqual({ list: 'check', text: 'Rope\nLantern' })
+    expect(listPatch({ text: 'Rope\nLantern', list: 'check' }, 'number')).toEqual({ list: 'number' })
+    expect(listPatch({ text: 'Rope\nLantern', list: 'number' }, 'number')).toEqual({ list: undefined, checked: undefined })
   })
 })
 

@@ -64,12 +64,17 @@ export interface ChapterText {
 
 /** Story items that can be placed on the mind map; the card shows the live item. */
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'beat'
-export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange'
+export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
 export type TextSize = 'sm' | 'md' | 'lg'
 /** A text box shown as a list: each line is an item. */
 export type MapListStyle = 'bullet' | 'number' | 'check'
-/** What an opened-up card shows: a chapter's pages, or the beats of a chapter or arc. */
-export type MapCardView = 'text' | 'beats'
+/** What an opened-up card shows: a chapter's pages, the beats of a chapter or arc, or a character's details. */
+export type MapCardView = 'text' | 'beats' | 'details'
+/** A card's size on the map, when the writer has set one. */
+export interface MapSize {
+  width: number
+  height: number
+}
 
 export type MapNode =
   | {
@@ -78,10 +83,24 @@ export type MapNode =
       refId: string
       x: number
       y: number
-      /** Chapters open up to their pages or beats, arcs to their beats. */
+      /** Chapters open up to their pages or beats, arcs to their beats, characters to their details. */
       expanded?: MapCardView
+      /** Sizes the writer gave the card while opened up, per view. */
+      sizes?: Partial<Record<MapCardView, MapSize>>
     }
-  | { id: string; kind: 'note'; x: number; y: number; width: number; height: number; text: string; color: NoteColor }
+  | {
+      id: string
+      kind: 'note'
+      x: number
+      y: number
+      width: number
+      height: number
+      text: string
+      color: NoteColor
+      list?: MapListStyle
+      /** Ticked items of a checklist, by line. */
+      checked?: number[]
+    }
   | {
       id: string
       kind: 'text'

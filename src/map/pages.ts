@@ -25,7 +25,7 @@ export function countWords(node: RichNode): number {
 }
 
 /** The first `budget` words of a paragraph, and the rest (null if it all fits). */
-function splitParagraph(p: RichNode, budget: number): [RichNode, RichNode | null] {
+export function splitParagraph(p: RichNode, budget: number): [RichNode, RichNode | null] {
   const head: RichNode[] = []
   const tail: RichNode[] = []
   let used = 0

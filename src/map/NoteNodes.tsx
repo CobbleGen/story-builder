@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { NodeResizer, NodeToolbar, type NodeProps } from '@xyflow/react'
-import { List, ListChecks, ListOrdered, PenLine, Trash2 } from 'lucide-react'
-import type { MapListStyle, MapNode, NoteColor, TextSize } from '../types'
+import { PenLine, Trash2 } from 'lucide-react'
+import type { MapNode, NoteColor, TextSize } from '../types'
 import { useStory } from '../store/storyStore'
 import { NOTE_COLORS } from '../store/storyOps'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
-import { ListEditor, TextList } from './TextList'
-import { toItems } from './listLines'
+import { ListButtons, ListEditor, TextList } from './TextList'
 import { NOTE_COLOR_VALUES, focusSoon, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 
 type NoteMapNode = Extract<MapNode, { kind: 'note' }>
@@ -20,11 +19,6 @@ const SIZES: { size: TextSize; label: string }[] = [
   { size: 'lg', label: 'L' },
 ]
 
-const LISTS: { style: MapListStyle; label: string; icon: React.ReactNode }[] = [
-  { style: 'bullet', label: 'Bulleted list', icon: <List size={15} /> },
-  { style: 'number', label: 'Numbered list', icon: <ListOrdered size={15} /> },
-  { style: 'check', label: 'Checklist', icon: <ListChecks size={15} /> },
-]
 
 /** Shared editing behaviour: double-click to write, click away or Escape to stop. */
 function useEditing(id: string) {
@@ -51,7 +45,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
 
   return (
     <div
-      className={`map-note${editing ? ' editing' : ''}`}
+      className={`map-note note-${node.color}${editing ? ' editing' : ''}`}
       style={{ background: NOTE_COLOR_VALUES[node.color] }}
       onDoubleClick={start}
     >
@@ -75,29 +69,41 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
           />
         ))}
         <span className="map-tool-sep" />
-        <button className="map-tool" onClick={start}>
-          <PenLine size={14} /> Edit
+        <ListButtons node={node} />
+        <span className="map-tool-sep" />
+        <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
+          <PenLine size={14} />
         </button>
-        <button className="map-tool" onClick={remove}>
-          <Trash2 size={14} /> Delete
+        <button className="map-tool icon-only" onClick={remove} aria-label="Delete" title="Delete">
+          <Trash2 size={14} />
         </button>
       </NodeToolbar>
       <Handles />
       {editing ? (
         <div className="map-note-scroll nodrag nopan nowheel">
-          <MentionTextarea
-            ref={input}
-            className="map-note-input"
-            value={node.text}
-            placeholder="Write a note… Type @ to mention a character."
-            aria-label="Note"
-            onChange={(text) => updateMapNode(id, { text })}
-            onBlur={stop}
-          />
+          {node.list ? (
+            <ListEditor node={node} onDone={stop} />
+          ) : (
+            <MentionTextarea
+              ref={input}
+              className="map-note-input"
+              value={node.text}
+              placeholder="Write a note… Type @ to mention a character."
+              aria-label="Note"
+              onChange={(text) => updateMapNode(id, { text })}
+              onBlur={stop}
+            />
+          )}
         </div>
       ) : (
         <div className="map-note-text">
-          {node.text ? <MentionText text={node.text} /> : <span className="map-placeholder">Double-click to write</span>}
+          {node.text && node.list ? (
+            <TextList node={node} />
+          ) : node.text ? (
+            <MentionText text={node.text} />
+          ) : (
+            <span className="map-placeholder">Double-click to write</span>
+          )}
         </div>
       )}
     </div>
@@ -110,15 +116,9 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const { editing, input, start, stop, remove } = useEditing(id)
   const toolbar = useToolbarPlacement(id, selected)
 
-  const setList = (style: MapListStyle) => {
-    if (node.list === style) updateMapNode(id, { list: undefined, checked: undefined })
-    else if (node.list) updateMapNode(id, { list: style })
-    else updateMapNode(id, { list: style, text: toItems(node.text) })
-  }
-
   return (
     <div
-      className={`map-text size-${node.size}${node.bg ? ' has-bg' : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
+      className={`map-text size-${node.size}${node.bg ? ` has-bg bg-${node.bg}` : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
       style={node.bg ? { background: NOTE_COLOR_VALUES[node.bg] } : undefined}
       onDoubleClick={start}
     >
@@ -160,18 +160,7 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
           />
         ))}
         <span className="map-tool-sep" />
-        {LISTS.map((l) => (
-          <button
-            key={l.style}
-            className={`map-tool icon-only${node.list === l.style ? ' active' : ''}`}
-            onClick={() => setList(l.style)}
-            aria-pressed={node.list === l.style}
-            aria-label={l.label}
-            title={l.label}
-          >
-            {l.icon}
-          </button>
-        ))}
+        <ListButtons node={node} />
         <span className="map-tool-sep" />
         <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
           <PenLine size={14} />

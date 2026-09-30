@@ -35,6 +35,7 @@ export const NOTE_COLOR_VALUES: Record<NoteColor, string> = {
   green: '#cfe9c8',
   purple: '#dccff5',
   orange: '#fbd2ad',
+  white: '#ffffff',
 }
 
 export type StoryFlowNode = Node<{ node: MapNode }, MapNode['kind']>

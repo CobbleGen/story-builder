@@ -86,7 +86,7 @@ function renderNode(node: RichNode, key: number, ctx: Context, className?: strin
 }
 
 /** A page of a chapter's text, read-only, looking like the manuscript. */
-export function RichView({ blocks }: { blocks: PageBlock[] }) {
+export function RichView({ blocks, first }: { blocks: PageBlock[]; first?: boolean }) {
   const lookup = useCharacterLookup()
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
@@ -100,7 +100,7 @@ export function RichView({ blocks }: { blocks: PageBlock[] }) {
     },
   }
   return (
-    <div className="map-rich">
+    <div className={`map-rich${first ? ' first-page' : ''}`}>
       {blocks.map((b, i) => renderNode(b.node, i, ctx, b.continued ? 'continued' : undefined))}
     </div>
   )

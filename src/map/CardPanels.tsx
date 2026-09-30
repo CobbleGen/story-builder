@@ -1,19 +1,65 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Check, ChevronLeft, ChevronRight, PenLine, Plus } from 'lucide-react'
-import type { Beat } from '../types'
+import type { Beat, Character, RichNode } from '../types'
 import { chapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
-import { plainText } from '../lib/mentions'
+import { displayName, mentions, plainText } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ArcPicker } from '../components/ArcPicker'
 import { ChapterTag } from '../components/ChapterTag'
 import { RichView } from './RichView'
-import { paginate, WORDS_PER_PAGE } from './pages'
+import { paginate, type PageBlock } from './pages'
+import { measurePages } from './measurePages'
 import { DRAG_MIME, focusSoon } from './mapShared'
 
-/** The first page also carries the chapter heading. */
-const FIRST_PAGE_WORDS = WORDS_PER_PAGE - 30
+// How many words a page holds follows the size of the paper, so a bigger card
+// shows more of the chapter at once. Tuned by measuring the page's type.
+const WORDS_PER_SQUARE_PX = 130 / (272 * 290)
+/** Room the chapter heading takes at the top of the first page. */
+const HEADING_PX = 76
+/** The text area of the paper at the card's standard size. */
+const STANDARD_PAPER = { width: 272, height: 290 }
+
+/** Room left under the last line, so rounding never tips a page into scrolling. */
+const FIT_SLACK = 3
+
+/** Changes when web fonts finish loading, since text then takes a different amount of room. */
+function useFontsLoaded(): number {
+  const [loads, setLoads] = useState(0)
+  useEffect(() => {
+    const fonts = document.fonts
+    if (!fonts) return
+    const again = () => setLoads((n) => n + 1)
+    fonts.addEventListener('loadingdone', again)
+    void fonts.ready.then(again)
+    return () => fonts.removeEventListener('loadingdone', again)
+  }, [])
+  return loads
+}
+
+/** The size of the paper's text area (inside its padding), as it changes. */
+function usePaperSize(ref: RefObject<HTMLElement | null>, doc: RichNode | undefined) {
+  const [size, setSize] = useState(STANDARD_PAPER)
+  const hasPaper = !!doc
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const cs = getComputedStyle(el)
+      const px = (v: string) => parseFloat(v) || 0
+      // offsetWidth, not clientWidth: a scrollbar appearing mustn't change the page size.
+      const width = Math.round(el.offsetWidth - px(cs.paddingLeft) - px(cs.paddingRight) - px(cs.borderLeftWidth) - px(cs.borderRightWidth))
+      const height = Math.round(el.offsetHeight - px(cs.paddingTop) - px(cs.paddingBottom) - px(cs.borderTopWidth) - px(cs.borderBottomWidth))
+      setSize((s) => (s.width === width && s.height === height ? s : { width, height }))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref, hasPaper])
+  return size
+}
 
 /**
  * Whether an element has more content than fits, so it scrolls. Only then
@@ -50,9 +96,44 @@ interface PagesProps {
 /** The chapter's text a page at a time, with arrows and a page picker. */
 export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) {
   const doc = useStory((s) => s.texts[chapterId]?.doc)
-  const pages = useMemo(() => paginate(doc, WORDS_PER_PAGE, FIRST_PAGE_WORDS), [doc])
-  const [page, setPage] = useState(0)
+  const characters = useStory((s) => s.characters)
   const paper = useRef<HTMLDivElement>(null)
+  const measureHead = useRef<HTMLDivElement>(null)
+  const measureText = useRef<HTMLDivElement>(null)
+  const size = usePaperSize(paper, doc)
+  const fonts = useFontsLoaded()
+
+  // A quick estimate by word count, replaced before it's seen by pages
+  // measured in a hidden copy of the paper.
+  const perPage = Math.max(30, Math.round(size.width * size.height * WORDS_PER_SQUARE_PX))
+  const firstPage = Math.max(15, Math.round(size.width * (size.height - HEADING_PX) * WORDS_PER_SQUARE_PX))
+  const estimate = useMemo(() => paginate(doc, perPage, firstPage), [doc, perPage, firstPage])
+  const [measured, setMeasured] = useState<PageBlock[][] | null>(null)
+  const measuredFor = useRef<unknown[] | null>(null)
+
+  useLayoutEffect(() => {
+    const head = measureHead.current
+    const host = measureText.current
+    if (!doc || !head || !host) return
+    const run = () => {
+      const cs = getComputedStyle(head)
+      const headRoom = head.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0)
+      const name = (id: string) => {
+        const c = characters.find((ch) => ch.id === id)
+        return c ? displayName(c) : 'unknown character'
+      }
+      setMeasured(measurePages(doc, host, { first: size.height - headRoom - FIT_SLACK, rest: size.height - FIT_SLACK }, name))
+    }
+    // New text lays out straight away; while a card is being resized, wait for a pause.
+    const prev = measuredFor.current
+    measuredFor.current = [doc, characters, title]
+    if (!prev || prev[0] !== doc || prev[1] !== characters || prev[2] !== title) return run()
+    const timer = setTimeout(run, 120)
+    return () => clearTimeout(timer)
+  }, [doc, characters, title, size, fonts])
+
+  const pages = doc ? (measured ?? estimate) : []
+  const [page, setPage] = useState(0)
   const scrolls = useScrolls(paper)
   const at = Math.max(0, Math.min(page, pages.length - 1))
 
@@ -82,7 +163,16 @@ export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) 
             </strong>
           </div>
         )}
-        <RichView blocks={pages[at]} />
+        <RichView blocks={pages[at]} first={at === 0} />
+      </div>
+      <div className="map-paper map-measure" style={{ width: size.width }} aria-hidden>
+        <div ref={measureHead} className="map-paper-head">
+          <span>Chapter {number}</span>
+          <strong>
+            <MentionText text={title} fallback="Untitled chapter" />
+          </strong>
+        </div>
+        <div ref={measureText} className="map-rich" />
       </div>
       <div className="map-page-nav">
         <button
@@ -312,6 +402,95 @@ export function BeatList({ beatIds, scope }: { beatIds: string[]; scope: BeatSco
         >
           <Plus size={14} /> Add beat
         </button>
+      )}
+    </div>
+  )
+}
+
+// ---------- A character's details ----------
+
+/** Everything about a character: their attributes in full, arcs, chapters and beats. */
+export function CharacterDetails({ character }: { character: Character }) {
+  const arcs = useStory((s) => s.arcs)
+  const chapters = useStory((s) => s.chapters)
+  const beats = useStory((s) => s.beats)
+  const openBeat = useUi((s) => s.openBeat)
+  const scroller = useRef<HTMLDivElement>(null)
+  const scrolls = useScrolls(scroller)
+  const numbers = chapterNumbers(chapters)
+  const attributes = character.attributes.filter((a) => a.label || a.value)
+  const inArcs = arcs.filter((a) => a.characterIds.includes(character.id))
+  const pov = chapters.filter((c) => c.povCharacterId === character.id)
+  const inBeats = arcs.flatMap((a) =>
+    a.beatIds
+      .map((id) => beats[id])
+      .filter((b): b is Beat => !!b && (mentions(b.title, character.id) || mentions(b.description, character.id))),
+  )
+  const colorOf = (arcId: string) => arcs.find((a) => a.id === arcId)?.color
+
+  return (
+    <div ref={scroller} className={`map-panel map-details nodrag${scrolls ? ' nowheel' : ''}`}>
+      <section>
+        <h4>Attributes</h4>
+        {attributes.length ? (
+          <dl className="map-attr-list">
+            {attributes.map((a) => (
+              <div key={a.id}>
+                <dt>{a.label || 'Note'}</dt>
+                <dd>
+                  <MentionText text={a.value} fallback="–" />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="map-details-empty">None yet. Add some on their page.</p>
+        )}
+      </section>
+      {inArcs.length > 0 && (
+        <section>
+          <h4>Arcs</h4>
+          <ul className="map-chips">
+            {inArcs.map((a) => (
+              <li key={a.id} style={{ '--arc': a.color } as React.CSSProperties}>
+                <span className="arc-dot" />
+                <span className="map-chip-text">
+                  <MentionText text={a.name} fallback="Untitled arc" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {pov.length > 0 && (
+        <section>
+          <h4>Point of view in</h4>
+          <ul className="map-chips">
+            {pov.map((c) => (
+              <li key={c.id}>
+                <span className="map-chip-num">{numbers[c.id]}</span>
+                <span className="map-chip-text">
+                  <MentionText text={c.title} fallback="Untitled chapter" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {inBeats.length > 0 && (
+        <section>
+          <h4>In {inBeats.length === 1 ? 'one beat' : `${inBeats.length} beats`}</h4>
+          <ol className="map-beat-list">
+            {inBeats.map((b) => (
+              <li key={b.id} className="map-beat" style={{ '--arc': colorOf(b.arcId) } as React.CSSProperties}>
+                {b.chapterId && <ChapterTag number={numbers[b.chapterId]} />}
+                <button type="button" className="map-beat-title" onClick={() => openBeat(b.id)}>
+                  <MentionText text={b.title} fallback={<span className="muted">Untitled beat</span>} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
     </div>
   )

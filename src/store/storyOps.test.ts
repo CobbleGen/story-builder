@@ -433,10 +433,27 @@ describe('mind map', () => {
           { id: 'n3', kind: 'arc', refId: 'a1', x: 0, y: 0, expanded: 'text' },
           { id: 'n4', kind: 'text', x: 0, y: 0, text: 'Rope\nLantern', bg: 'green', list: 'check', checked: [1, 1, 5, -1, 'x'] },
           { id: 'n5', kind: 'text', x: 0, y: 0, text: 'Plain', bg: 'neon', list: 'stars' },
+          {
+            id: 'n6',
+            kind: 'chapter',
+            refId: 'c1',
+            x: 0,
+            y: 0,
+            expanded: 'beats',
+            sizes: { text: { width: 500, height: 99999 }, beats: { width: 'wide' }, details: { width: 300, height: 300 } },
+          },
+          { id: 'n7', kind: 'note', x: 0, y: 0, text: 'A\nB', color: 'white', list: 'bullet', checked: [0] },
+          { id: 'n8', kind: 'character', refId: 'ch1', x: 0, y: 0, expanded: 'details' },
         ],
       },
+      characters: [{ id: 'ch1', name: 'Mara', color: '#123456' }],
     })
-    const [chapter, arc, badArc, list, plain] = data.mindMap.nodes
+    const [chapter, arc, badArc, list, plain, sized, note, character] = data.mindMap.nodes
+    expect(sized).toMatchObject({ expanded: 'beats', sizes: { text: { width: 500, height: 4000 } } })
+    expect(sized).not.toHaveProperty('sizes.beats')
+    expect(sized).not.toHaveProperty('sizes.details')
+    expect(note).toMatchObject({ color: 'white', list: 'bullet', checked: [0] })
+    expect(character).toMatchObject({ expanded: 'details' })
     expect(chapter).toMatchObject({ expanded: 'text' })
     expect(arc).toMatchObject({ expanded: 'beats' })
     expect(badArc).not.toHaveProperty('expanded')

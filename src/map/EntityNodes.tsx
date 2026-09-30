@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
-import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react'
-import { ArrowUpRight, BookOpen, Check, ChevronDown, CircleDashed, FileText, ListTree, PenLine, X } from 'lucide-react'
-import type { MapCardView, MapNode } from '../types'
+import { Handle, NodeResizer, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
+import { ArrowUpRight, BookOpen, Check, ChevronDown, CircleDashed, FileText, IdCard, ListTree, PenLine, Shrink, X } from 'lucide-react'
+import type { MapCardView, MapNode, MapSize } from '../types'
 import { chapterNumbers, useStory } from '../store/storyStore'
 import { displayName } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
-import { BeatList, ChapterPages } from './CardPanels'
+import { BeatList, ChapterPages, CharacterDetails } from './CardPanels'
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 
@@ -33,19 +33,57 @@ interface CardProps {
   className?: string
 }
 
+/** The smallest an opened-up card can be made, per view. */
+const MIN_SIZE: Record<MapCardView, MapSize> = {
+  text: { width: 260, height: 320 },
+  beats: { width: 220, height: 200 },
+  details: { width: 220, height: 180 },
+}
+
 function Card({ node, selected, kindLabel, color, openLabel, openIcon, children, className }: CardProps) {
   const { openItem, removeNode } = useMap()
+  const updateMapNode = useStory((s) => s.updateMapNode)
   const toolbar = useToolbarPlacement(node.id, selected)
-  const expanded = 'expanded' in node && node.expanded
+  const entity = 'refId' in node ? node : null
+  const view = entity?.expanded
+  // Opened cards can be resized; a resized card fills the size it was given.
+  const sized = useStore((s) => {
+    const n = s.nodeLookup.get(node.id)
+    return !!view && n?.width !== undefined && n?.height !== undefined
+  })
+  const saveSize = (size: MapSize | undefined, at?: { x: number; y: number }) => {
+    if (!entity || !view) return
+    const sizes = { ...entity.sizes }
+    if (size) sizes[view] = size
+    else delete sizes[view]
+    updateMapNode(node.id, { ...at, sizes })
+  }
   return (
     <div
-      className={`map-card${className ? ` ${className}` : ''}${expanded ? ` expanded ${expanded}` : ''}`}
+      className={`map-card${className ? ` ${className}` : ''}${view ? ` expanded ${view}` : ''}${sized ? ' sized' : ''}`}
       style={color ? ({ '--card': color } as React.CSSProperties) : undefined}
     >
+      {view && (
+        <NodeResizer
+          isVisible={selected}
+          minWidth={MIN_SIZE[view].width}
+          minHeight={MIN_SIZE[view].height}
+          lineClassName="map-resize-line"
+          handleClassName="map-resize-handle"
+          onResizeEnd={(_, p) =>
+            saveSize({ width: Math.round(p.width), height: Math.round(p.height) }, { x: Math.round(p.x), y: Math.round(p.y) })
+          }
+        />
+      )}
       <NodeToolbar isVisible={selected} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         <button className="map-tool" onClick={() => openItem(node)}>
           {openIcon ?? <ArrowUpRight size={14} />} {openLabel}
         </button>
+        {view && entity?.sizes?.[view] && (
+          <button className="map-tool" onClick={() => saveSize(undefined)} title="Back to the standard size">
+            <Shrink size={14} /> Standard size
+          </button>
+        )}
         <button className="map-tool" onClick={() => removeNode(node.id)} title="Remove from the map (the item itself stays)">
           <X size={14} /> Remove from map
         </button>
@@ -217,7 +255,10 @@ export function ChapterNode({ data, selected }: NodeProps<StoryFlowNode>) {
 export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const character = useStory((s) => s.characters.find((c) => c.id === node.refId))
+  const toggle = useToggleView(node)
   if (!character) return <Missing what="Character" />
+  const attributes = character.attributes.filter((a) => a.label || a.value)
+  const open = node.expanded === 'details'
   return (
     <Card node={node} selected={selected} color={character.color} className="character-card" kindLabel="Character" openLabel="Open character">
       <div className="map-character-head">
@@ -229,21 +270,33 @@ export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
           <MentionText text={character.description} />
         </div>
       )}
-      {character.attributes.filter((a) => a.label || a.value).length > 0 && (
+      {!open && attributes.length > 0 && (
         <dl className="map-attrs">
-          {character.attributes
-            .filter((a) => a.label || a.value)
-            .slice(0, 3)
-            .map((a) => (
-              <div key={a.id}>
-                <dt>{a.label || 'Note'}</dt>
-                <dd>
-                  <MentionText text={a.value} fallback="–" />
-                </dd>
-              </div>
-            ))}
+          {attributes.slice(0, 3).map((a) => (
+            <div key={a.id}>
+              <dt>{a.label || 'Note'}</dt>
+              <dd>
+                <MentionText text={a.value} fallback="–" />
+              </dd>
+            </div>
+          ))}
         </dl>
       )}
+      <div className="map-card-foot">
+        <ViewButton
+          active={open}
+          onClick={() => toggle('details')}
+          icon={<IdCard size={13} />}
+          label={
+            <>
+              Details
+              {attributes.length > 3 && !open && <span className="map-view-count">+{attributes.length - 3}</span>}
+            </>
+          }
+          title={open ? 'Hide the details' : 'Show all their attributes, arcs and beats'}
+        />
+      </div>
+      {open && <CharacterDetails character={character} />}
     </Card>
   )
 }
@@ -264,7 +317,10 @@ export function BeatNode({ data, selected }: NodeProps<StoryFlowNode>) {
       className="beat-card-map"
       kindLabel={
         <>
-          <span className="arc-dot" /> <MentionText text={arc?.name ?? ''} fallback="Beat" />
+          <span className="arc-dot" />
+          <span className="map-kind-text">
+            <MentionText text={arc?.name ?? ''} fallback="Beat" />
+          </span>
         </>
       }
       openLabel="Edit beat"
