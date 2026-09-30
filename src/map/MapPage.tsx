@@ -149,6 +149,8 @@ function MapCanvas() {
         target: e.target,
         type: 'story',
         data: { edge: e },
+        // Over the cards (even a selected one), so a line visibly reaches the row it's drawn from.
+        zIndex: 2000,
         selected: !!edgeSelection[e.id],
         markerEnd: e.arrow ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#8f897f' } : undefined,
       })),

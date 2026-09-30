@@ -25,6 +25,23 @@ const centre = (node: InternalNode): Point => ({
   y: node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2,
 })
 
+/** Room left at each end of a line that doesn't take clicks. */
+const END_GAP = 10
+
+/** A line's end moved a little way along the line. */
+function inset(end: End, by: number): End {
+  switch (end.position) {
+    case Position.Left:
+      return { ...end, x: end.x - by }
+    case Position.Right:
+      return { ...end, x: end.x + by }
+    case Position.Top:
+      return { ...end, y: end.y - by }
+    default:
+      return { ...end, y: end.y + by }
+  }
+}
+
 /** Middle of a card's side, facing a point. */
 function cardEnd(node: InternalNode, toward: Point): End {
   const w = node.measured.width ?? 0
@@ -78,18 +95,24 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
   const toRow = rowEnd(targetNode, edge.targetAnchor, fromRow ?? centre(sourceNode), loop)
   const from = fromRow ?? cardEnd(sourceNode, toRow ?? centre(targetNode))
   const to = toRow ?? cardEnd(targetNode, from)
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX: from.x,
-    sourceY: from.y,
-    sourcePosition: from.position,
-    targetX: to.x,
-    targetY: to.y,
-    targetPosition: to.position,
-  })
+  const curve = (a: End, b: End) =>
+    getBezierPath({
+      sourceX: a.x,
+      sourceY: a.y,
+      sourcePosition: a.position,
+      targetX: b.x,
+      targetY: b.y,
+      targetPosition: b.position,
+    })
+  const [path, labelX, labelY] = curve(from, to)
+  // Lines are drawn over the cards, so the part that takes clicks stops short
+  // of each end: the connection points there stay free to draw new lines from.
+  const [clickPath] = curve(inset(from, END_GAP), inset(to, END_GAP))
 
   return (
     <>
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`map-edge${selected ? ' selected' : ''}`} interactionWidth={18} />
+      <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`map-edge${selected ? ' selected' : ''}`} interactionWidth={0} />
+      <path d={clickPath} className="react-flow__edge-interaction map-edge-hit" fill="none" strokeOpacity={0} strokeWidth={14} />
       <EdgeLabelRenderer>
         <div
           className={`map-edge-label-wrap nodrag nopan${selected ? ' selected' : ''}`}

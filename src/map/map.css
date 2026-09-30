@@ -172,7 +172,6 @@
   padding: 0 8px 20px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .palette-section + .palette-section {
@@ -1385,15 +1384,25 @@
 
 /* ---------- Lines ---------- */
 
-/* Labels sit under cards like their lines do, except the selected line's, whose tools must show. */
+/* Lines and their labels sit over the cards; the selected line's label and tools on top. */
 .map-edge-label-wrap {
   position: absolute;
-  z-index: 0;
+  z-index: 2001;
   pointer-events: all;
 }
 
 .map-edge-label-wrap.selected {
-  z-index: 2000;
+  z-index: 2002;
+}
+
+/* Only the (shortened) hit path takes clicks, not the drawn line. */
+.map-canvas .react-flow__edge-path.map-edge {
+  pointer-events: none;
+}
+
+.map-canvas .map-edge-hit {
+  stroke: transparent;
+  pointer-events: stroke;
 }
 
 .map-edge-label {
@@ -1434,6 +1443,24 @@
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* Scrollbars stay out of sight until the pointer is over the part that scrolls. */
+.palette-scroll,
+.map-paper,
+.map-beats,
+.map-details,
+.map-note-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.palette-scroll:hover,
+.map-paper:hover,
+.map-beats:hover,
+.map-details:hover,
+.map-note-scroll:hover {
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 /* ---------- Phones ---------- */

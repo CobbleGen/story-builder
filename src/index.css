@@ -2545,8 +2545,6 @@ a {
   min-height: 0;
   overflow-y: auto;
   padding: 32px 76px 96px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .write-paper {
@@ -2879,13 +2877,31 @@ a {
   color: var(--ink-3);
 }
 
-/* ---------- Scrollbars ---------- */
+/* ---------- Scrollbars ----------
+   Thin, and out of sight until the pointer is over the part that scrolls. */
 
 .board,
 .chapter-beats,
 .sidebar-scroll,
-.arc-page {
+.arc-page,
+.modal,
+.backup-list,
+.beats-panel,
+.write-scroll,
+.mention-popup {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.board:hover,
+.chapter-beats:hover,
+.sidebar-scroll:hover,
+.arc-page:hover,
+.modal:hover,
+.backup-list:hover,
+.beats-panel:hover,
+.write-scroll:hover,
+.mention-popup:hover {
   scrollbar-color: var(--line-strong) transparent;
 }
 
