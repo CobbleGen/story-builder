@@ -3,13 +3,14 @@
 A planning board for writers. Lay your book out chapter by chapter and drag
 colour-coded story beats into place, Trello-style.
 
-It has three views: the **chapter board**, the **manuscript** and the
-**mind map**.
+It has four views: the **chapter board**, the **manuscript**, the
+**mind map** and the **timeline**.
 
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
   chapter by its "Chapter N" label to reorder the book (numbers update
-  automatically).
+  automatically). Each chapter has a **status** (outline, draft, revised,
+  done) shown as a coloured pill, and can have a word target.
 - **Beats** are cards, colour-coded by the **arc** they belong to. Click a
   beat to edit its title and notes, or to change its arc or chapter.
 - **Arcs sidebar** (left, collapsible) lists every arc. Click an arc to
@@ -26,9 +27,15 @@ It has three views: the **chapter board**, the **manuscript** and the
   mentioned. Hovering a character dims beats they aren't part of.
 - **Point of view**: pick a chapter's POV character from its header; the
   chapter takes on that character's colour.
-- **@mentions**: type `@` in any text to mention a character (or create a
-  new one). Mentions show as the name in the character's colour, and renaming
-  a character updates every mention.
+- **Places, objects and groups** live in the sidebar's **World** tab, sorted
+  by kind (place, object, group, other). They work like characters: each has
+  a colour, a page with its own attributes and suggestions for the kind, and
+  a list of everywhere it's mentioned. Hovering one dims the beats that don't
+  mention it.
+- **@mentions**: type `@` in any text to mention a character, place or thing
+  (or create a new character or place from what you typed). Mentions show as
+  the name in its colour, and renaming updates every mention; deleting turns
+  them back into plain text.
 - **Manuscript** (second tab in the top bar) is where each chapter is
   written, in a full text editor: headings, bold/italic/underline, quotes,
   lists, scene breaks, undo, smart quotes and dashes, and `@` mentions. The
@@ -51,6 +58,17 @@ It has three views: the **chapter board**, the **manuscript** and the
   the card, and a paragraph's lines follow it when text is added above it. Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
+- **Several mind maps**: the map's name sits at its top left; its menu
+  switches maps, starts a new one, renames it or deletes it (the story items
+  on it stay). Each map remembers where it was scrolled and zoomed to. Places
+  and things go on maps too, and open up to their details.
+- **Timeline** (fourth tab) puts every beat on one line of time, with a lane
+  per arc. **Story order** is when things happen in the story's world: drag
+  a beat to move it in time, and give beats a "when" ("The next morning") in
+  the beat editor; runs of the same "when" are labelled along the top.
+  **Reading order** is chapter by chapter, as readers meet them. Beats told
+  out of order are marked **Flashback** or **Flash-forward**, and **Match
+  reading order** puts story time back the way it's read.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button
   shows the chapter's text a page at a time (arrows or the page picker to move
   through it), and **Beats** lists its beats. An arc card lists its beats in
@@ -61,6 +79,27 @@ It has three views: the **chapter board**, the **manuscript** and the
   or drag it out onto the map. Select an opened card to resize it from its
   edges: pages re-flow to fill the new size (make it big enough and the whole
   chapter fits on one page), and **Standard size** puts it back.
+
+- **Search** (Ctrl+K, or ⌘K on a Mac, or Search in the top bar) finds
+  anything: chapters, the manuscript's text, beats, characters and their
+  attributes, places and things, arcs, and notes on every mind map. Case and
+  accents don't matter, and "quoted words" are found together. Pick a result
+  to go straight to it: the manuscript opens with the words selected, a note
+  is centred on its map, a chapter glows on the board.
+- **Undo and redo** (the arrows in the top bar, Ctrl+Z and Ctrl+Shift+Z or
+  Ctrl+Y, ⌘Z and ⇧⌘Z on a Mac) step through changes on the board, pages and
+  mind maps; typing in one field is one step. The manuscript has the text
+  editor's own undo.
+- **Word count and goals** (the target icon in the top bar, or ⋯): the whole
+  draft's words, a goal for the draft and for each day, the last 30 days'
+  writing as a chart (or a table), a streak, and every chapter's words
+  against its target.
+- **Export the manuscript** (⋯ → Export manuscript…) as a Word document, a
+  PDF (through the print window), plain text or Markdown, laid out as a
+  manuscript: double spaced, each chapter on a new page, with an optional
+  title page. Word files use real headings (so chapters show in Word's
+  navigation pane) and put the title and page number at the top of each page.
+- **Dark mode**: ⋯ → Light, Dark, or Match system.
 
 Your story saves automatically in the browser (IndexedDB) as you type, and
 stays when the app is updated. Copies are also kept in the browser before each app
@@ -88,27 +127,35 @@ npm run build    # type-check and build to dist/
 
 Built with React, TypeScript and Vite. Drag and drop uses
 [dnd-kit](https://dndkit.com), state uses [zustand](https://zustand.docs.pmnd.rs),
-the manuscript editor uses [TipTap](https://tiptap.dev) and the mind map uses
-[React Flow](https://reactflow.dev).
+the manuscript editor uses [TipTap](https://tiptap.dev), the mind map uses
+[React Flow](https://reactflow.dev) and Word export uses
+[docx](https://docx.js.org).
 The build uses hash routing and relative paths, so `dist/` can be served from
 any static host or sub-folder.
 
 ### Layout
 
 - `src/types.ts`: the data model (story → chapters, arcs, beats, characters,
-  chapter texts, mind map)
+  places and things, chapter texts, story time, mind maps, goals)
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
-- `src/pages/CharacterPage.tsx`: a single character's page
+- `src/pages/CharacterPage.tsx` and `src/pages/ElementPage.tsx`: a character's
+  page and a place or thing's page
+- `src/pages/TimelinePage.tsx` and `src/lib/timeline.ts`: the timeline and how
+  flashbacks are found
 - `src/pages/WritePage.tsx` and `src/editor/`: the manuscript editor (TipTap),
   its beat links, mentions and beats checklist
 - `src/map/`: the mind map (React Flow canvas, its cards, notes, lines and
   the add-to-map panel)
 - `src/store/persistence.ts`: saving to IndexedDB (batched writes, migration
   from older saves); `src/store/backups.ts`: automatic backups
-- `src/components/Sidebar.tsx`: the arcs / characters sidebar
+- `src/components/Sidebar.tsx`: the arcs / characters / world sidebar
 - `src/lib/mentions.ts` and `src/components/MentionTextarea.tsx`: how
-  `@mentions` are stored (as character ids) and edited
+  `@mentions` are stored (as ids) and edited
+- `src/lib/search.ts` and `src/components/SearchDialog.tsx`: search
+- `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
+  (the Word library loads only when exporting)
+- `src/store/history.ts`: undo and redo
