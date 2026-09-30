@@ -1,6 +1,20 @@
 import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Download, FilePlus2, Feather, History, Moon, Sparkles, Sun, SunMoon, Target, Upload } from 'lucide-react'
+import {
+  Download,
+  FilePlus2,
+  Feather,
+  History,
+  Moon,
+  Network,
+  PenLine,
+  Sparkles,
+  SquareKanban,
+  Sun,
+  SunMoon,
+  Target,
+  Upload,
+} from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
@@ -91,15 +105,25 @@ export function TopBar() {
         aria-label="Story title"
         size={Math.max(12, title.length + 1)}
       />
+      {/* On narrow phones the pages are icons, with their names as labels. */}
       <nav className="topnav">
-        <NavLink to="/" end>
-          <span className="nav-long">Chapter </span>
-          <span className="nav-short-cap">board</span>
+        <NavLink to="/" end aria-label="Chapter board" title="Chapter board">
+          <SquareKanban size={18} className="nav-icon" aria-hidden />
+          <span className="nav-text">
+            <span className="nav-long">Chapter </span>
+            <span className="nav-short-cap">board</span>
+          </span>
         </NavLink>
-        <NavLink to="/write">Manuscript</NavLink>
-        <NavLink to="/map">
-          <span className="nav-long">Mind </span>
-          <span className="nav-short-cap">map</span>
+        <NavLink to="/write" aria-label="Manuscript" title="Manuscript">
+          <PenLine size={18} className="nav-icon" aria-hidden />
+          <span className="nav-text">Manuscript</span>
+        </NavLink>
+        <NavLink to="/map" aria-label="Mind map" title="Mind map">
+          <Network size={18} className="nav-icon" aria-hidden />
+          <span className="nav-text">
+            <span className="nav-long">Mind </span>
+            <span className="nav-short-cap">map</span>
+          </span>
         </NavLink>
       </nav>
       <div className="topbar-actions">

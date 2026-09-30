@@ -9,7 +9,7 @@ import type { NewMapNode } from '../store/storyOps'
 export const DRAG_MIME = 'application/x-story-map-node'
 
 export type PaletteItem =
-  | { kind: 'arc' | 'chapter' | 'character' | 'beat'; refId: string }
+  | { kind: 'arc' | 'chapter' | 'character' | 'element' | 'beat'; refId: string }
   | { kind: 'note' }
   | { kind: 'text' }
 
@@ -27,6 +27,7 @@ export const NEW_NODE_CENTER: Record<PaletteItem['kind'], { x: number; y: number
   arc: { x: 120, y: 40 },
   chapter: { x: 120, y: 50 },
   character: { x: 120, y: 40 },
+  element: { x: 120, y: 40 },
   beat: { x: 120, y: 35 },
 }
 

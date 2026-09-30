@@ -2,17 +2,21 @@ import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { ArrowUpRight, ChevronRight, CircleDashed, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
-import type { Arc, Beat, Character } from '../types'
-import { useChapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
+import type { Arc, Beat, Character, ElementKind, StoryElement } from '../types'
+import { useChapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type SidebarMode } from '../store/uiStore'
 import { nextArcColor } from '../lib/colors'
-import { displayName, plainText } from '../lib/mentions'
+import { displayName, mentions, plainText } from '../lib/mentions'
+import { ELEMENT_KIND_NAMES } from '../lib/elements'
+import { ELEMENT_KINDS } from '../store/storyOps'
 import type { BeatDragData, UnassignDropData } from '../lib/dnd'
 import { ChapterTag } from './ChapterTag'
 import { ColorSwatches } from './ColorSwatches'
 import { MentionText } from './MentionText'
 import { MentionTextarea } from './MentionTextarea'
 import { CharacterAvatar } from './CharacterAvatar'
+import { ElementIcon } from './ElementIcon'
+import { KindPicker } from './KindPicker'
 
 interface Props {
   /** Beats can be dragged from the sidebar onto the chapter board. */
@@ -21,14 +25,16 @@ interface Props {
   unassignActive?: boolean
 }
 
-const MODES: { mode: SidebarMode; label: string }[] = [
-  { mode: 'arcs', label: 'Arcs' },
-  { mode: 'characters', label: 'Characters' },
+const MODES: { mode: SidebarMode; label: string; title: string }[] = [
+  { mode: 'arcs', label: 'Arcs', title: 'Arcs and their beats' },
+  { mode: 'characters', label: 'Characters', title: 'Characters' },
+  { mode: 'world', label: 'World', title: 'Places, objects, groups and more' },
 ]
 
 export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) {
   const arcs = useStory((s) => s.arcs)
   const characters = useStory((s) => s.characters)
+  const elements = useStory((s) => s.elements)
   const open = useUi((s) => s.sidebarOpen)
   const mode = useUi((s) => s.sidebarMode)
   const setMode = useUi((s) => s.setSidebarMode)
@@ -36,7 +42,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   const toggleArc = useUi((s) => s.toggleArc)
   const expanded = useUi((s) => s.expandedArcs)
   const navigate = useNavigate()
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const dropData: UnassignDropData = { type: 'unassign' }
   const { setNodeRef, isOver } = useDroppable({
     id: 'sidebar:unassign',
@@ -45,30 +51,49 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   })
 
   if (!open) {
-    const items = mode === 'arcs' ? arcs : characters
+    const label = MODES.find((m) => m.mode === mode)?.label ?? 'Arcs'
     return (
-      <aside className="sidebar collapsed" aria-label={mode === 'arcs' ? 'Arcs' : 'Characters'}>
+      <aside className="sidebar collapsed" aria-label={label}>
         <button className="icon-btn" onClick={toggleSidebar} title="Show sidebar" aria-label="Show sidebar">
           <PanelLeftOpen size={18} />
         </button>
         <div className="rail-dots">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              className={`rail-dot${mode === 'characters' ? ' round' : ''}`}
-              style={{ '--arc': item.color } as React.CSSProperties}
-              title={mode === 'arcs' ? plainText(item.name, lookup) : displayName(item)}
-              aria-label={mode === 'arcs' ? `Show arc ${plainText(item.name, lookup)}` : `Open ${displayName(item)}`}
-              onClick={() => {
-                if (mode === 'characters') {
-                  navigate(`/characters/${item.id}`)
-                  return
-                }
-                if (!expanded[item.id]) toggleArc(item.id)
-                toggleSidebar()
-              }}
-            />
-          ))}
+          {mode === 'arcs' &&
+            arcs.map((arc) => (
+              <button
+                key={arc.id}
+                className="rail-dot"
+                style={{ '--arc': arc.color } as React.CSSProperties}
+                title={plainText(arc.name, lookup)}
+                aria-label={`Show arc ${plainText(arc.name, lookup)}`}
+                onClick={() => {
+                  if (!expanded[arc.id]) toggleArc(arc.id)
+                  toggleSidebar()
+                }}
+              />
+            ))}
+          {mode === 'characters' &&
+            characters.map((c) => (
+              <button
+                key={c.id}
+                className="rail-dot round"
+                style={{ '--arc': c.color } as React.CSSProperties}
+                title={displayName(c)}
+                aria-label={`Open ${displayName(c)}`}
+                onClick={() => navigate(`/characters/${c.id}`)}
+              />
+            ))}
+          {mode === 'world' &&
+            elements.map((e) => (
+              <button
+                key={e.id}
+                className="rail-dot square"
+                style={{ '--arc': e.color } as React.CSSProperties}
+                title={displayName(e)}
+                aria-label={`Open ${displayName(e)}`}
+                onClick={() => navigate(`/elements/${e.id}`)}
+              />
+            ))}
         </div>
       </aside>
     )
@@ -88,10 +113,13 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
               role="tab"
               aria-selected={mode === m.mode}
               className={`mode-tab${mode === m.mode ? ' active' : ''}`}
+              title={m.title}
               onClick={() => setMode(m.mode)}
             >
               {m.label}
-              <span className="mode-count">{m.mode === 'arcs' ? arcs.length : characters.length}</span>
+              <span className="mode-count">
+                {m.mode === 'arcs' ? arcs.length : m.mode === 'characters' ? characters.length : elements.length}
+              </span>
             </button>
           ))}
         </div>
@@ -108,7 +136,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
             ))}
             <NewArcForm />
           </>
-        ) : (
+        ) : mode === 'characters' ? (
           <>
             {characters.length === 0 && (
               <p className="sidebar-empty">No characters yet. Add one here, or type @ and a new name in any text.</p>
@@ -117,6 +145,28 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
               <CharacterRow key={c.id} character={c} />
             ))}
             <NewCharacterForm />
+          </>
+        ) : (
+          <>
+            {elements.length === 0 && (
+              <p className="sidebar-empty">
+                The places, objects and groups in your story, and anything else worth keeping track of. Add one here, or
+                type @ and a new name in any text.
+              </p>
+            )}
+            {ELEMENT_KINDS.map((kind) => {
+              const list = elements.filter((e) => e.kind === kind)
+              if (!list.length) return null
+              return (
+                <section key={kind} className="world-group" aria-label={ELEMENT_KIND_NAMES[kind].many}>
+                  <h3 className="world-group-head">{ELEMENT_KIND_NAMES[kind].many}</h3>
+                  {list.map((e) => (
+                    <ElementRow key={e.id} element={e} />
+                  ))}
+                </section>
+              )
+            })}
+            <NewElementForm />
           </>
         )}
       </div>
@@ -436,4 +486,99 @@ function NewCharacterForm() {
       </div>
     </form>
   )
+}
+
+function ElementRow({ element }: { element: StoryElement }) {
+  const beats = useStory((s) => s.beats)
+  const setHighlight = useHighlightCleanup(element.id)
+  const inBeats = Object.values(beats).filter((b) => mentions(b.title, element.id) || mentions(b.description, element.id)).length
+
+  return (
+    <NavLink
+      to={`/elements/${element.id}`}
+      className="character-row"
+      style={{ '--char': element.color } as React.CSSProperties}
+      onMouseEnter={() => setHighlight({ kind: 'element', id: element.id })}
+      onMouseLeave={() => setHighlight(null)}
+      onClick={closeOnPhone}
+    >
+      <ElementIcon element={element} />
+      <span className="character-row-name">{displayName(element)}</span>
+      {inBeats > 0 && (
+        <span className="character-row-meta">
+          {inBeats} beat{inBeats === 1 ? '' : 's'}
+        </span>
+      )}
+    </NavLink>
+  )
+}
+
+function NewElementForm() {
+  const elements = useStory((s) => s.elements)
+  const addElement = useStory((s) => s.addElement)
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<ElementKind>('place')
+  const [color, setColor] = useState('')
+  const chosen = color || nextArcColor(elements.map((e) => e.color))
+
+  if (!open) {
+    return (
+      <button className="new-arc-btn" onClick={() => setOpen(true)}>
+        <Plus size={16} /> New place or thing
+      </button>
+    )
+  }
+
+  const close = () => {
+    setOpen(false)
+    setName('')
+    setColor('')
+  }
+  const submit = () => {
+    if (!name.trim()) return
+    const id = addElement({ name: name.trim(), kind, color: chosen })
+    close()
+    closeOnPhone()
+    navigate(`/elements/${id}`)
+  }
+
+  return (
+    <form
+      className="new-arc-form"
+      style={{ '--arc': chosen } as React.CSSProperties}
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
+      <input
+        autoFocus
+        className="plain-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={`Name, e.g. “${EXAMPLES[kind]}”`}
+        aria-label="Name"
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      />
+      <KindPicker value={kind} onChange={setKind} />
+      <ColorSwatches value={chosen} onChange={setColor} />
+      <div className="form-actions">
+        <button type="submit" className="btn primary" disabled={!name.trim()}>
+          Create {ELEMENT_KIND_NAMES[kind].noun}
+        </button>
+        <button type="button" className="btn ghost" onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+const EXAMPLES: Record<ElementKind, string> = {
+  place: 'The lighthouse',
+  object: 'The silver key',
+  group: 'The Night Watch',
+  other: 'The prophecy',
 }

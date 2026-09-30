@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { StoryData } from '../types'
+import type { ElementKind, StoryData } from '../types'
+import { ELEMENT_KIND_NAMES } from '../lib/elements'
 
 // Undo and redo for the story (the board, arcs, characters, the mind map…).
 // Each change keeps a copy of the story from just before it; the copies share
@@ -39,6 +40,7 @@ const GROUPED = new Set([
   'updateArc',
   'updateBeat',
   'updateCharacter',
+  'updateElement',
   'updateAttribute',
   'updateMapNode',
   'updateMapEdge',
@@ -68,6 +70,10 @@ const LABELS: Record<string, string> = {
   updateCharacter: 'edit character',
   deleteCharacter: 'delete character',
   moveCharacter: 'move character',
+  // Elements are named by their kind ("delete place"); see labelOf.
+  addElement: 'add',
+  updateElement: 'edit',
+  deleteElement: 'delete',
   addAttribute: 'add attribute',
   updateAttribute: 'edit attribute',
   deleteAttribute: 'delete attribute',
@@ -88,6 +94,18 @@ const LABELS: Record<string, string> = {
 
 export const labelFor = (name: string) => LABELS[name] ?? 'change'
 
+/** The label for a change, naming the kind of element for element changes. */
+function labelOf(name: string, before: StoryData, target: unknown): string {
+  if (name === 'addElement' || name === 'updateElement' || name === 'deleteElement') {
+    const kind: ElementKind | undefined =
+      typeof target === 'string'
+        ? before.elements.find((e) => e.id === target)?.kind
+        : (target as { kind?: ElementKind } | undefined)?.kind
+    return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
+  }
+  return labelFor(name)
+}
+
 /** Notes the story as it was before a change. */
 export function remember(before: StoryData, name: string, target?: unknown) {
   const key = `${name}:${typeof target === 'string' ? target : ''}`
@@ -98,7 +116,7 @@ export function remember(before: StoryData, name: string, target?: unknown) {
     useHistory.setState({ past: [...past.slice(0, -1), { ...last, lastAt: now }], future: [] })
     return
   }
-  const entry: HistoryEntry = { data: before, key, label: labelFor(name), takenAt: now, lastAt: now }
+  const entry: HistoryEntry = { data: before, key, label: labelOf(name, before, target), takenAt: now, lastAt: now }
   useHistory.setState({ past: [...past.slice(-(LIMIT - 1)), entry], future: [] })
 }
 

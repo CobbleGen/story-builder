@@ -23,7 +23,7 @@ import { useStory } from '../store/storyStore'
 import { anchorOfHandle } from '../lib/anchors'
 import { useResolvedTheme } from '../lib/theme'
 import { useUi } from '../store/uiStore'
-import { ArcNode, BeatNode, ChapterNode, CharacterNode } from './EntityNodes'
+import { ArcNode, BeatNode, ChapterNode, CharacterNode, ElementNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
 import { MapPalette } from './MapPalette'
@@ -42,6 +42,7 @@ const nodeTypes = {
   arc: ArcNode,
   chapter: ChapterNode,
   character: CharacterNode,
+  element: ElementNode,
   beat: BeatNode,
   note: NoteNode,
   text: TextNode,
@@ -225,6 +226,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     (node: MapNode) => {
       if (node.kind === 'arc') navigate(`/arcs/${node.refId}`)
       else if (node.kind === 'character') navigate(`/characters/${node.refId}`)
+      else if (node.kind === 'element') navigate(`/elements/${node.refId}`)
       else if (node.kind === 'chapter') navigate(`/write/${node.refId}`)
       else if (node.kind === 'beat') openBeat(node.refId)
       else setEditingId(node.id)
@@ -343,8 +345,8 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             <div className="map-empty">
               <strong>Your mind map is empty</strong>
               <span>
-                Drag chapters, arcs, characters and beats here from the left, or double-click anywhere for a sticky
-                note.
+                Drag chapters, arcs, characters, places and beats here from the left, or double-click anywhere for a
+                sticky note.
               </span>
             </div>
           )}

@@ -1,11 +1,11 @@
 import type { RichNode } from '../types'
 
 // Helpers over a chapter's saved text (TipTap/ProseMirror JSON), for changes
-// made outside the editor: deleting beats or characters.
+// made outside the editor: deleting beats, characters or elements.
 
 /** Mark that links a stretch of text to a beat (attrs: beatId). */
 export const BEAT_MARK = 'beatLink'
-/** Inline node for a character mention (attrs: id, label). */
+/** Inline node for a mention of a character or element (attrs: id, label). */
 export const MENTION_NODE = 'mention'
 
 type Mark = NonNullable<RichNode['marks']>[number]
@@ -56,18 +56,18 @@ export function stripBeatLinks(doc: RichNode, beatIds: Set<string>): RichNode {
   })
 }
 
-/** Turns mentions of a character into plain text with their name. */
-export function unlinkMentions(doc: RichNode, characterId: string, name: string): RichNode {
+/** Turns mentions of a character or element into plain text with its name. */
+export function unlinkMentions(doc: RichNode, id: string, name: string): RichNode {
   return transform(doc, (node) =>
-    node.type === MENTION_NODE && node.attrs?.id === characterId
+    node.type === MENTION_NODE && node.attrs?.id === id
       ? { type: 'text', text: name, ...(node.marks ? { marks: node.marks } : {}) }
       : node,
   )
 }
 
-export function countMentions(node: RichNode, characterId: string): number {
-  let n = node.type === MENTION_NODE && node.attrs?.id === characterId ? 1 : 0
-  for (const child of node.content ?? []) n += countMentions(child, characterId)
+export function countMentions(node: RichNode, id: string): number {
+  let n = node.type === MENTION_NODE && node.attrs?.id === id ? 1 : 0
+  for (const child of node.content ?? []) n += countMentions(child, id)
   return n
 }
 

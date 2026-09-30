@@ -10,8 +10,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { UserPlus } from 'lucide-react'
-import type { Character } from '../types'
+import { MapPinPlus, UserPlus } from 'lucide-react'
 import {
   activeQuery,
   applyTextEdit,
@@ -22,12 +21,13 @@ import {
   parseMentions,
   replaceRange,
   toDisplay,
+  type Mentionable,
   type Segment,
 } from '../lib/mentions'
-import { nextArcColor } from '../lib/colors'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { createMentioned, type NewMentioned } from '../lib/newMentioned'
+import { useMentionables, useMentionLookup } from '../store/storyStore'
 import { MentionName } from './MentionText'
-import { CharacterAvatar } from './CharacterAvatar'
+import { MentionBadge } from './ElementIcon'
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'className' | 'onSubmit'> & {
   /** Stored text (mentions as tokens). */
@@ -44,7 +44,7 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
   plain?: boolean
 }
 
-type Option = { kind: 'character'; character: Character } | { kind: 'create'; name: string }
+type Option = { kind: 'item'; item: Mentionable } | { kind: 'create'; what: NewMentioned; name: string }
 type Query = { start: number; query: string }
 
 const MAX_SUGGESTIONS = 6
@@ -52,7 +52,7 @@ const NEW_NAME_RE = /^[\p{L}\p{N}_'’-]+$/u
 
 /**
  * A growing text field that understands mentions: typing `@` suggests
- * characters, and a mention shows as the character's name in their color.
+ * characters, places and things, and a mention shows as the name in its color.
  * The colored text is drawn in a layer behind a transparent textarea, so
  * native editing, selection and undo keep working; edits are mapped back
  * onto the stored text so mentions survive typing around them.
@@ -70,9 +70,8 @@ export function MentionTextarea({
   onFocus,
   ...rest
 }: Props) {
-  const characters = useStory((s) => s.characters)
-  const addCharacter = useStory((s) => s.addCharacter)
-  const lookup = useCharacterLookup()
+  const named = useMentionables()
+  const lookup = useMentionLookup()
   const inner = useRef<HTMLTextAreaElement>(null)
   const marker = useRef<HTMLSpanElement>(null)
   const pendingCaret = useRef<number | null>(null)
@@ -97,7 +96,7 @@ export function MentionTextarea({
     if (!q) return null
     const possible =
       q.query === '' ||
-      characters.some((c) => matchesName(c, q.query)) ||
+      named.some((c) => matchesName(c, q.query)) ||
       NEW_NAME_RE.test(q.query)
     return possible ? q : null
   }
@@ -105,12 +104,14 @@ export function MentionTextarea({
   let options: Option[] = []
   if (query && !plain) {
     const q = query.query.toLowerCase()
-    const found = characters.filter((c) => matchesName(c, query.query))
+    const found = named.filter((c) => matchesName(c, query.query))
     const exact = found.find((c) => displayName(c).toLowerCase() === q)
     options = (exact ? [exact, ...found.filter((c) => c !== exact)] : found)
       .slice(0, MAX_SUGGESTIONS)
-      .map((character) => ({ kind: 'character' as const, character }))
-    if (query.query && !exact && NEW_NAME_RE.test(query.query)) options.push({ kind: 'create', name: query.query })
+      .map((item) => ({ kind: 'item' as const, item }))
+    if (query.query && !exact && NEW_NAME_RE.test(query.query)) {
+      options.push({ kind: 'create', what: 'character', name: query.query }, { kind: 'create', what: 'place', name: query.query })
+    }
   }
   const open = focused && options.length > 0
   const activeIndex = Math.min(active, Math.max(0, options.length - 1))
@@ -149,7 +150,7 @@ export function MentionTextarea({
 
   /** Links every finished @Name, e.g. when leaving the field or submitting. */
   const linkAll = () => {
-    const linked = linkTyped(latest.current, characters, lookup).stored
+    const linked = linkTyped(latest.current, named, lookup).stored
     if (linked !== latest.current) commit(linked)
     return linked
   }
@@ -161,7 +162,7 @@ export function MentionTextarea({
     }
     const caret = el.selectionStart
     const q = liveQuery(el.value, caret)
-    const result = applyTextEdit(latest.current, characters, lookup, el.value, caret, q?.start ?? null)
+    const result = applyTextEdit(latest.current, named, lookup, el.value, caret, q?.start ?? null)
     commit(result.stored, result.caret)
     setQueryIfChanged(liveQuery(toDisplay(result.stored, lookup), result.caret))
   }
@@ -178,22 +179,15 @@ export function MentionTextarea({
     const q = liveQuery(el.value, caret)
     setQueryIfChanged(q)
     // Moving away from a finished @Name turns it into a mention.
-    const result = linkTyped(latest.current, characters, lookup, { skipAt: q?.start ?? null, caret })
+    const result = linkTyped(latest.current, named, lookup, { skipAt: q?.start ?? null, caret })
     if (result.stored !== latest.current) commit(result.stored, result.caret)
   }
 
   const choose = (option: Option) => {
     const el = inner.current
     if (!el || !query) return
-    let id: string
-    let name: string
-    if (option.kind === 'create') {
-      name = option.name
-      id = addCharacter({ name, color: nextArcColor(characters.map((c) => c.color)) })
-    } else {
-      name = displayName(option.character)
-      id = option.character.id
-    }
+    const name = option.kind === 'create' ? option.name : displayName(option.item)
+    const id = option.kind === 'create' ? createMentioned(option.what, name) : option.item.id
     const caret = el.selectionStart
     const after = el.value.slice(caret)
     const spacer = /^\s/.test(after) ? '' : ' '
@@ -292,7 +286,7 @@ export function MentionTextarea({
           <div id={listId} className="mention-popup" role="listbox" style={pos}>
             {options.map((option, i) => (
               <div
-                key={option.kind === 'create' ? 'create' : option.character.id}
+                key={option.kind === 'create' ? `create-${option.what}` : option.item.id}
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={i === activeIndex}
@@ -301,17 +295,19 @@ export function MentionTextarea({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(option)}
               >
-                {option.kind === 'character' ? (
+                {option.kind === 'item' ? (
                   <>
-                    <CharacterAvatar character={option.character} size="sm" />
-                    <span className="mention-option-name">{displayName(option.character)}</span>
+                    <MentionBadge item={option.item} size="sm" />
+                    <span className="mention-option-name">{displayName(option.item)}</span>
                   </>
                 ) : (
                   <>
                     <span className="avatar avatar-sm avatar-new">
-                      <UserPlus size={12} />
+                      {option.what === 'character' ? <UserPlus size={12} /> : <MapPinPlus size={12} />}
                     </span>
-                    <span className="mention-option-name">New character “{option.name}”</span>
+                    <span className="mention-option-name">
+                      New {option.what} “{option.name}”
+                    </span>
                   </>
                 )}
               </div>

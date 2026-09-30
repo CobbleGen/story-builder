@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 import type { StoryData } from '../types'
 import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
-import { lookupOf } from '../lib/mentions'
+import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
 import { remember, travel } from './history'
 
@@ -32,6 +32,9 @@ interface StoryActions {
   updateCharacter: (...args: Tail<Parameters<typeof ops.updateCharacter>>) => void
   deleteCharacter: (...args: Tail<Parameters<typeof ops.deleteCharacter>>) => void
   moveCharacter: (...args: Tail<Parameters<typeof ops.moveCharacter>>) => void
+  addElement: (...args: Tail<Parameters<typeof ops.addElement>>) => string
+  updateElement: (...args: Tail<Parameters<typeof ops.updateElement>>) => void
+  deleteElement: (...args: Tail<Parameters<typeof ops.deleteElement>>) => void
   addAttribute: (...args: Tail<Parameters<typeof ops.addAttribute>>) => string
   updateAttribute: (...args: Tail<Parameters<typeof ops.updateAttribute>>) => void
   deleteAttribute: (...args: Tail<Parameters<typeof ops.deleteAttribute>>) => void
@@ -56,7 +59,18 @@ interface StoryActions {
 
 export type StoryStore = StoryData & StoryActions
 
-const STORY_KEYS = ['title', 'chapters', 'arcs', 'beats', 'characters', 'texts', 'mindMaps', 'goals', 'wordLog'] as const satisfies readonly (keyof StoryData)[]
+const STORY_KEYS = [
+  'title',
+  'chapters',
+  'arcs',
+  'beats',
+  'characters',
+  'elements',
+  'texts',
+  'mindMaps',
+  'goals',
+  'wordLog',
+] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
 export const pickData = (s: StoryData): StoryData => ({
@@ -65,6 +79,7 @@ export const pickData = (s: StoryData): StoryData => ({
   arcs: s.arcs,
   beats: s.beats,
   characters: s.characters,
+  elements: s.elements,
   texts: s.texts,
   mindMaps: s.mindMaps,
   goals: s.goals,
@@ -109,6 +124,9 @@ export const useStory = create<StoryStore>()(
         updateCharacter: (...a) => apply(ops.updateCharacter(data(), ...a), 'updateCharacter', a[0]),
         deleteCharacter: (...a) => apply(ops.deleteCharacter(data(), ...a), 'deleteCharacter', a[0]),
         moveCharacter: (...a) => apply(ops.moveCharacter(data(), ...a), 'moveCharacter', a[0]),
+        addElement: (...a) => withId(ops.addElement(data(), ...a), 'addElement', a[0]),
+        updateElement: (...a) => apply(ops.updateElement(data(), ...a), 'updateElement', a[0]),
+        deleteElement: (...a) => apply(ops.deleteElement(data(), ...a), 'deleteElement', a[0]),
         addAttribute: (...a) => withId(ops.addAttribute(data(), ...a), 'addAttribute', a[0]),
         updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a), 'updateAttribute', a[0]),
         deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a), 'deleteAttribute', a[0]),
@@ -163,17 +181,30 @@ export function chapterNumbers(chapters: StoryData['chapters']): Record<string, 
   return map
 }
 
-const lookupCache = new WeakMap<object, ReturnType<typeof lookupOf>>()
+// The last lists worked out, so every text field shares one copy.
+let named: { characters: StoryData['characters']; elements: StoryData['elements']; list: Mentionable[]; lookup: Lookup } | null =
+  null
 
-/** Character id -> character, for rendering mentions. */
-export function useCharacterLookup() {
-  const characters = useStory((s) => s.characters)
-  let map = lookupCache.get(characters)
-  if (!map) {
-    map = lookupOf(characters)
-    lookupCache.set(characters, map)
+function namedFor(characters: StoryData['characters'], elements: StoryData['elements']) {
+  if (!named || named.characters !== characters || named.elements !== elements) {
+    const list = ops.mentionables({ characters, elements })
+    named = { characters, elements, list, lookup: lookupOf(list) }
   }
-  return map
+  return named
+}
+
+/** Everything that can be @mentioned (characters, then elements). */
+export function useMentionables(): Mentionable[] {
+  const characters = useStory((s) => s.characters)
+  const elements = useStory((s) => s.elements)
+  return namedFor(characters, elements).list
+}
+
+/** Id -> character or element, for rendering mentions. */
+export function useMentionLookup(): Lookup {
+  const characters = useStory((s) => s.characters)
+  const elements = useStory((s) => s.elements)
+  return namedFor(characters, elements).lookup
 }
 
 /** Whether the saved story has been loaded (it loads asynchronously). */

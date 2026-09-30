@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronRight, PanelLeftClose, Search, StickyNote, Type } from 'lucide-react'
 import type { Beat } from '../types'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { displayName, plainText } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
+import { ElementIcon } from '../components/ElementIcon'
 import { ChapterTag } from '../components/ChapterTag'
 import { DRAG_MIME, type PaletteItem } from './mapShared'
 
@@ -68,8 +69,9 @@ export function MapPalette({ onMap, onAdd }: Props) {
   const chapters = useStory((s) => s.chapters)
   const arcs = useStory((s) => s.arcs)
   const characters = useStory((s) => s.characters)
+  const elements = useStory((s) => s.elements)
   const beats = useStory((s) => s.beats)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const toggle = useUi((s) => s.toggleMapPalette)
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
@@ -78,6 +80,7 @@ export function MapPalette({ onMap, onAdd }: Props) {
   const chapterList = chapters.map((c, i) => ({ c, n: i + 1 })).filter(({ c, n }) => match(c.title) || String(n) === q)
   const arcList = arcs.filter((a) => match(a.name))
   const characterList = characters.filter((c) => match(displayName(c)))
+  const elementList = elements.filter((e) => match(displayName(e)))
   const beatList = arcs.flatMap((a) =>
     a.beatIds.map((id) => beats[id]).filter((b): b is Beat => !!b && match(b.title)),
   )
@@ -134,6 +137,14 @@ export function MapPalette({ onMap, onAdd }: Props) {
             </PaletteEntry>
           ))}
         </Section>
+        <Section title="Places & things" count={elementList.length}>
+          {elementList.map((e) => (
+            <PaletteEntry key={e.id} item={{ kind: 'element', refId: e.id }} onAdd={onAdd} onMap={onMap.has(e.id)}>
+              <ElementIcon element={e} size="xs" />
+              <span className="palette-name">{displayName(e)}</span>
+            </PaletteEntry>
+          ))}
+        </Section>
         <Section title="Beats" count={beatList.length} defaultOpen={beatList.length <= 12 || !!q}>
           {beatList.map((b) => {
             const arc = arcs.find((a) => a.id === b.arcId)
@@ -153,7 +164,7 @@ export function MapPalette({ onMap, onAdd }: Props) {
             )
           })}
         </Section>
-        {q && !chapterList.length && !arcList.length && !characterList.length && !beatList.length && (
+        {q && !chapterList.length && !arcList.length && !characterList.length && !elementList.length && !beatList.length && (
           <p className="beats-empty">Nothing matches “{query}”.</p>
         )}
       </div>

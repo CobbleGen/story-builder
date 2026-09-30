@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react'
 import { Handle, NodeResizer, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
 import { ArrowUpRight, BookOpen, Check, ChevronDown, CircleDashed, FileText, IdCard, ListTree, PenLine, Shrink, X } from 'lucide-react'
-import type { MapCardView, MapNode, MapSize } from '../types'
+import type { Character, MapCardView, MapNode, MapSize, StoryElement } from '../types'
 import { chapterNumbers, useStory } from '../store/storyStore'
 import { displayName } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
+import { ElementIcon, KindIcon } from '../components/ElementIcon'
+import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
-import { BeatList, ChapterPages, CharacterDetails } from './CardPanels'
+import { BeatList, ChapterPages, Details } from './CardPanels'
 import { Anchor } from './Anchor'
 import { itemAnchor } from '../lib/anchors'
 import { STATUS_LABELS } from '../lib/chapterStatus'
@@ -261,19 +263,67 @@ export function ChapterNode({ data, selected }: NodeProps<StoryFlowNode>) {
 export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as EntityNode
   const character = useStory((s) => s.characters.find((c) => c.id === node.refId))
-  const toggle = useToggleView(node)
   if (!character) return <Missing what="Character" />
-  const attributes = character.attributes.filter((a) => a.label || a.value)
-  const open = node.expanded === 'details'
   return (
-    <Card node={node} selected={selected} color={character.color} className="character-card" kindLabel="Character" openLabel="Open character">
+    <DescribedCard
+      node={node}
+      selected={selected}
+      item={character}
+      badge={<CharacterAvatar character={character} size="md" />}
+      className="character-card"
+      kindLabel="Character"
+      openLabel="Open character"
+    />
+  )
+}
+
+export function ElementNode({ data, selected }: NodeProps<StoryFlowNode>) {
+  const node = data.node as EntityNode
+  const element = useStory((s) => s.elements.find((e) => e.id === node.refId))
+  if (!element) return <Missing what="Place or thing" />
+  const names = ELEMENT_KIND_NAMES[element.kind]
+  return (
+    <DescribedCard
+      node={node}
+      selected={selected}
+      item={element}
+      badge={<ElementIcon element={element} size="md" />}
+      className="character-card element-card"
+      kindLabel={
+        <>
+          <KindIcon kind={element.kind} size={12} /> {names.one}
+        </>
+      }
+      openLabel={`Open ${names.noun}`}
+    />
+  )
+}
+
+interface DescribedCardProps {
+  node: EntityNode
+  selected: boolean
+  item: Character | StoryElement
+  badge: ReactNode
+  className: string
+  kindLabel: ReactNode
+  openLabel: string
+}
+
+/** A character's or element's card: name, description, a few attributes, and all its details when opened. */
+function DescribedCard({ node, selected, item, badge, className, kindLabel, openLabel }: DescribedCardProps) {
+  const toggle = useToggleView(node)
+  const attributes = item.attributes.filter((a) => a.label || a.value)
+  const open = node.expanded === 'details'
+  const isCharacter = !('kind' in item)
+  return (
+    <Card node={node} selected={selected} color={item.color} className={className} kindLabel={kindLabel} openLabel={openLabel}>
       <div className="map-character-head">
-        <CharacterAvatar character={character} size="md" />
-        <div className="map-card-title">{displayName(character)}</div>
+        {badge}
+        <div className="map-card-title">{displayName(item)}</div>
       </div>
-      {character.description && (
+      {item.description && (
         <div className="map-card-text">
-          <MentionText text={character.description} />
+          <MentionText text={item.description} />
         </div>
       )}
       {!open && attributes.length > 0 && (
@@ -300,10 +350,12 @@ export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
               {attributes.length > 3 && !open && <span className="map-view-count">+{attributes.length - 3}</span>}
             </>
           }
-          title={open ? 'Hide the details' : 'Show all their attributes, arcs and beats'}
+          title={
+            open ? 'Hide the details' : isCharacter ? 'Show all their attributes, arcs and beats' : 'Show all its attributes and beats'
+          }
         />
       </div>
-      {open && <CharacterDetails character={character} />}
+      {open && <Details item={item} />}
     </Card>
   )
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export type SidebarMode = 'arcs' | 'characters'
+export type SidebarMode = 'arcs' | 'characters' | 'world'
 /** Light or dark colours, or whichever the device is set to. */
 export type ThemeSetting = 'system' | 'light' | 'dark'
 
@@ -11,8 +11,8 @@ export interface MapViewport {
   zoom: number
 }
 
-/** What the board is emphasising (hovering an arc or character in the sidebar). */
-export type Highlight = { kind: 'arc' | 'character'; id: string } | null
+/** What the board is emphasising (hovering an arc, character or element in the sidebar). */
+export type Highlight = { kind: 'arc' | 'character' | 'element'; id: string } | null
 
 interface UiState {
   sidebarOpen: boolean

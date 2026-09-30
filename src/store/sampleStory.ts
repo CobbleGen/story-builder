@@ -1,4 +1,4 @@
-import type { RichNode, StoryData } from '../types'
+import type { ElementKind, RichNode, StoryData } from '../types'
 import { ARC_COLORS } from '../lib/colors'
 import type { NewMapNode } from './storyOps'
 import {
@@ -6,6 +6,7 @@ import {
   addBeat,
   addChapter,
   addCharacter,
+  addElement,
   addMapEdge,
   addMapNode,
   emptyStory,
@@ -21,7 +22,7 @@ const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
 /**
  * A small example story so the board has something to show on first visit.
  * Text is written with plain `@Name` mentions; linkMentions turns them into
- * real character links at the end.
+ * real links to characters and places at the end.
  */
 export function buildSampleStory(): StoryData {
   let data: StoryData = emptyStory('The Lighthouse at Gull Point')
@@ -35,6 +36,23 @@ export function buildSampleStory(): StoryData {
     let id: string
     ;[data, id] = addCharacter(data, {
       name,
+      color: color(colorName),
+      description,
+      attributes: attributes.map(([label, value]) => ({ label, value })),
+    })
+    return id
+  }
+  const element = (
+    name: string,
+    kind: ElementKind,
+    colorName: string,
+    description: string,
+    attributes: [string, string][] = [],
+  ) => {
+    let id: string
+    ;[data, id] = addElement(data, {
+      name,
+      kind,
       color: color(colorName),
       description,
       attributes: attributes.map(([label, value]) => ({ label, value })),
@@ -72,7 +90,21 @@ export function buildSampleStory(): StoryData {
     ['Relationship', 'Father of @Mara'],
     ['Secret', 'Guides smugglers past the reef'],
   ])
-  const harrow = character('Harrow', 'Amber', 'Chair of the harbour council.', [['Wants', 'The lighthouse land']])
+  const harrow = character('Harrow', 'Amber', 'Chair of the @Harbour Council.', [['Wants', 'The lighthouse land']])
+
+  const light = element('Gull Point Light', 'place', 'Sky', 'The lighthouse on the headland, above the reef.', [
+    ['Looks like', 'White tower, red lantern room, ninety-six steps'],
+    ['Who’s there', '@Elias, and now @Mara'],
+  ])
+  element('Sea Caves', 'place', 'Slate', 'Under the north cliffs. Only reachable at low tide.')
+  element('Green Logbook', 'object', 'Grass', '@Elias’s private log: tide times, initials, and the same date every October.', [
+    ['Belongs to', '@Elias'],
+    ['Where it is', 'Inside @Mara’s coat'],
+  ])
+  element('Harbour Council', 'group', 'Bronze', 'Five votes that decide what happens to the harbour.', [
+    ['Leader', '@Harrow'],
+    ['Wants', 'The lighthouse land, for holiday lets'],
+  ])
 
   const ch1 = chapter('The Storm', '@Mara returns to Gull Point the night the Aurelia goes down.', mara)
   const ch2 = chapter('Wreckage', 'The village wakes to debris on the rocks and too many questions.', theo)
@@ -82,18 +114,18 @@ export function buildSampleStory(): StoryData {
   const mystery = arc('The missing ship', 'Blue', 'What really happened to the Aurelia, and who wanted it lost?', [mara])
   const romance = arc('@Mara & @Theo', 'Pink', 'Old flames, old grudges.', [mara, theo])
   const secret = arc('The keeper’s secret', 'Plum', '@Elias has been lying for twenty years.', [elias, mara])
-  const village = arc('Village politics', 'Bronze', 'The harbour council wants the lighthouse closed.', [harrow])
+  const village = arc('Village politics', 'Bronze', 'The @Harbour Council wants @Gull Point Light closed.', [harrow])
 
   beat(mystery, 'The Aurelia signals from the reef', 'A flash of lantern light, then nothing.', ch1)
   beat(secret, 'The lamp goes dark', '@Elias refuses to explain why the light failed.', ch1)
   beat(romance, '@Theo meets the bus', 'He is the last person @Mara wanted to see.', ch1)
   beat(mystery, 'No bodies on the beach', 'Only cargo crates, all of them empty.', ch2)
-  beat(village, 'Emergency council meeting', '@Harrow moves to decommission the lighthouse.', ch2)
+  beat(village, 'Emergency council meeting', '@Harrow moves to decommission @Gull Point Light.', ch2)
   beat(romance, 'Argument on the pier', '', ch2)
-  const drawer = beat(secret, 'The locked drawer', '@Mara finds the logbook under a false bottom.', ch3, true)
+  const drawer = beat(secret, 'The locked drawer', '@Mara finds the @Green Logbook under a false bottom.', ch3, true)
   const margin = beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3, true)
   beat(village, '@Harrow buys the old boathouse', '', ch4)
-  beat(mystery, 'A survivor in the sea caves', 'Someone was waiting for the tide to drop.')
+  beat(mystery, 'A survivor in the @Sea Caves', 'Someone was waiting for the tide to drop.')
   beat(romance, '@Theo admits he stayed for her', '')
   beat(secret, '@Elias confesses', 'He has been guiding smugglers past the reef for years.')
   beat(village, 'The vote', 'The lighthouse is saved by a single voice.')
@@ -173,12 +205,13 @@ export function buildSampleStory(): StoryData {
   const nTheo = place({ kind: 'character', refId: theo, x: 340, y: -40 })
   const nElias = place({ kind: 'character', refId: elias, x: -360, y: 40 })
   const nHarrow = place({ kind: 'character', refId: harrow, x: -250, y: 380 })
+  const nLight = place({ kind: 'element', refId: light, x: 100, y: 330 })
   const nSecret = place({ kind: 'arc', refId: secret, x: -700, y: 120 })
   const nLogbook = place({ kind: 'chapter', refId: ch3, x: -710, y: 470 })
   place({
     kind: 'note',
-    x: 360,
-    y: 250,
+    x: 410,
+    y: 240,
     width: 220,
     height: 150,
     color: 'yellow',
@@ -186,7 +219,8 @@ export function buildSampleStory(): StoryData {
   })
   connect(nElias, nMara, 'father of')
   connect(nMara, nTheo, 'old flame')
-  connect(nHarrow, nElias, 'wants his lighthouse')
+  connect(nHarrow, nLight, 'wants it closed')
+  connect(nElias, nLight, 'keeper of')
   connect(nElias, nSecret, 'hides')
   connect(nSecret, nLogbook, 'comes out in')
 

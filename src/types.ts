@@ -1,7 +1,7 @@
 export interface Beat {
   id: string
   arcId: string
-  /** Text fields may contain character mentions, stored as `@{<characterId>}`. */
+  /** Text fields may contain mentions of characters and elements, stored as `@{<id>}`. */
   title: string
   description: string
   /** The chapter this beat is placed in, or null while it only lives on its arc. */
@@ -52,6 +52,22 @@ export interface Character {
   attributes: CharacterAttribute[]
 }
 
+/** What sort of thing a story element is. */
+export type ElementKind = 'place' | 'object' | 'group' | 'other'
+
+/**
+ * A place, object, group or anything else the story keeps track of. Works
+ * like a character: it has a page, attributes, and can be @mentioned.
+ */
+export interface StoryElement {
+  id: string
+  kind: ElementKind
+  name: string
+  color: string
+  description: string
+  attributes: CharacterAttribute[]
+}
+
 /** A ProseMirror/TipTap JSON node, as stored. */
 export interface RichNode {
   type: string
@@ -69,7 +85,7 @@ export interface ChapterText {
 }
 
 /** Story items that can be placed on the mind map; the card shows the live item. */
-export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'beat'
+export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'element' | 'beat'
 export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
 export type TextSize = 'sm' | 'md' | 'lg'
 /** A text box shown as a list: each line is an item. */
@@ -89,7 +105,7 @@ export type MapNode =
       refId: string
       x: number
       y: number
-      /** Chapters open up to their pages or beats, arcs to their beats, characters to their details. */
+      /** Chapters open up to their pages or beats, arcs to their beats, characters and elements to their details. */
       expanded?: MapCardView
       /** Sizes the writer gave the card while opened up, per view. */
       sizes?: Partial<Record<MapCardView, MapSize>>
@@ -154,6 +170,8 @@ export interface StoryData {
   arcs: Arc[]
   beats: Record<string, Beat>
   characters: Character[]
+  /** Places, objects, groups and the like. */
+  elements: StoryElement[]
   /** Chapter id -> the chapter's written text. */
   texts: Record<string, ChapterText>
   /** A story can have several mind maps (card and line ids are unique across them). */

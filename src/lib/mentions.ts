@@ -1,40 +1,51 @@
-import type { Character } from '../types'
+import type { ElementKind } from '../types'
+import { ELEMENT_KIND_NAMES } from './elements'
 
-// Character mentions are stored in text as `@{<characterId>}`, so renaming a
-// character updates every mention. They're shown as the character's name
-// alone, in the character's color; `@` is only typed to start one.
+// Mentions of characters and story elements (places, objects, groups…) are
+// stored in text as `@{<id>}`, so renaming one updates every mention. They're
+// shown as the name alone, in its color; `@` is only typed to start one.
 
-const TOKEN_RE = /@\{(chr_[A-Za-z0-9_]+)\}/g
+const TOKEN_RE = /@\{((?:chr|elm)_[A-Za-z0-9_]+)\}/g
 const WORD_RE = /[\p{L}\p{N}_]/u
 const isWordChar = (ch: string | undefined) => !!ch && WORD_RE.test(ch)
 
 export const mentionToken = (id: string) => `@{${id}}`
 
-/** The name a character is shown (and typed) by. */
-export const displayName = (c: Pick<Character, 'name'>) => c.name.trim() || 'Unnamed character'
+/** Something that can be mentioned: a character, or an element (which has a kind). */
+export interface Mentionable {
+  id: string
+  name: string
+  color: string
+  kind?: ElementKind
+}
 
-type Named = Pick<Character, 'id' | 'name'>
-type Lookup = Map<string, Pick<Character, 'id' | 'name' | 'color'>>
+/** The name a character or element is shown (and typed) by. */
+export const displayName = (c: Pick<Mentionable, 'name' | 'kind'>) =>
+  c.name.trim() || `Unnamed ${c.kind ? ELEMENT_KIND_NAMES[c.kind].noun : 'character'}`
 
-export function lookupOf(characters: Pick<Character, 'id' | 'name' | 'color'>[]): Lookup {
-  return new Map(characters.map((c) => [c.id, c]))
+type Named = Pick<Mentionable, 'id' | 'name' | 'kind'>
+export type Lookup = Map<string, Mentionable>
+
+export function lookupOf(items: Mentionable[]): Lookup {
+  return new Map(items.map((c) => [c.id, c]))
 }
 
 export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'mention'; id: string; text: string; color: string | null; known: boolean }
 
-/** Splits stored text into plain runs and mentions (whose text is the character's name). */
+/** Splits stored text into plain runs and mentions (whose text is the name of who or what is mentioned). */
 export function parseMentions(stored: string, lookup: Lookup): Segment[] {
   const out: Segment[] = []
   let last = 0
   for (const m of stored.matchAll(TOKEN_RE)) {
     if (m.index > last) out.push({ kind: 'text', text: stored.slice(last, m.index) })
-    const c = lookup.get(m[1])
+    const id = m[1]
+    const c = lookup.get(id)
     out.push({
       kind: 'mention',
-      id: m[1],
-      text: c ? displayName(c) : 'unknown character',
+      id,
+      text: c ? displayName(c) : id.startsWith('elm_') ? 'unknown item' : 'unknown character',
       color: c?.color ?? null,
       known: !!c,
     })
@@ -44,7 +55,7 @@ export function parseMentions(stored: string, lookup: Lookup): Segment[] {
   return out
 }
 
-/** Stored text as it reads (and is edited): each mention becomes the character's name. */
+/** Stored text as it reads (and is edited): each mention becomes the name. */
 export function toDisplay(stored: string, lookup: Lookup): string {
   if (!stored.includes('@{')) return stored
   return parseMentions(stored, lookup)
@@ -55,13 +66,13 @@ export function toDisplay(stored: string, lookup: Lookup): string {
 /** Same as toDisplay; for plain contexts such as tooltips and menus. */
 export const plainText = toDisplay
 
-export function mentions(stored: string, characterId: string): boolean {
-  return stored.includes(mentionToken(characterId))
+export function mentions(stored: string, id: string): boolean {
+  return stored.includes(mentionToken(id))
 }
 
-/** Whether a typed query could be (the start of) this character's name. */
-export function matchesName(character: Pick<Character, 'name'>, query: string): boolean {
-  const name = displayName(character).toLowerCase()
+/** Whether a typed query could be (the start of) this name. */
+export function matchesName(item: Pick<Mentionable, 'name' | 'kind'>, query: string): boolean {
+  const name = displayName(item).toLowerCase()
   const q = query.toLowerCase()
   if (/\s/.test(q)) return name.startsWith(q)
   return name.startsWith(q) || name.split(/\s+/).some((word) => word.startsWith(q))
@@ -128,20 +139,21 @@ export function diffEdit(prev: string, next: string, caret: number): { a: number
 }
 
 /**
- * Turns typed `@Name` into mentions when the name matches a character's
- * (ignoring case; longest name wins) and isn't followed by more of a word. `skipAt` is the
+ * Turns typed `@Name` into mentions when the name matches a character's or
+ * element's (ignoring case; longest name wins; characters first on a tie) and
+ * isn't followed by more of a word. `skipAt` is the
  * shown position of an `@` the user is still typing. Returns the new stored
  * text and the caret moved back for each `@` removed before it.
  */
 export function linkTyped(
   stored: string,
-  characters: Named[],
+  named: Named[],
   lookup: Lookup,
   opts: { skipAt?: number | null; caret?: number } = {},
 ): { stored: string; caret: number } {
   const caret = opts.caret ?? 0
-  if (characters.length === 0 || !/@(?!\{)/.test(stored)) return { stored, caret }
-  const names = characters
+  if (named.length === 0 || !/@(?!\{)/.test(stored)) return { stored, caret }
+  const names = named
     .map((c) => ({ id: c.id, lower: displayName(c).toLowerCase() }))
     .sort((x, y) => y.lower.length - x.lower.length)
   const segments = parseMentions(stored, lookup)
@@ -195,7 +207,7 @@ export function linkTyped(
  */
 export function applyTextEdit(
   stored: string,
-  characters: Named[],
+  named: Named[],
   lookup: Lookup,
   next: string,
   caret: number,
@@ -209,5 +221,5 @@ export function applyTextEdit(
           const { a, b, inserted } = diffEdit(prev, next, caret)
           return replaceRange(stored, lookup, a, b, inserted)
         })()
-  return linkTyped(replaced, characters, lookup, { skipAt: activeAt, caret })
+  return linkTyped(replaced, named, lookup, { skipAt: activeAt, caret })
 }

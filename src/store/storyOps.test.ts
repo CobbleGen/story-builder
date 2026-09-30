@@ -33,9 +33,15 @@ import {
   setGoals,
   placeBeat,
   setBeatArc,
+  addElement,
+  updateElement,
+  deleteElement,
+  linkMentions,
+  mentionables,
 } from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
+import { mentionPlaces, placeCount } from '../lib/mentionedIn'
 
 function setup() {
   let data: StoryData = emptyStory('Test')
@@ -585,5 +591,124 @@ describe('mind map', () => {
     expect(plain).not.toHaveProperty('bg')
     expect(plain).not.toHaveProperty('list')
     expect(plain).not.toHaveProperty('checked')
+  })
+})
+
+describe('places and other elements', () => {
+  it('adds, edits and deletes one, turning its mentions into its name', () => {
+    let { data, ch1, main } = setup()
+    let dock: string, beat: string, mara: string, attr: string
+    ;[data, dock] = addElement(data, { name: 'The Dock', kind: 'place', color: '#08f' })
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0' })
+    ;[data, beat] = addBeat(data, { arcId: main, title: `Mara waits at ${mentionToken(dock)}`, chapterId: ch1 })
+    ;[data, attr] = addAttribute(data, mara, { label: 'Home', value: mentionToken(dock) })
+    expect(data.elements[0]).toMatchObject({ id: dock, kind: 'place', name: 'The Dock', attributes: [] })
+    // Renaming shows everywhere; a kind that isn't one is ignored.
+    data = updateElement(data, dock, { name: 'The Old Dock', kind: 'object' })
+    expect(toDisplay(data.beats[beat].title, lookupOf(mentionables(data)))).toBe('Mara waits at The Old Dock')
+    expect(updateElement(data, dock, { kind: 'planet' as never })).toBe(data)
+    const doc: RichNode = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'At ' }, { type: 'mention', attrs: { id: dock, label: 'x' } }] }],
+    }
+    data = setChapterText(data, ch1, { doc, words: 2, updatedAt: 1 }, null)
+    let card: string | null
+    ;[data, card] = addMapNode(data, { kind: 'element', refId: dock, x: 0, y: 0 })
+    expect(card).not.toBeNull()
+    const gone = deleteElement(data, dock)
+    expect(gone.elements).toEqual([])
+    expect(gone.beats[beat].title).toBe('Mara waits at The Old Dock')
+    expect(gone.characters[0].attributes.find((a) => a.id === attr)?.value).toBe('The Old Dock')
+    expect(gone.texts[ch1].doc.content?.[0].content).toEqual([{ type: 'text', text: 'At The Old Dock' }])
+    expect(gone.mindMaps[0].nodes).toEqual([])
+  })
+
+  it('has attributes like a character, and lines drawn from them go with them', () => {
+    let data = emptyStory()
+    let key: string, owner: string, color: string
+    ;[data, key] = addElement(data, { name: 'Key', kind: 'object', color: '#fa0' })
+    ;[data, owner] = addAttribute(data, key, { label: 'Owner' })
+    ;[data, color] = addAttribute(data, key, { label: 'Colour', value: 'Silver' })
+    data = updateAttribute(data, key, owner, { value: 'Mara' })
+    data = moveAttribute(data, key, 1, 0)
+    expect(data.elements[0].attributes.map((a) => [a.label, a.value])).toEqual([
+      ['Colour', 'Silver'],
+      ['Owner', 'Mara'],
+    ])
+    let card: string | null, note: string | null
+    ;[data, card] = addMapNode(data, { kind: 'element', refId: key, x: 0, y: 0 })
+    ;[data, note] = addMapNode(data, { kind: 'note', x: 300, y: 0, width: 200, height: 150, text: '', color: 'yellow' })
+    ;[data] = addMapEdge(data, card!, note!, { source: `attr:${color}` })
+    expect(data.mindMaps[0].edges).toHaveLength(1)
+    const without = deleteAttribute(data, key, color)
+    expect(without.elements[0].attributes).toHaveLength(1)
+    expect(without.mindMaps[0].edges).toEqual([])
+    // An id that is neither a character nor an element changes nothing.
+    expect(addAttribute(data, 'elm_nope')[0]).toBe(data)
+  })
+
+  it('links a typed @Name to an element, and prefers the longest name', () => {
+    let data = emptyStory()
+    let city: string, oldCity: string, main: string
+    ;[data, city] = addElement(data, { name: 'Harbor', kind: 'place', color: '#08f' })
+    ;[data, oldCity] = addElement(data, { name: 'Harbor Town', kind: 'place', color: '#0af' })
+    ;[data, main] = addArc(data, { name: 'Main', color: '#f00' })
+    let beat: string
+    ;[data, beat] = addBeat(data, { arcId: main, title: 'From @Harbor Town to @harbor.' })
+    data = linkMentions(data)
+    expect(data.beats[beat].title).toBe(`From ${mentionToken(oldCity)} to ${mentionToken(city)}.`)
+  })
+
+  it('loads elements, repairing bad ones and dropping map cards for missing ones', () => {
+    const loaded = normalizeStory({
+      elements: [
+        { id: 'elm_1', kind: 'group', name: 'The Watch', color: '#123', attributes: [{ label: 'Leader', value: '' }] },
+        { id: 'not-an-element-id', kind: 'weird', name: 'Fog' },
+      ],
+      mindMaps: [
+        {
+          id: 'map_main',
+          name: 'Map',
+          nodes: [
+            { id: 'n1', kind: 'element', refId: 'elm_1', x: 0, y: 0, expanded: 'details' },
+            { id: 'n2', kind: 'element', refId: 'elm_missing', x: 0, y: 0 },
+            { id: 'n3', kind: 'element', refId: 'elm_1', x: 0, y: 0, expanded: 'text' },
+          ],
+          edges: [],
+        },
+      ],
+    })
+    expect(loaded.elements[0]).toMatchObject({ id: 'elm_1', kind: 'group', name: 'The Watch' })
+    expect(loaded.elements[0].attributes[0].id).toMatch(/^attr_/)
+    // Ids must look like element ids for mentions to find them.
+    expect(loaded.elements[1].id).toMatch(/^elm_/)
+    expect(loaded.elements[1]).toMatchObject({ kind: 'other', name: 'Fog', color: '#6f7480', description: '' })
+    expect(loaded.mindMaps[0].nodes.map((n) => n.id)).toEqual(['n1', 'n3'])
+    expect(loaded.mindMaps[0].nodes[0]).toMatchObject({ expanded: 'details' })
+    // Elements only open up to their details.
+    expect(loaded.mindMaps[0].nodes[1]).not.toHaveProperty('expanded')
+    // Saves from before elements existed.
+    expect(normalizeStory({ title: 'Old' }).elements).toEqual([])
+  })
+
+  it('finds everywhere something is mentioned', () => {
+    let { data, ch1, main } = setup()
+    let dock: string, mara: string, gang: string
+    ;[data, dock] = addElement(data, { name: 'Dock', kind: 'place', color: '#08f' })
+    ;[data, gang] = addElement(data, { name: 'Gang', kind: 'group', color: '#f80', description: `Meets at ${mentionToken(dock)}` })
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#0a0', description: `Lives at ${mentionToken(dock)}` })
+    ;[data] = addBeat(data, { arcId: main, title: `To ${mentionToken(dock)}`, chapterId: ch1 })
+    data = updateChapter(data, ch1, { summary: `Night at ${mentionToken(dock)}` })
+    const doc: RichNode = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'mention', attrs: { id: dock } }] }] }
+    data = setChapterText(data, ch1, { doc, words: 1, updatedAt: 1 }, null)
+    const places = mentionPlaces(data, dock)
+    expect(places.beats).toHaveLength(1)
+    expect(places.texts).toEqual([{ chapter: data.chapters[0], count: 1 }])
+    expect(places.chapters.map((c) => c.id)).toEqual([ch1])
+    expect(places.characters.map((c) => c.id)).toEqual([mara])
+    expect(places.elements.map((e) => e.id)).toEqual([gang])
+    expect(placeCount(places)).toBe(5)
+    // Its own description doesn't count.
+    expect(mentionPlaces(data, gang).elements).toEqual([])
   })
 })

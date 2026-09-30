@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
 import type { RichNode } from '../types'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { displayName } from '../lib/mentions'
 import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
@@ -9,7 +9,7 @@ import { startsFlush, type PageBlock } from './pages'
 import { Anchor } from './Anchor'
 
 interface Context {
-  lookup: ReturnType<typeof useCharacterLookup>
+  lookup: ReturnType<typeof useMentionLookup>
   /** Beat id -> its arc's colour, when arc colours are on. */
   beatColor: (beatId: string) => string | undefined
 }
@@ -43,7 +43,7 @@ function renderNode(node: RichNode, key: number, ctx: Context, className?: strin
           segment={{
             kind: 'mention',
             id,
-            text: c ? displayName(c) : String(node.attrs?.label ?? 'unknown character'),
+            text: c ? displayName(c) : String(node.attrs?.label ?? 'unknown'),
             color: c?.color ?? null,
             known: !!c,
           }}
@@ -96,7 +96,7 @@ interface Props {
 
 /** A page of a chapter's text, read-only, looking like the manuscript. */
 export function RichView({ blocks, first, anchorsFor }: Props) {
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
   const showColors = useUi((s) => s.showArcColors)

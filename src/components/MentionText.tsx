@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { parseMentions, type Segment } from '../lib/mentions'
-import { useCharacterLookup } from '../store/storyStore'
+import { useMentionLookup } from '../store/storyStore'
 
 /** A mention as it appears in text: the character's name, in their color. */
 export function MentionName({ segment }: { segment: Extract<Segment, { kind: 'mention' }> }) {
@@ -16,7 +16,7 @@ export function MentionName({ segment }: { segment: Extract<Segment, { kind: 'me
 
 /** Renders stored text with its character mentions in their colors. */
 export function MentionText({ text, fallback = null }: { text: string; fallback?: ReactNode }) {
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   if (!text) return <>{fallback}</>
   return (
     <>

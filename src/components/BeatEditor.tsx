@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, Trash2 } from 'lucide-react'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { askConfirm } from '../lib/confirm'
 import { plainText } from '../lib/mentions'
@@ -20,7 +20,7 @@ export function BeatEditor() {
   const setBeatArc = useStory((s) => s.setBeatArc)
   const placeBeat = useStory((s) => s.placeBeat)
   const deleteBeat = useStory((s) => s.deleteBeat)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const close = useCallback(() => openBeat(null), [openBeat])
 
   if (!beat) return null

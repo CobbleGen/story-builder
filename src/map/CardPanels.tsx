@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Check, ChevronLeft, ChevronRight, PenLine, Plus } from 'lucide-react'
-import type { Beat, Character, RichNode } from '../types'
-import { chapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
+import type { Beat, Character, RichNode, StoryElement } from '../types'
+import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { displayName, mentions, plainText } from '../lib/mentions'
 import { MentionText } from '../components/MentionText'
@@ -98,7 +98,7 @@ interface PagesProps {
 /** The chapter's text a page at a time, with arrows and a page picker. */
 export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) {
   const doc = useStory((s) => s.texts[chapterId]?.doc)
-  const characters = useStory((s) => s.characters)
+  const lookup = useMentionLookup()
   const paper = useRef<HTMLDivElement>(null)
   const measureHead = useRef<HTMLDivElement>(null)
   const measureText = useRef<HTMLDivElement>(null)
@@ -121,18 +121,18 @@ export function ChapterPages({ chapterId, number, title, onWrite }: PagesProps) 
       const cs = getComputedStyle(head)
       const headRoom = head.offsetHeight + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0)
       const name = (id: string) => {
-        const c = characters.find((ch) => ch.id === id)
-        return c ? displayName(c) : 'unknown character'
+        const c = lookup.get(id)
+        return c ? displayName(c) : 'unknown'
       }
       setMeasured(measurePages(doc, host, { first: size.height - headRoom - FIT_SLACK, rest: size.height - FIT_SLACK }, name))
     }
     // New text lays out straight away; while a card is being resized, wait for a pause.
     const prev = measuredFor.current
-    measuredFor.current = [doc, characters, title]
-    if (!prev || prev[0] !== doc || prev[1] !== characters || prev[2] !== title) return run()
+    measuredFor.current = [doc, lookup, title]
+    if (!prev || prev[0] !== doc || prev[1] !== lookup || prev[2] !== title) return run()
     const timer = setTimeout(run, 120)
     return () => clearTimeout(timer)
-  }, [doc, characters, title, size, fonts])
+  }, [doc, lookup, title, size, fonts])
 
   const pages = doc ? (measured ?? estimate) : []
   const [page, setPage] = useState(0)
@@ -363,7 +363,7 @@ export function BeatList({ beatIds, scope }: { beatIds: string[]; scope: BeatSco
   const arcs = useStory((s) => s.arcs)
   const chapters = useStory((s) => s.chapters)
   const lastArcId = useUi((s) => s.lastArcId)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const [adding, setAdding] = useState<number | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const scrolls = useScrolls(scroller)
@@ -433,7 +433,8 @@ export function BeatList({ beatIds, scope }: { beatIds: string[]; scope: BeatSco
 // ---------- A character's details ----------
 
 /** Everything about a character: their attributes in full, arcs, chapters and beats. */
-export function CharacterDetails({ character }: { character: Character }) {
+/** An opened-up character or element card: its attributes, and where it turns up. */
+export function Details({ item }: { item: Character | StoryElement }) {
   const arcs = useStory((s) => s.arcs)
   const chapters = useStory((s) => s.chapters)
   const beats = useStory((s) => s.beats)
@@ -441,13 +442,14 @@ export function CharacterDetails({ character }: { character: Character }) {
   const scroller = useRef<HTMLDivElement>(null)
   const scrolls = useScrolls(scroller)
   const numbers = chapterNumbers(chapters)
-  const attributes = character.attributes.filter((a) => a.label || a.value)
-  const inArcs = arcs.filter((a) => a.characterIds.includes(character.id))
-  const pov = chapters.filter((c) => c.povCharacterId === character.id)
+  const isCharacter = !('kind' in item)
+  const attributes = item.attributes.filter((a) => a.label || a.value)
+  const inArcs = isCharacter ? arcs.filter((a) => a.characterIds.includes(item.id)) : []
+  const pov = isCharacter ? chapters.filter((c) => c.povCharacterId === item.id) : []
   const inBeats = arcs.flatMap((a) =>
     a.beatIds
       .map((id) => beats[id])
-      .filter((b): b is Beat => !!b && (mentions(b.title, character.id) || mentions(b.description, character.id))),
+      .filter((b): b is Beat => !!b && (mentions(b.title, item.id) || mentions(b.description, item.id))),
   )
   const colorOf = (arcId: string) => arcs.find((a) => a.id === arcId)?.color
   const refresh = useRefreshHandles()
@@ -469,7 +471,7 @@ export function CharacterDetails({ character }: { character: Character }) {
             ))}
           </dl>
         ) : (
-          <p className="map-details-empty">None yet. Add some on their page.</p>
+          <p className="map-details-empty">None yet. Add some on {isCharacter ? 'their' : 'its'} page.</p>
         )}
       </section>
       {inArcs.length > 0 && (

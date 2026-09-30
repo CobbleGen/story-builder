@@ -44,7 +44,7 @@ export function MapSwitcher({ map }: { map: MindMap }) {
     const ok = await askConfirm({
       title: `Delete the map “${map.name}”?`,
       message: cards
-        ? `Its ${cards} card${cards === 1 ? '' : 's'} and lines go with it. Chapters, arcs, characters and beats on it stay in your story.`
+        ? `Its ${cards} card${cards === 1 ? '' : 's'} and lines go with it. The chapters, characters, places and beats on it stay in your story.`
         : undefined,
       confirmLabel: 'Delete map',
       danger: true,

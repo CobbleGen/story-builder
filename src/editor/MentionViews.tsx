@@ -1,33 +1,34 @@
 import { forwardRef, useImperativeHandle, useState } from 'react'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import type { SuggestionProps } from '@tiptap/suggestion'
-import { UserPlus } from 'lucide-react'
-import { useStory } from '../store/storyStore'
+import { MapPinPlus, UserPlus } from 'lucide-react'
+import { useMentionLookup } from '../store/storyStore'
 import { displayName } from '../lib/mentions'
-import { CharacterAvatar } from '../components/CharacterAvatar'
+import type { NewMentioned } from '../lib/newMentioned'
+import { MentionBadge } from '../components/ElementIcon'
 
-export type MentionItem = { kind: 'character'; id: string; label: string } | { kind: 'create'; label: string }
+export type MentionItem = { kind: 'item'; id: string; label: string } | { kind: 'create'; what: NewMentioned; label: string }
 
 export interface MentionListHandle {
   onKeyDown: (event: KeyboardEvent) => boolean
 }
 
-/** A mention in the manuscript: the character's current name, in their colour. */
+/** A mention in the manuscript: the current name of who or what it names, in its colour. */
 export function MentionView({ node }: NodeViewProps) {
-  const character = useStory((s) => s.characters.find((c) => c.id === node.attrs.id))
+  const named = useMentionLookup().get(String(node.attrs.id))
   return (
     <NodeViewWrapper
       as="span"
-      className={`mention${character ? '' : ' unknown'}`}
-      style={character ? ({ '--char': character.color } as React.CSSProperties) : undefined}
+      className={`mention${named ? '' : ' unknown'}`}
+      style={named ? ({ '--char': named.color } as React.CSSProperties) : undefined}
     >
-      {character ? displayName(character) : (node.attrs.label ?? 'unknown character')}
+      {named ? displayName(named) : (node.attrs.label ?? 'unknown')}
     </NodeViewWrapper>
   )
 }
 
 export const MentionList = forwardRef<MentionListHandle, SuggestionProps<MentionItem, MentionItem>>(function MentionList({ items, command }, ref) {
-  const characters = useStory((s) => s.characters)
+  const lookup = useMentionLookup()
   const [active, setActive] = useState(0)
   const index = Math.min(active, Math.max(0, items.length - 1))
 
@@ -51,10 +52,10 @@ export const MentionList = forwardRef<MentionListHandle, SuggestionProps<Mention
   return (
     <div className="mention-popup floating" role="listbox">
       {items.map((item, i) => {
-        const character = item.kind === 'character' ? characters.find((c) => c.id === item.id) : undefined
+        const named = item.kind === 'item' ? lookup.get(item.id) : undefined
         return (
           <div
-            key={item.kind === 'create' ? 'create' : item.id}
+            key={item.kind === 'create' ? `create-${item.what}` : item.id}
             role="option"
             aria-selected={i === index}
             className={`mention-option${i === index ? ' active' : ''}`}
@@ -62,15 +63,15 @@ export const MentionList = forwardRef<MentionListHandle, SuggestionProps<Mention
             onMouseEnter={() => setActive(i)}
             onClick={() => command(item)}
           >
-            {character ? (
-              <CharacterAvatar character={character} size="sm" />
+            {named ? (
+              <MentionBadge item={named} size="sm" />
             ) : (
               <span className="avatar avatar-sm avatar-new">
-                <UserPlus size={12} />
+                {item.kind === 'create' && item.what === 'place' ? <MapPinPlus size={12} /> : <UserPlus size={12} />}
               </span>
             )}
             <span className="mention-option-name">
-              {item.kind === 'create' ? `New character “${item.label}”` : item.label}
+              {item.kind === 'create' ? `New ${item.what} “${item.label}”` : item.label}
             </span>
           </div>
         )

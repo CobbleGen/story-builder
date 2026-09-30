@@ -15,7 +15,7 @@ import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifi
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import type { Arc, Beat } from '../types'
-import { chapterNumbers, useCharacterLookup, useStory } from '../store/storyStore'
+import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { Sidebar } from '../components/Sidebar'
 import { MentionTextarea } from '../components/MentionTextarea'
@@ -57,7 +57,7 @@ function ArcView({ arc }: { arc: Arc }) {
   const deleteArc = useStory((s) => s.deleteArc)
   const moveArcBeat = useStory((s) => s.moveArcBeat)
   const navigate = useNavigate()
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const [showColors, setShowColors] = useState(false)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -170,7 +170,7 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
   const openBeat = useUi((s) => s.openBeat)
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: beat.id })
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const number = beat.chapterId ? chapterNumbers(chapters)[beat.chapterId] : null
   const chapter = chapters.find((c) => c.id === beat.chapterId)
 

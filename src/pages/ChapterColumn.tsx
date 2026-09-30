@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeftToLine, ArrowRightToLine, GripHorizontal, PenLine, Trash2 } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { useMentionLookup, useStory } from '../store/storyStore'
 import { Link } from 'react-router-dom'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
@@ -45,7 +45,7 @@ export function ChapterColumn({
   const deleteChapter = useStory((s) => s.deleteChapter)
   const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
   const words = useStory((s) => s.texts[chapter.id]?.words ?? 0)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const data: ChapterDragData = { type: 'chapter', chapterId: chapter.id }
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =

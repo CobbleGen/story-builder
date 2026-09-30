@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { emptyStory, addChapter, setChapterText, updateChapter } from './storyOps'
+import { emptyStory, addChapter, addElement, deleteElement, setChapterText, updateChapter } from './storyOps'
 import { remember, restore, travel, useHistory } from './history'
 import type { StoryData } from '../types'
 
@@ -41,5 +41,13 @@ describe('undo history', () => {
     const [withTwo, ch2] = addChapter(later, { title: 'Two' })
     const withText = setChapterText(withTwo, ch2, { doc, words: 5, updatedAt: 5000 }, null)
     expect(restore(later, withText, 4500).texts).not.toHaveProperty(ch2)
+  })
+
+  it('names the kind of element in its steps', () => {
+    let [data, dock] = addElement(emptyStory(), { name: 'Dock', kind: 'place', color: '#08f' })
+    remember(data, 'deleteElement', dock)
+    data = deleteElement(data, dock)
+    remember(data, 'addElement', { name: 'Gang', kind: 'group', color: '#f80' })
+    expect(useHistory.getState().past.map((e) => e.label)).toEqual(['delete place', 'add group'])
   })
 })

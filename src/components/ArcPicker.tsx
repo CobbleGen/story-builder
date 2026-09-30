@@ -1,6 +1,6 @@
 import type { Arc } from '../types'
 import { plainText } from '../lib/mentions'
-import { useCharacterLookup } from '../store/storyStore'
+import { useMentionLookup } from '../store/storyStore'
 import { MentionText } from './MentionText'
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
 
 export function ArcPicker({ arcs, value, onChange, compact }: Props) {
   const selected = arcs.find((a) => a.id === value)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   return (
     <div className={`arc-picker${compact ? ' compact' : ''}`} role="radiogroup" aria-label="Arc">
       {arcs.map((arc) => (

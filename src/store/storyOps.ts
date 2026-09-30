@@ -6,6 +6,7 @@ import type {
   ChapterText,
   Character,
   CharacterAttribute,
+  ElementKind,
   MapCardView,
   MapEdge,
   MapEntityKind,
@@ -16,6 +17,7 @@ import type {
   NoteColor,
   RichNode,
   StoryData,
+  StoryElement,
   StoryGoals,
   TextSize,
 } from '../types'
@@ -28,7 +30,7 @@ import { anchorItemId, cleanAnchor } from '../lib/anchors'
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
 // beatIds of its chapter (and no other chapter) when chapterId is set.
 // References to characters (arc casts, chapter POVs, mentions) only ever
-// point at characters that exist.
+// point at characters that exist; mentions of elements likewise.
 
 export type ChapterLayout = Record<string, string[]>
 
@@ -58,6 +60,13 @@ function mapArcs(data: StoryData, fn: (a: Arc) => Arc): StoryData {
 function mapCharacters(data: StoryData, fn: (c: Character) => Character): StoryData {
   return { ...data, characters: data.characters.map(fn) }
 }
+
+function mapElements(data: StoryData, fn: (e: StoryElement) => StoryElement): StoryData {
+  return { ...data, elements: data.elements.map(fn) }
+}
+
+/** Everything that can be @mentioned: characters first, then elements. */
+export const mentionables = (data: Pick<StoryData, 'characters' | 'elements'>) => [...data.characters, ...data.elements]
 
 /** Applies fn to every chapter's written text, keeping untouched entries as they are. */
 function mapTexts(data: StoryData, fn: (doc: RichNode) => RichNode): StoryData {
@@ -93,17 +102,8 @@ export function mapStoryText(data: StoryData, fn: (text: string) => string): Sto
       const description = fn(a.description)
       return name === a.name && description === a.description ? a : { ...a, name, description }
     }),
-    characters: data.characters.map((c) => {
-      const description = fn(c.description)
-      let changed = description !== c.description
-      const attributes = c.attributes.map((attr) => {
-        const value = fn(attr.value)
-        if (value === attr.value) return attr
-        changed = true
-        return { ...attr, value }
-      })
-      return changed ? { ...c, description, attributes } : c
-    }),
+    characters: data.characters.map((c) => mapDescribed(c, fn)),
+    elements: data.elements.map((e) => mapDescribed(e, fn)),
     mindMaps: data.mindMaps.map((map) => {
       let changed = false
       const nodes = map.nodes.map((n) => {
@@ -118,10 +118,33 @@ export function mapStoryText(data: StoryData, fn: (text: string) => string): Sto
   }
 }
 
-/** Turns any plain `@Name` text that names a character into a real mention. */
+/** A character's or element's description and attribute values, through fn. */
+function mapDescribed<T extends Character | StoryElement>(item: T, fn: (text: string) => string): T {
+  const description = fn(item.description)
+  let changed = description !== item.description
+  const attributes = item.attributes.map((attr) => {
+    const value = fn(attr.value)
+    if (value === attr.value) return attr
+    changed = true
+    return { ...attr, value }
+  })
+  return changed ? { ...item, description, attributes } : item
+}
+
+/** Turns any plain `@Name` text that names a character or element into a real mention. */
 export function linkMentions(data: StoryData): StoryData {
-  const lookup = lookupOf(data.characters)
-  return mapStoryText(data, (text) => linkTyped(text, data.characters, lookup).stored)
+  const named = mentionables(data)
+  const lookup = lookupOf(named)
+  return mapStoryText(data, (text) => linkTyped(text, named, lookup).stored)
+}
+
+/** Turns every mention of a character or element into plain text with its name. */
+function unmention(data: StoryData, id: string, name: string): StoryData {
+  const token = mentionToken(id)
+  return mapTexts(
+    mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
+    (doc) => unlinkMentions(doc, id, name),
+  )
 }
 
 // ---------- Chapters ----------
@@ -215,6 +238,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     arcs: [],
     beats: {},
     characters: [],
+    elements: [],
     texts: {},
     mindMaps: [defaultMindMap()],
     goals: {},
@@ -322,12 +346,7 @@ export function updateCharacter(
 export function deleteCharacter(data: StoryData, id: string): StoryData {
   const character = data.characters.find((c) => c.id === id)
   if (!character) return data
-  const token = mentionToken(id)
-  const name = displayName(character)
-  const next = mapTexts(
-    mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
-    (doc) => unlinkMentions(doc, id, name),
-  )
+  const next = unmention(data, id, displayName(character))
   return dropMapRefs(
     {
       ...next,
@@ -345,41 +364,95 @@ export function moveCharacter(data: StoryData, from: number, to: number): StoryD
   return { ...data, characters: moveItem(data.characters, from, to) }
 }
 
-function mapAttributes(
+// ---------- Elements (places, objects, groups…) ----------
+
+export const ELEMENT_KINDS: ElementKind[] = ['place', 'object', 'group', 'other']
+
+export function addElement(
   data: StoryData,
-  characterId: string,
-  fn: (attributes: CharacterAttribute[]) => CharacterAttribute[],
-): StoryData {
-  return mapCharacters(data, (c) => (c.id === characterId ? { ...c, attributes: fn(c.attributes) } : c))
+  init: {
+    name: string
+    kind: ElementKind
+    color: string
+    description?: string
+    attributes?: { label: string; value: string }[]
+  },
+): [StoryData, string] {
+  const element: StoryElement = {
+    id: makeId('elm'),
+    kind: ELEMENT_KINDS.includes(init.kind) ? init.kind : 'other',
+    name: init.name,
+    color: init.color,
+    description: init.description ?? '',
+    attributes: (init.attributes ?? []).map((a) => ({ id: makeId('attr'), label: a.label, value: a.value })),
+  }
+  return [{ ...data, elements: [...data.elements, element] }, element.id]
 }
 
+export function updateElement(
+  data: StoryData,
+  id: string,
+  patch: Partial<Pick<StoryElement, 'name' | 'kind' | 'color' | 'description'>>,
+): StoryData {
+  if (patch.kind && !ELEMENT_KINDS.includes(patch.kind)) return data
+  return mapElements(data, (e) => (e.id === id ? { ...e, ...patch } : e))
+}
+
+/** Removes an element; its mentions turn into its plain name. */
+export function deleteElement(data: StoryData, id: string): StoryData {
+  const element = data.elements.find((e) => e.id === id)
+  if (!element) return data
+  const next = unmention(data, id, displayName(element))
+  return dropMapRefs(
+    { ...next, elements: next.elements.filter((e) => e.id !== id) },
+    new Set([id, ...element.attributes.map((a) => a.id)]),
+  )
+}
+
+// ---------- Attributes (of a character or an element) ----------
+
+function mapAttributes(
+  data: StoryData,
+  ownerId: string,
+  fn: (attributes: CharacterAttribute[]) => CharacterAttribute[],
+): StoryData {
+  if (data.characters.some((c) => c.id === ownerId)) {
+    return mapCharacters(data, (c) => (c.id === ownerId ? { ...c, attributes: fn(c.attributes) } : c))
+  }
+  if (data.elements.some((e) => e.id === ownerId)) {
+    return mapElements(data, (e) => (e.id === ownerId ? { ...e, attributes: fn(e.attributes) } : e))
+  }
+  return data
+}
+
+/** Adds an attribute to a character or element (`ownerId`). */
 export function addAttribute(
   data: StoryData,
-  characterId: string,
+  ownerId: string,
   init: { label?: string; value?: string } = {},
 ): [StoryData, string] {
   const attribute: CharacterAttribute = { id: makeId('attr'), label: init.label ?? '', value: init.value ?? '' }
-  return [mapAttributes(data, characterId, (list) => [...list, attribute]), attribute.id]
+  return [mapAttributes(data, ownerId, (list) => [...list, attribute]), attribute.id]
 }
 
 export function updateAttribute(
   data: StoryData,
-  characterId: string,
+  ownerId: string,
   attributeId: string,
   patch: Partial<Pick<CharacterAttribute, 'label' | 'value'>>,
 ): StoryData {
-  return mapAttributes(data, characterId, (list) => list.map((a) => (a.id === attributeId ? { ...a, ...patch } : a)))
+  return mapAttributes(data, ownerId, (list) => list.map((a) => (a.id === attributeId ? { ...a, ...patch } : a)))
 }
 
-export function deleteAttribute(data: StoryData, characterId: string, attributeId: string): StoryData {
+export function deleteAttribute(data: StoryData, ownerId: string, attributeId: string): StoryData {
   return dropMapRefs(
-    mapAttributes(data, characterId, (list) => list.filter((a) => a.id !== attributeId)),
+    mapAttributes(data, ownerId, (list) => list.filter((a) => a.id !== attributeId)),
     new Set([attributeId]),
   )
 }
 
-export function moveAttribute(data: StoryData, characterId: string, from: number, to: number): StoryData {
-  return mapAttributes(data, characterId, (list) => moveItem(list, from, to))
+export function moveAttribute(data: StoryData, ownerId: string, from: number, to: number): StoryData {
+  return mapAttributes(data, ownerId, (list) => moveItem(list, from, to))
 }
 
 export function moveArcBeat(data: StoryData, arcId: string, from: number, to: number): StoryData {
@@ -584,6 +657,8 @@ function refExists(data: StoryData, node: NewMapNode): boolean {
       return data.chapters.some((c) => c.id === node.refId)
     case 'character':
       return data.characters.some((c) => c.id === node.refId)
+    case 'element':
+      return data.elements.some((e) => e.id === node.refId)
     case 'beat':
       return !!data.beats[node.refId]
   }
@@ -755,6 +830,7 @@ export const MAP_CARD_VIEWS: Record<MapEntityKind, MapCardView[]> = {
   chapter: ['text', 'beats'],
   arc: ['beats'],
   character: ['details'],
+  element: ['details'],
   beat: [],
 }
 
@@ -773,18 +849,29 @@ const ids = (value: unknown): string[] =>
 export function normalizeStory(input: unknown): StoryData {
   const raw = isRecord(input) ? input : {}
   const list = (value: unknown) => (Array.isArray(value) ? value : []).filter(isRecord)
+  const attributesOf = (value: unknown): CharacterAttribute[] =>
+    list(value).map((a) => ({
+      id: str(a.id) || makeId('attr'),
+      label: str(a.label),
+      value: str(a.value),
+    }))
   const characters: Character[] = list(raw.characters).map((c) => ({
     id: str(c.id) || makeId('chr'),
     name: str(c.name),
     color: str(c.color, '#6f7480'),
     description: str(c.description),
-    attributes: list(c.attributes).map((a) => ({
-      id: str(a.id) || makeId('attr'),
-      label: str(a.label),
-      value: str(a.value),
-    })),
+    attributes: attributesOf(c.attributes),
   }))
   const characterIds = new Set(characters.map((c) => c.id))
+  const elements: StoryElement[] = list(raw.elements).map((e) => ({
+    // Element ids start with elm_, which is how mentions of them are recognised.
+    id: /^elm_[A-Za-z0-9_]+$/.test(str(e.id)) ? str(e.id) : makeId('elm'),
+    kind: ELEMENT_KINDS.includes(e.kind as ElementKind) ? (e.kind as ElementKind) : 'other',
+    name: str(e.name),
+    color: str(e.color, '#6f7480'),
+    description: str(e.description),
+    attributes: attributesOf(e.attributes),
+  }))
   const arcs: Arc[] = list(raw.arcs).map((a) => ({
     id: str(a.id) || makeId('arc'),
     name: str(a.name, 'Untitled arc'),
@@ -875,6 +962,7 @@ export function normalizeStory(input: unknown): StoryData {
     arc: new Set(arcs.map((a) => a.id)),
     chapter: chapterIds,
     character: characterIds,
+    element: new Set(elements.map((e) => e.id)),
     beat: new Set(Object.keys(beats)),
   }
   const num = (v: unknown, fallback: number, min = -1e7, max = 1e7) =>
@@ -1017,6 +1105,7 @@ export function normalizeStory(input: unknown): StoryData {
     chapters,
     beats,
     characters,
+    elements,
     texts,
     mindMaps,
     goals,

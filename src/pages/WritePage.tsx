@@ -4,7 +4,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useCharacterLookup, useStory } from '../store/storyStore'
+import { useMentionables, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { flushStory, useSaveStatus } from '../store/persistence'
 import { displayName, mentionToken, plainText } from '../lib/mentions'
@@ -79,7 +79,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
   const texts = useStory((s) => s.texts)
-  const characters = useStory((s) => s.characters)
+  const named = useMentionables()
   const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
   const updateChapter = useStory((s) => s.updateChapter)
   const setChapterText = useStory((s) => s.setChapterText)
@@ -89,7 +89,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const toggleBeatsPanel = useUi((s) => s.toggleBeatsPanel)
   const setLastChapterId = useUi((s) => s.setLastChapterId)
   const saveStatus = useSaveStatus((s) => s.status)
-  const lookup = useCharacterLookup()
+  const lookup = useMentionLookup()
   const navigate = useNavigate()
 
   const [contentError, setContentError] = useState(false)
@@ -150,15 +150,15 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     }
   }, [saveNow])
 
-  // Deleting a beat or character elsewhere cleans up saved texts; do the same
+  // Deleting a beat, character or element elsewhere cleans up saved texts; do the same
   // in the open editor so it doesn't save the old links back.
   const knownNames = useRef(new Map<string, string>())
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
     const beatIds = new Set(Object.keys(beats))
     const names = knownNames.current
-    for (const c of characters) names.set(c.id, displayName(c))
-    const liveIds = new Set(characters.map((c) => c.id))
+    for (const c of named) names.set(c.id, displayName(c))
+    const liveIds = new Set(named.map((c) => c.id))
     const { state } = editor
     const tr = state.tr
     const gone: { pos: number; node: PmNode }[] = []
@@ -172,11 +172,11 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       }
     })
     for (const { pos, node } of gone.reverse()) {
-      const name = names.get(String(node.attrs.id)) || String(node.attrs.label || 'unknown character')
+      const name = names.get(String(node.attrs.id)) || String(node.attrs.label || 'unknown')
       tr.replaceWith(tr.mapping.map(pos), tr.mapping.map(pos + node.nodeSize), state.schema.text(name, node.marks))
     }
     if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false))
-  }, [editor, beats, characters])
+  }, [editor, beats, named])
 
   const words = useEditorState({
     editor,
