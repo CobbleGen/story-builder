@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
 import { PovPicker } from '../components/PovPicker'
+import { StatusPicker } from '../components/StatusPicker'
 import { plainText } from '../lib/mentions'
 import { BeatComposer } from '../components/BeatComposer'
 import { BeatCardView, DraggableBeatCard } from '../components/BeatCard'
@@ -118,10 +119,14 @@ export function ChapterColumn({
           aria-label={`Chapter ${number} summary`}
           onChange={(summary) => updateChapter(chapter.id, { summary })}
         />
-        <Link to={`/write/${chapter.id}`} className="chapter-write" title="Open this chapter in the manuscript">
-          <PenLine size={13} />
-          {words ? `${words.toLocaleString()} word${words === 1 ? '' : 's'}` : 'Write'}
-        </Link>
+        <div className="chapter-meta">
+          <Link to={`/write/${chapter.id}`} className="chapter-write" title="Open this chapter in the manuscript">
+            <PenLine size={13} />
+            {words ? `${words.toLocaleString()} word${words === 1 ? '' : 's'}` : 'Write'}
+            {chapter.targetWords ? <span className="chapter-target"> / {chapter.targetWords.toLocaleString()}</span> : null}
+          </Link>
+          <StatusPicker chapter={chapter} />
+        </div>
       </header>
       <div className="chapter-beats" data-chapter-list={chapter.id}>
         {beatIds.map((id) => (

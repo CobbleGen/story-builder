@@ -2,6 +2,7 @@ import type {
   Arc,
   Beat,
   Chapter,
+  ChapterStatus,
   ChapterText,
   Character,
   CharacterAttribute,
@@ -133,6 +134,7 @@ export function addChapter(
     summary: init.summary ?? '',
     beatIds: [],
     povCharacterId: null,
+    status: 'outline',
   }
   return [{ ...data, chapters: insertAt(data.chapters, chapter, init.index) }, chapter.id]
 }
@@ -140,10 +142,20 @@ export function addChapter(
 export function updateChapter(
   data: StoryData,
   id: string,
-  patch: Partial<Pick<Chapter, 'title' | 'summary' | 'povCharacterId'>>,
+  patch: Partial<Pick<Chapter, 'title' | 'summary' | 'povCharacterId' | 'status' | 'targetWords'>>,
 ): StoryData {
   if (patch.povCharacterId && !data.characters.some((c) => c.id === patch.povCharacterId)) return data
-  return mapChapters(data, (c) => (c.id === id ? { ...c, ...patch } : c))
+  if (patch.status && !CHAPTER_STATUSES.includes(patch.status)) return data
+  const target = 'targetWords' in patch ? cleanTarget(patch.targetWords) : undefined
+  return mapChapters(data, (c) => {
+    if (c.id !== id) return c
+    const next = { ...c, ...patch }
+    if ('targetWords' in patch) {
+      if (target) next.targetWords = target
+      else delete next.targetWords
+    }
+    return next
+  })
 }
 
 /** Removes the chapter; its beats stay on their arcs, unassigned. */
@@ -632,6 +644,13 @@ export function removeMapEdges(data: StoryData, ids: string[]): StoryData {
 
 // ---------- Integrity ----------
 
+export const CHAPTER_STATUSES: ChapterStatus[] = ['outline', 'draft', 'revised', 'done']
+
+/** A word target: a whole number of words, or nothing. */
+export function cleanTarget(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? Math.min(10_000_000, Math.round(value)) : undefined
+}
+
 export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange', 'white']
 export const MAP_LIST_STYLES: MapListStyle[] = ['bullet', 'number', 'check']
 /** The ways each kind of card can open up on the mind map. */
@@ -677,13 +696,20 @@ export function normalizeStory(input: unknown): StoryData {
     beatIds: ids(a.beatIds),
     characterIds: [...new Set(ids(a.characterIds).filter((id) => characterIds.has(id)))],
   }))
-  const chapters: Chapter[] = list(raw.chapters).map((c) => ({
-    id: str(c.id) || makeId('ch'),
-    title: str(c.title),
-    summary: str(c.summary),
-    beatIds: ids(c.beatIds),
-    povCharacterId: characterIds.has(str(c.povCharacterId)) ? str(c.povCharacterId) : null,
-  }))
+  const rawChapters = list(raw.chapters)
+  let chapters: Chapter[] = rawChapters.map((c) => {
+    const chapter: Chapter = {
+      id: str(c.id) || makeId('ch'),
+      title: str(c.title),
+      summary: str(c.summary),
+      beatIds: ids(c.beatIds),
+      povCharacterId: characterIds.has(str(c.povCharacterId)) ? str(c.povCharacterId) : null,
+      status: CHAPTER_STATUSES.includes(c.status as ChapterStatus) ? (c.status as ChapterStatus) : 'outline',
+    }
+    const target = cleanTarget(c.targetWords)
+    if (target) chapter.targetWords = target
+    return chapter
+  })
   const arcIds = new Set(arcs.map((a) => a.id))
   const chapterIds = new Set(chapters.map((c) => c.id))
 
@@ -742,6 +768,11 @@ export function normalizeStory(input: unknown): StoryData {
       updatedAt: typeof t.updatedAt === 'number' ? t.updatedAt : 0,
     }
   }
+
+  // Saves from before chapter status: a chapter with writing in it is a draft.
+  chapters = chapters.map((c, i) =>
+    !CHAPTER_STATUSES.includes(rawChapters[i].status as ChapterStatus) && texts[c.id]?.words ? { ...c, status: 'draft' } : c,
+  )
 
   const refs: Record<string, Set<string>> = {
     arc: new Set(arcs.map((a) => a.id)),

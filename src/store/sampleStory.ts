@@ -152,6 +152,7 @@ export function buildSampleStory(): StoryData {
         ? 1
         : (node.content ?? []).reduce((n, c) => n + countWords(c), 0)
   data = setChapterText(data, ch3, { doc: logbook, words: countWords(logbook), updatedAt: Date.now() })
+  data = updateChapter(data, ch3, { status: 'draft', targetWords: 3000 })
 
   // A small mind map: who's who, and an open question.
   const place = (node: NewMapNode) => {

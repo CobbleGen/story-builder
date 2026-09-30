@@ -17,6 +17,7 @@ import { BeatsPanel } from '../editor/BeatsPanel'
 import { NewBeatDialog } from '../editor/NewBeatDialog'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { PovPicker } from '../components/PovPicker'
+import { StatusPicker } from '../components/StatusPicker'
 
 const SAVE_DELAY_MS = 400
 const SAFE_COLOR = /^#[0-9a-f]{3,8}$/i
@@ -260,7 +261,10 @@ function ChapterWriter({ chapter, index }: WriterProps) {
                     ))}
                   </select>
                 </label>
-                <PovPicker chapter={chapter} />
+                <span className="write-head-pickers">
+                  <StatusPicker chapter={chapter} />
+                  <PovPicker chapter={chapter} />
+                </span>
               </div>
               <MentionTextarea
                 className="write-title"

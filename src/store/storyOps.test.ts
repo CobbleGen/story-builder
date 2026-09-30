@@ -427,6 +427,26 @@ describe('mind map', () => {
     expect(normalizeStory(withLine).mindMap.edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
   })
 
+  it('keeps each chapter’s status and word target', () => {
+    let { data, ch1 } = setup()
+    expect(data.chapters[0].status).toBe('outline')
+    data = updateChapter(data, ch1, { status: 'revised', targetWords: 2500.4 })
+    expect(data.chapters[0]).toMatchObject({ status: 'revised', targetWords: 2500 })
+    expect(updateChapter(data, ch1, { status: 'nonsense' as never })).toBe(data)
+    expect(updateChapter(data, ch1, { targetWords: 0 }).chapters[0]).not.toHaveProperty('targetWords')
+    // Saves from before statuses: written chapters count as drafts.
+    const old = normalizeStory({
+      chapters: [
+        { id: 'a', title: 'Written' },
+        { id: 'b', title: 'Not yet' },
+        { id: 'c', title: 'Done', status: 'done', targetWords: 'lots' },
+      ],
+      texts: { a: { doc: { type: 'doc', content: [] }, words: 120, updatedAt: 1 } },
+    })
+    expect(old.chapters.map((c) => c.status)).toEqual(['draft', 'outline', 'done'])
+    expect(old.chapters[2]).not.toHaveProperty('targetWords')
+  })
+
   it('repairs a loaded map', () => {
     const data = normalizeStory({
       chapters: [{ id: 'c1', title: 'One', beatIds: [] }],

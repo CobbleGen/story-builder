@@ -10,6 +10,9 @@ export interface Beat {
   done: boolean
 }
 
+/** How far along a chapter is. */
+export type ChapterStatus = 'outline' | 'draft' | 'revised' | 'done'
+
 export interface Chapter {
   id: string
   title: string
@@ -18,6 +21,9 @@ export interface Chapter {
   beatIds: string[]
   /** The character whose point of view the chapter is told from. */
   povCharacterId: string | null
+  status: ChapterStatus
+  /** Words the writer is aiming for in this chapter, if they've set a target. */
+  targetWords?: number
 }
 
 export interface Arc {

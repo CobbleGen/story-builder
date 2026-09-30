@@ -1512,3 +1512,8 @@
     opacity: 0.55;
   }
 }
+
+.map-status {
+  color: color-mix(in srgb, var(--status) 78%, var(--shade));
+  font-weight: 600;
+}
