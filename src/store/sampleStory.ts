@@ -8,6 +8,7 @@ import {
   addCharacter,
   addMapEdge,
   addMapNode,
+  emptyStory,
   linkMentions,
   setChapterText,
   updateChapter,
@@ -22,7 +23,7 @@ const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
  * real character links at the end.
  */
 export function buildSampleStory(): StoryData {
-  let data: StoryData = { title: 'The Lighthouse at Gull Point', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
+  let data: StoryData = emptyStory('The Lighthouse at Gull Point')
 
   const character = (
     name: string,
@@ -151,7 +152,7 @@ export function buildSampleStory(): StoryData {
       : node.type === 'mention'
         ? 1
         : (node.content ?? []).reduce((n, c) => n + countWords(c), 0)
-  data = setChapterText(data, ch3, { doc: logbook, words: countWords(logbook), updatedAt: Date.now() })
+  data = setChapterText(data, ch3, { doc: logbook, words: countWords(logbook), updatedAt: Date.now() }, null)
   data = updateChapter(data, ch3, { status: 'draft', targetWords: 3000 })
 
   // A small mind map: who's who, and an open question.
@@ -191,7 +192,7 @@ export function buildSampleStory(): StoryData {
 }
 
 export function buildBlankStory(): StoryData {
-  let data: StoryData = { title: 'Untitled story', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
+  let data: StoryData = emptyStory()
   ;[data] = addChapter(data, { title: '' })
   ;[data] = addArc(data, { name: 'Main plot', color: ARC_COLORS[6].value })
   return data

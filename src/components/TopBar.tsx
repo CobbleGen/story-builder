@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Download, FilePlus2, Feather, History, Moon, Sparkles, Sun, SunMoon, Upload } from 'lucide-react'
+import { Download, FilePlus2, Feather, History, Moon, Sparkles, Sun, SunMoon, Target, Upload } from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
@@ -8,6 +8,7 @@ import { askConfirm } from '../lib/confirm'
 import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
 import { useUi } from '../store/uiStore'
+import { totalWords } from '../lib/progress'
 
 function slug(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
@@ -21,6 +22,9 @@ export function TopBar() {
   const [showBackups, setShowBackups] = useState(false)
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
+  const setProgressOpen = useUi((s) => s.setProgressOpen)
+  const total = useStory((s) => totalWords(s.texts))
+  const goal = useStory((s) => s.goals.draft)
 
   const exportStory = () => {
     const story = pickData(useStory.getState())
@@ -98,6 +102,20 @@ export function TopBar() {
         </NavLink>
       </nav>
       <div className="topbar-actions">
+        <button
+          className="topbar-progress"
+          onClick={() => setProgressOpen(true)}
+          title={goal ? `${total.toLocaleString()} of ${goal.toLocaleString()} words: word count and goals` : 'Word count and goals'}
+          aria-label="Word count and goals"
+        >
+          <Target size={16} />
+          <span className="topbar-words">{total.toLocaleString()} words</span>
+          {goal ? (
+            <span className="topbar-goal" aria-hidden>
+              <span style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} />
+            </span>
+          ) : null}
+        </button>
         <Menu
           label="Story options"
           items={[

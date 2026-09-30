@@ -36,6 +36,7 @@ interface StoryActions {
   deleteAttribute: (...args: Tail<Parameters<typeof ops.deleteAttribute>>) => void
   moveAttribute: (...args: Tail<Parameters<typeof ops.moveAttribute>>) => void
   setChapterText: (...args: Tail<Parameters<typeof ops.setChapterText>>) => void
+  setGoals: (...args: Tail<Parameters<typeof ops.setGoals>>) => void
   addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
   updateMapNode: (...args: Tail<Parameters<typeof ops.updateMapNode>>) => void
   moveMapNodes: (...args: Tail<Parameters<typeof ops.moveMapNodes>>) => void
@@ -58,6 +59,8 @@ export const pickData = (s: StoryData): StoryData => ({
   characters: s.characters,
   texts: s.texts,
   mindMap: s.mindMap,
+  goals: s.goals,
+  wordLog: s.wordLog,
 })
 
 export const useStory = create<StoryStore>()(
@@ -97,6 +100,7 @@ export const useStory = create<StoryStore>()(
         deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a)),
         moveAttribute: (...a) => apply(ops.moveAttribute(data(), ...a)),
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
+        setGoals: (...a) => apply(ops.setGoals(data(), ...a)),
         addMapNode: (...a) => withId(ops.addMapNode(data(), ...a)),
         updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a)),
         moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a)),

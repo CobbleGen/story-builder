@@ -139,6 +139,12 @@ export interface MindMap {
   edges: MapEdge[]
 }
 
+/** Word targets for the whole draft and for each day's writing. */
+export interface StoryGoals {
+  draft?: number
+  daily?: number
+}
+
 export interface StoryData {
   title: string
   /** Chapters in reading order; a chapter's number is its position + 1. */
@@ -149,4 +155,7 @@ export interface StoryData {
   /** Chapter id -> the chapter's written text. */
   texts: Record<string, ChapterText>
   mindMap: MindMap
+  goals: StoryGoals
+  /** Local date (YYYY-MM-DD) -> words added that day, less words cut. */
+  wordLog: Record<string, number>
 }

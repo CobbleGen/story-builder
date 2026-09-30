@@ -28,6 +28,8 @@ interface UiState {
   /** Mind map: the "add to map" panel is open. */
   mapPaletteOpen: boolean
   theme: ThemeSetting
+  /** The word count and goals dialog is open. */
+  progressOpen: boolean
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -40,6 +42,7 @@ interface UiState {
   setMapViewport: (viewport: { x: number; y: number; zoom: number }) => void
   toggleMapPalette: () => void
   setTheme: (theme: ThemeSetting) => void
+  setProgressOpen: (open: boolean) => void
 }
 
 export const useUi = create<UiState>()(
@@ -58,6 +61,7 @@ export const useUi = create<UiState>()(
       mapViewport: null,
       mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
       theme: 'system',
+      progressOpen: false,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -71,6 +75,7 @@ export const useUi = create<UiState>()(
       setMapViewport: (mapViewport) => set({ mapViewport }),
       toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
       setTheme: (theme) => set({ theme }),
+      setProgressOpen: (progressOpen) => set({ progressOpen }),
     }),
     {
       name: 'story-builder:ui',

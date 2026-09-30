@@ -8,7 +8,7 @@ interface Props {
   children: ReactNode
   footer?: ReactNode
   accent?: string
-  variant?: 'confirm'
+  variant?: 'confirm' | 'wide'
 }
 
 // Open modals, oldest first; Escape only closes the topmost one.

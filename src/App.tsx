@@ -3,6 +3,8 @@ import { HashRouter, Route, Routes } from 'react-router-dom'
 import { TopBar } from './components/TopBar'
 import { BeatEditor } from './components/BeatEditor'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { ProgressDialog } from './components/ProgressDialog'
+import { useUi } from './store/uiStore'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
 import { CharacterPage } from './pages/CharacterPage'
@@ -18,6 +20,7 @@ export default function App() {
   useApplyTheme()
   const loaded = useStoryLoaded()
   const saveFailed = useSaveStatus((s) => s.status === 'error')
+  const progressOpen = useUi((s) => s.progressOpen)
 
   if (!loaded) return <div className="boot">Opening your story…</div>
 
@@ -48,6 +51,7 @@ export default function App() {
           <Route path="*" element={<BoardPage />} />
         </Routes>
         <BeatEditor />
+        {progressOpen && <ProgressDialog />}
         <ConfirmDialog />
         {saveFailed && (
           <div className="save-banner" role="alert">

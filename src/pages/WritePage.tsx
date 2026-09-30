@@ -16,6 +16,7 @@ import { SelectionMenu } from '../editor/SelectionMenu'
 import { BeatsPanel } from '../editor/BeatsPanel'
 import { NewBeatDialog } from '../editor/NewBeatDialog'
 import { MentionTextarea } from '../components/MentionTextarea'
+import { dayKey } from '../store/storyOps'
 import { PovPicker } from '../components/PovPicker'
 import { StatusPicker } from '../components/StatusPicker'
 
@@ -183,6 +184,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   })
   const totalWords =
     Object.entries(texts).reduce((sum, [id, t]) => (id === chapter.id ? sum : sum + t.words), 0) + (words ?? 0)
+  const todayWords = useStory((s) => s.wordLog[dayKey()] ?? 0)
+  const setProgressOpen = useUi((s) => s.setProgressOpen)
 
   // Colour linked text by arc; a hovered beat's text stands out even with colours off.
   const beatCss = useMemo(() => {
@@ -313,9 +316,13 @@ function ChapterWriter({ chapter, index }: WriterProps) {
         )}
         <div className="write-status" aria-live="polite">
           <span>
-            {(words ?? 0).toLocaleString()} word{words === 1 ? '' : 's'}
+            {(words ?? 0).toLocaleString()}
+            {chapter.targetWords ? ` / ${chapter.targetWords.toLocaleString()}` : ''} word{(chapter.targetWords ?? words) === 1 ? '' : 's'}
           </span>
-          <span className="muted">· {totalWords.toLocaleString()} in the manuscript</span>
+          <button className="write-status-link" onClick={() => setProgressOpen(true)} title="Word count and goals">
+            · {totalWords.toLocaleString()} in the manuscript
+            {todayWords ? ` · ${todayWords > 0 ? '+' : '−'}${Math.abs(todayWords).toLocaleString()} today` : ''}
+          </button>
           <span className={`save-state ${saveStatus === 'error' ? 'error' : ''}`}>{saveLabel}</span>
         </div>
       </div>

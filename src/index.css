@@ -29,6 +29,8 @@
   --success: #3a7d44;
   --overlay: rgba(30, 28, 24, 0.32);
   --canvas-dots: #cfc9bd;
+  /* Chart marks: validated against both surfaces (dataviz checks). */
+  --chart-accent: #3e63dd;
 
   font-family: var(--sans);
   font-size: 14px;
@@ -66,6 +68,7 @@
   --success: #5fb36b;
   --overlay: rgba(0, 0, 0, 0.55);
   --canvas-dots: #3a3732;
+  --chart-accent: #6482f0;
   color-scheme: dark;
 }
 
@@ -3021,6 +3024,392 @@ a {
   color: var(--ink-3);
 }
 
+/* ---------- Progress: word counts and goals ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.modal.wide {
+  width: min(760px, 100%);
+}
+
+.topbar-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  margin-right: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topbar-progress:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.topbar-goal {
+  width: 38px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--chart-accent) 18%, var(--tint));
+}
+
+.topbar-goal span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--chart-accent);
+}
+
+.write-status-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  cursor: pointer;
+}
+
+.write-status-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 18px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--column);
+}
+
+.stat-label {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.stat-note {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.goal-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.goal-row {
+  display: grid;
+  grid-template-columns: 96px 110px minmax(80px, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.goal-name {
+  font-weight: 500;
+}
+
+.goal-left {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.target-input {
+  width: 100%;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.target-input:focus {
+  outline: none;
+  border-color: var(--focus);
+}
+
+.target-input::placeholder {
+  color: var(--ink-3);
+}
+
+.meter {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--chart-accent) 16%, var(--tint));
+}
+
+.meter.empty {
+  background: var(--line);
+  opacity: 0.5;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--chart-accent);
+  transition: width 0.25s ease;
+}
+
+.words-chart {
+  margin-bottom: 20px;
+}
+
+.words-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.words-chart h3,
+.progress-heading {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.progress-heading {
+  margin-bottom: 8px;
+}
+
+.btn.small {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+.chart-plot {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  outline: none;
+}
+
+.chart-plot:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 50%, transparent);
+}
+
+.chart-plot svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-base {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.chart-tick {
+  fill: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-bar {
+  fill: var(--chart-accent);
+  transition: opacity 0.1s;
+}
+
+.chart-bar.negative {
+  fill: var(--ink-3);
+}
+
+.chart-bar.active {
+  opacity: 0.72;
+}
+
+.chart-goal {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+}
+
+.chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.chart-key-line {
+  width: 16px;
+  height: 0;
+  border-top: 1px solid var(--ink-2);
+}
+
+.chart-value {
+  fill: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-hit {
+  fill: transparent;
+  cursor: default;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+
+.chart-tooltip strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.chart-tooltip span {
+  color: var(--ink-3);
+}
+
+.chart-table-wrap,
+.progress-table-wrap {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.chart-table-wrap:hover,
+.progress-table-wrap:hover {
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.chart-table,
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.chart-table th,
+.progress-table th {
+  position: sticky;
+  top: 0;
+  padding: 7px 12px;
+  background: var(--column);
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.chart-table td,
+.progress-table td {
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.chart-table td:last-child,
+.progress-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.progress-table .target-input {
+  width: 92px;
+  margin-left: auto;
+  display: block;
+}
+
+.progress-table td:last-child {
+  width: 18%;
+  min-width: 70px;
+}
+
+.progress-chapter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.progress-chapter:hover .progress-title {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.progress-num {
+  flex: none;
+  min-width: 20px;
+  color: var(--ink-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- Scrollbars ----------
    Thin, and out of sight until the pointer is over the part that scrolls. */
 
@@ -3130,6 +3519,35 @@ a {
   }
 
   .nav-long {
+    display: none;
+  }
+
+  .topbar-words,
+  .topbar-goal {
+    display: none;
+  }
+
+  .topbar-progress {
+    padding: 0 7px;
+    margin-right: 0;
+  }
+
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .goal-row {
+    grid-template-columns: 80px 1fr;
+  }
+
+  .goal-row .meter,
+  .goal-row .goal-left {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .progress-table th:nth-child(2),
+  .progress-table td:nth-child(2) {
     display: none;
   }
 

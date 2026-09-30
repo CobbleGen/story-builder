@@ -15,6 +15,7 @@ import type {
   NoteColor,
   RichNode,
   StoryData,
+  StoryGoals,
   TextSize,
 } from '../types'
 import { makeId } from '../lib/id'
@@ -171,9 +172,53 @@ export function deleteChapter(data: StoryData, id: string): StoryData {
 }
 
 /** Saves a chapter's written text. */
-export function setChapterText(data: StoryData, chapterId: string, text: ChapterText): StoryData {
+/** A local calendar day as YYYY-MM-DD. */
+export function dayKey(time: number = Date.now()): string {
+  const d = new Date(time)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Saves a chapter's text. The change in its word count is added to the
+ * day's tally in the word log (`day` null to leave the log alone).
+ */
+export function setChapterText(
+  data: StoryData,
+  chapterId: string,
+  text: ChapterText,
+  day: string | null = dayKey(),
+): StoryData {
   if (!data.chapters.some((c) => c.id === chapterId)) return data
-  return { ...data, texts: { ...data.texts, [chapterId]: text } }
+  const next = { ...data, texts: { ...data.texts, [chapterId]: text } }
+  const change = text.words - (data.texts[chapterId]?.words ?? 0)
+  if (!day || !change) return next
+  return { ...next, wordLog: { ...data.wordLog, [day]: (data.wordLog[day] ?? 0) + change } }
+}
+
+export function setGoals(data: StoryData, patch: StoryGoals): StoryData {
+  const goals: StoryGoals = { ...data.goals }
+  for (const key of ['draft', 'daily'] as const) {
+    if (!(key in patch)) continue
+    const value = cleanTarget(patch[key])
+    if (value) goals[key] = value
+    else delete goals[key]
+  }
+  return { ...data, goals }
+}
+
+/** A story with nothing in it yet. */
+export function emptyStory(title = 'Untitled story'): StoryData {
+  return {
+    title,
+    chapters: [],
+    arcs: [],
+    beats: {},
+    characters: [],
+    texts: {},
+    mindMap: { nodes: [], edges: [] },
+    goals: {},
+    wordLog: {},
+  }
 }
 
 export function moveChapter(data: StoryData, from: number, to: number): StoryData {
@@ -871,6 +916,21 @@ export function normalizeStory(input: unknown): StoryData {
         nodeIds.has(e.target),
     )
 
+  const rawGoals = isRecord(raw.goals) ? raw.goals : {}
+  const goals: StoryGoals = {}
+  const draft = cleanTarget(rawGoals.draft)
+  const daily = cleanTarget(rawGoals.daily)
+  if (draft) goals.draft = draft
+  if (daily) goals.daily = daily
+  // The log keeps the last year or so of days.
+  const wordLog = Object.fromEntries(
+    Object.entries(isRecord(raw.wordLog) ? raw.wordLog : {})
+      .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n))
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .slice(-400)
+      .map(([day, n]) => [day, Math.round(n as number)]),
+  )
+
   return linkMentions({
     title: str(raw.title, 'Untitled story'),
     arcs,
@@ -879,5 +939,7 @@ export function normalizeStory(input: unknown): StoryData {
     characters,
     texts,
     mindMap: { nodes, edges },
+    goals,
+    wordLog,
   })
 }

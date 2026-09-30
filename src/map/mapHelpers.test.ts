@@ -111,3 +111,26 @@ describe('anchors for lines', () => {
     expect(anchorOfHandle(null)).toBeUndefined()
   })
 })
+
+describe('progress', () => {
+  it('counts recent days, streaks and totals', async () => {
+    const { daysBefore, recentDays, writingStreak, totalWords, progressTo } = await import('../lib/progress')
+    expect(daysBefore('2026-03-01', 1)).toBe('2026-02-28')
+    expect(daysBefore('2026-01-01', 1)).toBe('2025-12-31')
+    const log = { '2026-09-28': 300, '2026-09-29': 120, '2026-09-30': 0, '2026-10-01': 50 }
+    expect(recentDays(log, '2026-10-01', 3)).toEqual([
+      { day: '2026-09-29', words: 120 },
+      { day: '2026-09-30', words: 0 },
+      { day: '2026-10-01', words: 50 },
+    ])
+    expect(writingStreak(log, '2026-10-01')).toBe(1)
+    expect(writingStreak({ '2026-09-29': 10, '2026-09-30': 20 }, '2026-10-01')).toBe(2)
+    expect(writingStreak({ '2026-09-29': 600, '2026-09-30': 200 }, '2026-10-01', 500)).toBe(0)
+    expect(writingStreak({ '2026-09-29': 600, '2026-09-30': 700 }, '2026-10-01', 500)).toBe(2)
+    const doc = { type: 'doc' }
+    expect(totalWords({ a: { doc, words: 10, updatedAt: 0 }, b: { doc, words: 5, updatedAt: 0 } })).toBe(15)
+    expect(progressTo(50, 200)).toBe(0.25)
+    expect(progressTo(500, 200)).toBe(1)
+    expect(progressTo(5)).toBeNull()
+  })
+})

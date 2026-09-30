@@ -25,6 +25,8 @@ import {
   deleteChapter,
   moveChapter,
   normalizeStory,
+  emptyStory,
+  setGoals,
   placeBeat,
   setBeatArc,
 } from './storyOps'
@@ -32,7 +34,7 @@ import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 
 function setup() {
-  let data: StoryData = { title: 'Test', chapters: [], arcs: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } }
+  let data: StoryData = emptyStory('Test')
   let ch1: string, ch2: string, ch3: string, main: string, love: string
   ;[data, ch1] = addChapter(data, { title: 'One' })
   ;[data, ch2] = addChapter(data, { title: 'Two' })
@@ -216,7 +218,7 @@ describe('normalizeStory', () => {
   })
 
   it('survives garbage', () => {
-    expect(normalizeStory('nope')).toEqual({ title: 'Untitled story', arcs: [], chapters: [], beats: {}, characters: [], texts: {}, mindMap: { nodes: [], edges: [] } })
+    expect(normalizeStory('nope')).toEqual(emptyStory())
   })
 
   it('upgrades a story saved before characters existed', () => {
@@ -425,6 +427,25 @@ describe('mind map', () => {
     expect(deleteBeat(withLine, beat).mindMap.nodes).toHaveLength(2)
     // Anchors survive a reload.
     expect(normalizeStory(withLine).mindMap.edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
+  })
+
+  it('tallies the words written each day, and keeps goals', () => {
+    let { data, ch1, ch2 } = setup()
+    const doc = { type: 'doc', content: [] }
+    data = setChapterText(data, ch1, { doc, words: 300, updatedAt: 1 }, '2026-09-01')
+    data = setChapterText(data, ch1, { doc, words: 250, updatedAt: 2 }, '2026-09-02')
+    data = setChapterText(data, ch2, { doc, words: 120, updatedAt: 3 }, '2026-09-02')
+    data = setChapterText(data, ch2, { doc, words: 120, updatedAt: 4 }, '2026-09-03')
+    expect(data.wordLog).toEqual({ '2026-09-01': 300, '2026-09-02': 70 })
+    // Saving without a day (the example story) leaves the log alone.
+    expect(setChapterText(data, ch1, { doc, words: 900, updatedAt: 5 }, null).wordLog).toBe(data.wordLog)
+    data = setGoals(data, { draft: 80000, daily: 500 })
+    expect(data.goals).toEqual({ draft: 80000, daily: 500 })
+    data = setGoals(data, { daily: 0 })
+    expect(data.goals).toEqual({ draft: 80000 })
+    const loaded = normalizeStory({ ...data, goals: { draft: -3, daily: 400 }, wordLog: { '2026-09-01': 10, nonsense: 5, '2026-09-02': 'x' } })
+    expect(loaded.goals).toEqual({ daily: 400 })
+    expect(loaded.wordLog).toEqual({ '2026-09-01': 10 })
   })
 
   it('keeps each chapter’s status and word target', () => {
