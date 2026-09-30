@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 export type SidebarMode = 'arcs' | 'characters'
+/** Light or dark colours, or whichever the device is set to. */
+export type ThemeSetting = 'system' | 'light' | 'dark'
 
 /** What the board is emphasising (hovering an arc or character in the sidebar). */
 export type Highlight = { kind: 'arc' | 'character'; id: string } | null
@@ -25,6 +27,7 @@ interface UiState {
   mapViewport: { x: number; y: number; zoom: number } | null
   /** Mind map: the "add to map" panel is open. */
   mapPaletteOpen: boolean
+  theme: ThemeSetting
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -36,6 +39,7 @@ interface UiState {
   setLastChapterId: (chapterId: string) => void
   setMapViewport: (viewport: { x: number; y: number; zoom: number }) => void
   toggleMapPalette: () => void
+  setTheme: (theme: ThemeSetting) => void
 }
 
 export const useUi = create<UiState>()(
@@ -53,6 +57,7 @@ export const useUi = create<UiState>()(
       lastChapterId: null,
       mapViewport: null,
       mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
+      theme: 'system',
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -65,6 +70,7 @@ export const useUi = create<UiState>()(
       setLastChapterId: (lastChapterId) => set({ lastChapterId }),
       setMapViewport: (mapViewport) => set({ mapViewport }),
       toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
+      setTheme: (theme) => set({ theme }),
     }),
     {
       name: 'story-builder:ui',
@@ -79,6 +85,7 @@ export const useUi = create<UiState>()(
         lastChapterId: s.lastChapterId,
         mapViewport: s.mapViewport,
         mapPaletteOpen: s.mapPaletteOpen,
+        theme: s.theme,
       }),
     },
   ),

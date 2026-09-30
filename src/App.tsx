@@ -8,12 +8,14 @@ import { ArcPage } from './pages/ArcPage'
 import { CharacterPage } from './pages/CharacterPage'
 import { useStoryLoaded } from './store/storyStore'
 import { useSaveStatus } from './store/persistence'
+import { useApplyTheme } from './lib/theme'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
 const MapPage = lazy(() => import('./map/MapPage'))
 
 export default function App() {
+  useApplyTheme()
   const loaded = useStoryLoaded()
   const saveFailed = useSaveStatus((s) => s.status === 'error')
 

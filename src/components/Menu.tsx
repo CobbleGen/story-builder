@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { Check, MoreHorizontal } from 'lucide-react'
 
 export interface MenuItem {
   label: string
   icon?: ReactNode
   onSelect: () => void
   danger?: boolean
+  /** Shows a tick: the current choice among several. */
+  checked?: boolean
+  /** A thin line above this item, starting a new group. */
+  separated?: boolean
 }
 
 interface Props {
@@ -51,8 +55,9 @@ export function Menu({ items, label, align = 'right', trigger }: Props) {
           {items.map((item) => (
             <button
               key={item.label}
-              role="menuitem"
-              className={`menu-item${item.danger ? ' danger' : ''}`}
+              role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+              aria-checked={item.checked}
+              className={`menu-item${item.danger ? ' danger' : ''}${item.separated ? ' separated' : ''}`}
               onClick={() => {
                 setOpen(false)
                 item.onSelect()
@@ -60,6 +65,7 @@ export function Menu({ items, label, align = 'right', trigger }: Props) {
             >
               {item.icon}
               {item.label}
+              {item.checked && <Check size={15} className="menu-check" />}
             </button>
           ))}
         </div>

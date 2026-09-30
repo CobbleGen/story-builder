@@ -20,6 +20,15 @@
   --serif: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
   --sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --column-width: 284px;
+  /* Tinted backgrounds mix a colour into --tint; readable coloured text mixes into --shade. */
+  --tint: #ffffff;
+  --shade: #000000;
+  --paper: #fffdf8;
+  --on-primary: #ffffff;
+  --switch-on: var(--primary);
+  --success: #3a7d44;
+  --overlay: rgba(30, 28, 24, 0.32);
+  --canvas-dots: #cfc9bd;
 
   font-family: var(--sans);
   font-size: 14px;
@@ -28,6 +37,36 @@
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   color-scheme: light;
+}
+
+/* Dark theme: chosen in ⋯ → Appearance, or following the system setting. */
+:root[data-theme='dark'] {
+  --bg: #1c1b19;
+  --board: #171614;
+  --surface: #262422;
+  --column: #201f1c;
+  --sidebar: #1f1d1b;
+  --ink: #ebe7df;
+  --ink-2: #b9b3a8;
+  --ink-3: #8c867b;
+  --line: #34312d;
+  --line-strong: #47433c;
+  --hover: rgba(255, 255, 255, 0.07);
+  --primary: #e7e3db;
+  --primary-hover: #ffffff;
+  --focus: #7892ff;
+  --danger: #e5645f;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 18px 40px -12px rgba(0, 0, 0, 0.7), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --tint: #262422;
+  --shade: #ffffff;
+  --paper: #22201d;
+  --on-primary: #1c1b19;
+  --switch-on: var(--focus);
+  --success: #5fb36b;
+  --overlay: rgba(0, 0, 0, 0.55);
+  --canvas-dots: #3a3732;
+  color-scheme: dark;
 }
 
 * {
@@ -126,7 +165,7 @@ a {
 /* A mention is just the name in the character's colour, darkened a little
    so light colours stay readable on the pale backgrounds. */
 .mention {
-  color: color-mix(in srgb, var(--char, var(--ink-3)) 72%, black);
+  color: color-mix(in srgb, var(--char, var(--ink-3)) 72%, var(--shade));
 }
 
 .mention.unknown {
@@ -225,7 +264,7 @@ a {
 
 .btn.primary {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .btn.primary:hover:not(:disabled) {
@@ -426,6 +465,26 @@ a {
   color: var(--danger);
 }
 
+.menu-item.separated {
+  margin-top: 5px;
+  position: relative;
+}
+
+.menu-item.separated::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: var(--line);
+}
+
+.menu-item .menu-check {
+  margin-left: auto;
+  color: var(--focus);
+}
+
 /* ---------- Sidebar ---------- */
 
 .sidebar {
@@ -526,7 +585,7 @@ a {
 }
 
 .arc-row .icon-btn.active {
-  color: color-mix(in srgb, var(--arc) 80%, black);
+  color: color-mix(in srgb, var(--arc) 80%, var(--shade));
 }
 
 .arc-toggle {
@@ -640,8 +699,8 @@ a {
   height: 20px;
   padding: 0 5px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--arc) 16%, white);
-  color: color-mix(in srgb, var(--arc) 75%, black);
+  background: color-mix(in srgb, var(--arc) 16%, var(--tint));
+  color: color-mix(in srgb, var(--arc) 75%, var(--shade));
   font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -813,9 +872,9 @@ a {
 }
 
 .arc-option.selected {
-  background: color-mix(in srgb, var(--arc) 14%, white);
+  background: color-mix(in srgb, var(--arc) 14%, var(--tint));
   border-color: var(--arc);
-  color: color-mix(in srgb, var(--arc) 70%, black);
+  color: color-mix(in srgb, var(--arc) 70%, var(--shade));
   font-weight: 500;
 }
 
@@ -1063,8 +1122,8 @@ a {
 .beat-card {
   position: relative;
   padding: 9px 11px 8px;
-  background: color-mix(in srgb, var(--arc) 9%, white);
-  border: 1px solid color-mix(in srgb, var(--arc) 20%, white);
+  background: color-mix(in srgb, var(--arc) 9%, var(--tint));
+  border: 1px solid color-mix(in srgb, var(--arc) 20%, var(--tint));
   border-left: 4px solid var(--arc);
   border-radius: 10px;
   box-shadow: var(--shadow-sm);
@@ -1127,7 +1186,7 @@ a {
   max-width: 100%;
   font-size: 11.5px;
   font-weight: 500;
-  color: color-mix(in srgb, var(--arc) 70%, black);
+  color: color-mix(in srgb, var(--arc) 70%, var(--shade));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1174,7 +1233,7 @@ a {
 .arc-hero {
   margin: 12px 0 22px;
   padding: 18px 20px 16px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--arc) 12%, white), var(--surface) 70%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--arc) 12%, var(--tint)), var(--surface) 70%);
   border: 1px solid var(--line);
   border-top: 5px solid var(--arc);
   border-radius: 16px;
@@ -1272,7 +1331,7 @@ a {
 
 .arc-beat.unplaced {
   background: color-mix(in srgb, var(--surface) 70%, var(--board));
-  border-left-color: color-mix(in srgb, var(--arc) 45%, white);
+  border-left-color: color-mix(in srgb, var(--arc) 45%, var(--tint));
 }
 
 .arc-beat.dragging {
@@ -1308,8 +1367,8 @@ a {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--arc) 14%, white);
-  color: color-mix(in srgb, var(--arc) 75%, black);
+  background: color-mix(in srgb, var(--arc) 14%, var(--tint));
+  color: color-mix(in srgb, var(--arc) 75%, var(--shade));
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1352,8 +1411,8 @@ a {
   padding: 4px 8px 4px 10px;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--arc) 13%, white);
-  color: color-mix(in srgb, var(--arc) 72%, black);
+  background: color-mix(in srgb, var(--arc) 13%, var(--tint));
+  color: color-mix(in srgb, var(--arc) 72%, var(--shade));
   font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
@@ -1459,7 +1518,7 @@ a {
   align-items: flex-start;
   justify-content: center;
   padding: 10vh 16px 16px;
-  background: rgba(30, 28, 24, 0.32);
+  background: var(--overlay);
   animation: fade-in 0.12s ease-out;
 }
 
@@ -1603,9 +1662,9 @@ a {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--char) 20%, white);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--char) 55%, white);
-  color: color-mix(in srgb, var(--char) 75%, black);
+  background: color-mix(in srgb, var(--char) 20%, var(--tint));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--char) 55%, var(--tint));
+  color: color-mix(in srgb, var(--char) 75%, var(--shade));
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1629,7 +1688,7 @@ a {
   width: 44px;
   height: 44px;
   font-size: 16px;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--char) 60%, white);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--char) 60%, var(--tint));
 }
 
 .avatar-new {
@@ -1732,7 +1791,7 @@ a {
 .rail-dot.round {
   width: 18px;
   height: 18px;
-  background: color-mix(in srgb, var(--arc) 25%, white);
+  background: color-mix(in srgb, var(--arc) 25%, var(--tint));
   box-shadow: inset 0 0 0 2px var(--arc);
 }
 
@@ -1764,8 +1823,8 @@ a {
   height: 26px;
   padding: 0 7px 0 4px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--char) 16%, white);
-  color: color-mix(in srgb, var(--char) 75%, black);
+  background: color-mix(in srgb, var(--char) 16%, var(--tint));
+  color: color-mix(in srgb, var(--char) 75%, var(--shade));
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -1836,8 +1895,8 @@ a {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--char) 14%, white);
-  color: color-mix(in srgb, var(--char) 75%, black);
+  background: color-mix(in srgb, var(--char) 14%, var(--tint));
+  color: color-mix(in srgb, var(--char) 75%, var(--shade));
   font-size: 13px;
   font-weight: 500;
 }
@@ -2343,7 +2402,7 @@ a {
 }
 
 .switch-row[aria-checked='true'] .switch {
-  background: var(--primary);
+  background: var(--switch-on);
 }
 
 .switch-row[aria-checked='true'] .switch::after {
@@ -2438,7 +2497,7 @@ a {
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
-  color: color-mix(in srgb, var(--arc, var(--ink-3)) 70%, black);
+  color: color-mix(in srgb, var(--arc, var(--ink-3)) 70%, var(--shade));
 }
 
 .check-arc .arc-dot {
@@ -2646,7 +2705,7 @@ a {
   padding: 12px 14px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
-  color: color-mix(in srgb, var(--danger) 70%, black);
+  color: color-mix(in srgb, var(--danger) 70%, var(--shade));
   font-size: 14px;
 }
 

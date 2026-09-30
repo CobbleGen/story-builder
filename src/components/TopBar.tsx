@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Download, FilePlus2, Feather, History, Sparkles, Upload } from 'lucide-react'
+import { Download, FilePlus2, Feather, History, Moon, Sparkles, Sun, SunMoon, Upload } from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
 import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
+import { useUi } from '../store/uiStore'
 
 function slug(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
@@ -18,6 +19,8 @@ export function TopBar() {
   const replaceStory = useStory((s) => s.replaceStory)
   const fileRef = useRef<HTMLInputElement>(null)
   const [showBackups, setShowBackups] = useState(false)
+  const theme = useUi((s) => s.theme)
+  const setTheme = useUi((s) => s.setTheme)
 
   const exportStory = () => {
     const story = pickData(useStory.getState())
@@ -103,6 +106,9 @@ export function TopBar() {
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
             { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
             { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
+            { label: 'Match system', icon: <SunMoon size={16} />, onSelect: () => setTheme('system'), checked: theme === 'system', separated: true },
+            { label: 'Light', icon: <Sun size={16} />, onSelect: () => setTheme('light'), checked: theme === 'light' },
+            { label: 'Dark', icon: <Moon size={16} />, onSelect: () => setTheme('dark'), checked: theme === 'dark' },
           ]}
         />
         <input

@@ -11,7 +11,16 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
       rel="stylesheet"
     />
+    <meta name="theme-color" content="#f3f1ec" />
     <title>Story Builder</title>
+    <script>
+      // Pick light or dark before anything paints (the app keeps it in step afterwards).
+      try {
+        var theme = (JSON.parse(localStorage.getItem('story-builder:ui') || '{}').state || {}).theme || 'system'
+        var dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

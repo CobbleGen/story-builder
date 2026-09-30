@@ -21,6 +21,7 @@ import { PanelLeftOpen } from 'lucide-react'
 import type { MapNode } from '../types'
 import { useStory } from '../store/storyStore'
 import { anchorOfHandle } from '../lib/anchors'
+import { useResolvedTheme } from '../lib/theme'
 import { useUi } from '../store/uiStore'
 import { ArcNode, BeatNode, ChapterNode, CharacterNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
@@ -128,6 +129,7 @@ function MapCanvas() {
   const { screenToFlowPosition, deleteElements } = useReactFlow()
   const wrapper = useRef<HTMLDivElement>(null)
 
+  const dark = useResolvedTheme() === 'dark'
   const [editingId, setEditingId] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [edgeSelection, setEdgeSelection] = useState<Record<string, boolean>>({})
@@ -152,9 +154,9 @@ function MapCanvas() {
         // Over the cards (even a selected one), so a line visibly reaches the row it's drawn from.
         zIndex: 2000,
         selected: !!edgeSelection[e.id],
-        markerEnd: e.arrow ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#8f897f' } : undefined,
+        markerEnd: e.arrow ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: dark ? '#8c867b' : '#8f897f' } : undefined,
       })),
-    [mindMap.edges, edgeSelection],
+    [mindMap.edges, edgeSelection, dark],
   )
 
   const onMap = useMemo(
@@ -305,8 +307,9 @@ function MapCanvas() {
             minZoom={0.1}
             maxZoom={2.5}
             attributionPosition="top-right"
+            colorMode={dark ? 'dark' : 'light'}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="#cfc9bd" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color={dark ? '#3a3732' : '#cfc9bd'} />
             <Controls showInteractive={false} position="bottom-right" fitViewOptions={FIT_VIEW} />
             <MiniMap
               pannable
@@ -316,9 +319,9 @@ function MapCanvas() {
               nodeColor={(n) => {
                 const node = (n as StoryFlowNode).data.node
                 if (node.kind === 'note') return node.color === 'white' ? '#e4e0d7' : NOTE_COLOR_VALUES[node.color]
-                return node.kind === 'text' ? 'transparent' : '#d6d1c6'
+                return node.kind === 'text' ? 'transparent' : dark ? '#4a463f' : '#d6d1c6'
               }}
-              maskColor="rgba(239, 236, 229, 0.7)"
+              maskColor={dark ? 'rgba(23, 22, 20, 0.7)' : 'rgba(239, 236, 229, 0.7)'}
             />
           </ReactFlow>
           {nodes.length === 0 && (

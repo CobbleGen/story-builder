@@ -32,7 +32,7 @@
   --xy-controls-button-border-color: var(--line);
   --xy-controls-box-shadow: var(--shadow-sm);
   --xy-minimap-background-color: var(--surface);
-  --xy-minimap-mask-background-color: rgba(239, 236, 229, 0.7);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--board) 70%, transparent);
   font-family: var(--sans);
 }
 
@@ -306,7 +306,7 @@
   gap: 5px;
   min-width: 0;
   margin: 2px 0 5px;
-  color: color-mix(in srgb, var(--card) 72%, black);
+  color: color-mix(in srgb, var(--card) 72%, var(--shade));
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -375,7 +375,7 @@
 .chapter-card {
   width: 260px;
   background: linear-gradient(var(--card), var(--card)) top / 100% 4px no-repeat,
-    color-mix(in srgb, var(--card) 6%, white);
+    color-mix(in srgb, var(--card) 6%, var(--tint));
 }
 
 .map-character-head {
@@ -422,10 +422,10 @@
 .beat-card-map {
   width: 230px;
   padding: 9px 12px 10px;
-  border: 1px solid color-mix(in srgb, var(--card) 20%, white);
+  border: 1px solid color-mix(in srgb, var(--card) 20%, var(--tint));
   border-left: 4px solid var(--card);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--card) 9%, white);
+  background: color-mix(in srgb, var(--card) 9%, var(--tint));
 }
 
 .beat-card-map .map-card-kind {
@@ -447,8 +447,8 @@
   gap: 4px;
   padding: 1px 7px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--card) 16%, white);
-  color: color-mix(in srgb, var(--card) 75%, black);
+  background: color-mix(in srgb, var(--card) 16%, var(--tint));
+  color: color-mix(in srgb, var(--card) 75%, var(--shade));
   font-weight: 600;
 }
 
@@ -463,7 +463,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #3a7d44;
+  color: var(--success);
   font-weight: 600;
 }
 
@@ -510,9 +510,9 @@
 }
 
 .map-view-btn.active {
-  border-color: color-mix(in srgb, var(--card) 45%, white);
-  background: color-mix(in srgb, var(--card) 13%, white);
-  color: color-mix(in srgb, var(--card) 75%, black);
+  border-color: color-mix(in srgb, var(--card) 45%, var(--tint));
+  background: color-mix(in srgb, var(--card) 13%, var(--tint));
+  color: color-mix(in srgb, var(--card) 75%, var(--shade));
 }
 
 .map-view-btn .chevron {
@@ -548,7 +548,7 @@
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: #fffdf8;
+  background: var(--paper);
   box-shadow: var(--shadow-sm);
   color: var(--ink);
   font-family: var(--serif);
@@ -732,14 +732,14 @@
   padding: 6px 8px;
   border-left: 3px solid var(--arc, var(--line-strong));
   border-radius: 7px;
-  background: color-mix(in srgb, var(--arc, white) 8%, white);
+  background: color-mix(in srgb, var(--arc, var(--tint)) 8%, var(--tint));
   font-size: 12.5px;
   line-height: 1.35;
   cursor: grab;
 }
 
 .map-beat:hover {
-  background: color-mix(in srgb, var(--arc, white) 15%, white);
+  background: color-mix(in srgb, var(--arc, var(--tint)) 15%, var(--tint));
 }
 
 .map-beat .chapter-tag {
@@ -821,7 +821,7 @@
   gap: 6px;
   margin: 3px 0;
   padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--focus) 60%, white);
+  border: 1px solid color-mix(in srgb, var(--focus) 60%, var(--tint));
   border-left: 3px solid var(--arc, var(--focus));
   border-radius: 7px;
   background: var(--surface);
@@ -1139,8 +1139,8 @@
 }
 
 .map-tool.active {
-  background: color-mix(in srgb, var(--focus) 12%, white);
-  color: color-mix(in srgb, var(--focus) 80%, black);
+  background: color-mix(in srgb, var(--focus) 12%, var(--tint));
+  color: color-mix(in srgb, var(--focus) 80%, var(--shade));
 }
 
 .map-tool.icon-only {
@@ -1184,6 +1184,20 @@
 }
 
 /* ---------- Sticky notes and text boxes ---------- */
+
+/* Notes and coloured text boxes keep their paper colours in the dark theme,
+   so their text stays dark ink. */
+.map-note,
+.map-text.has-bg {
+  --ink: #26241f;
+  --ink-2: #5f5a52;
+  --ink-3: #8f897f;
+  --line: #e4e0d7;
+  --line-strong: #d2cdc2;
+  --surface: #ffffff;
+  --tint: #ffffff;
+  --shade: #000000;
+}
 
 .map-note {
   display: flex;
@@ -1362,8 +1376,8 @@
 }
 
 .map-check.on {
-  border-color: #3a7d44;
-  background: #3a7d44;
+  border-color: var(--success);
+  background: var(--success);
 }
 
 .map-list-input .mention-input::placeholder {
