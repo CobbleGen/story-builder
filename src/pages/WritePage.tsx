@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
@@ -11,6 +11,8 @@ import { displayName, mentionToken, plainText } from '../lib/mentions'
 import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
 import { manuscriptExtensions } from '../editor/extensions'
 import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
+import { findInDoc } from '../editor/findInDoc'
+import type { TextFind } from '../lib/search'
 import { Toolbar } from '../editor/Toolbar'
 import { SelectionMenu } from '../editor/SelectionMenu'
 import { BeatsPanel } from '../editor/BeatsPanel'
@@ -91,6 +93,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const saveStatus = useSaveStatus((s) => s.status)
   const lookup = useMentionLookup()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [contentError, setContentError] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -177,6 +180,24 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     }
     if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false))
   }, [editor, beats, named])
+
+  // Opened from a search result: select what was found, in the middle of the page.
+  const find = (location.state as { find?: TextFind } | null)?.find
+  useEffect(() => {
+    if (!find || !editor || editor.isDestroyed) return
+    const nameOf = (id: string) => {
+      const named = lookup.get(id)
+      return named ? displayName(named) : 'unknown'
+    }
+    const range = findInDoc(editor.state.doc, find, nameOf)
+    if (range) {
+      editor.chain().focus(null, { scrollIntoView: false }).setTextSelection(range).run()
+      const { node } = editor.view.domAtPos(range.from)
+      const el = node instanceof Element ? node : node.parentElement
+      el?.scrollIntoView({ block: 'center' })
+    }
+    navigate('.', { replace: true, state: null })
+  }, [find, editor, lookup, navigate, location.key])
 
   const words = useEditorState({
     editor,

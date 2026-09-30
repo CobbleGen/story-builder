@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
   BackgroundVariant,
@@ -10,7 +10,9 @@ import {
   ReactFlow,
   ReactFlowProvider,
   applyNodeChanges,
+  useNodesInitialized,
   useReactFlow,
+  useStoreApi,
   type EdgeChange,
   type FitViewOptions,
   type NodeChange,
@@ -141,7 +143,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
   // Where the map was left last time; read once, so panning doesn't re-render the page.
   const [savedViewport] = useState(() => useUi.getState().mapViewports[mindMap.id] ?? null)
   const navigate = useNavigate()
-  const { screenToFlowPosition, deleteElements } = useReactFlow()
+  const location = useLocation()
+  const { screenToFlowPosition, deleteElements, fitView } = useReactFlow()
+  const flowStore = useStoreApi<StoryFlowNode, StoryFlowEdge>()
   const wrapper = useRef<HTMLDivElement>(null)
 
   const dark = useResolvedTheme() === 'dark'
@@ -173,6 +177,16 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
       })),
     [mindMap.edges, edgeSelection, dark],
   )
+
+  // Opened from a search result: select the card and bring it to the middle.
+  const searched = (location.state as { focusNode?: string } | null)?.focusNode
+  const measured = useNodesInitialized()
+  useEffect(() => {
+    if (!searched || !measured) return
+    flowStore.getState().addSelectedNodes([searched])
+    void fitView({ nodes: [{ id: searched }], maxZoom: 1, minZoom: 0.5, duration: 400, padding: 0.3 })
+    navigate('.', { replace: true, state: null })
+  }, [searched, measured, flowStore, fitView, navigate, location.key])
 
   const onMap = useMemo(
     () => new Set(mindMap.nodes.flatMap((n) => ('refId' in n ? [n.refId] : []))),

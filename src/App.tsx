@@ -5,7 +5,9 @@ import { BeatEditor } from './components/BeatEditor'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ProgressDialog } from './components/ProgressDialog'
 import { UndoNotice } from './components/UndoControls'
+import { SearchDialog } from './components/SearchDialog'
 import { useUndoShortcuts } from './lib/undoShortcuts'
+import { useSearchShortcut } from './lib/searchShortcut'
 import { useUi } from './store/uiStore'
 import { BoardPage } from './pages/BoardPage'
 import { ArcPage } from './pages/ArcPage'
@@ -22,9 +24,11 @@ const MapPage = lazy(() => import('./map/MapPage'))
 export default function App() {
   useApplyTheme()
   useUndoShortcuts()
+  useSearchShortcut()
   const loaded = useStoryLoaded()
   const saveFailed = useSaveStatus((s) => s.status === 'error')
   const progressOpen = useUi((s) => s.progressOpen)
+  const searchOpen = useUi((s) => s.searchOpen)
 
   if (!loaded) return <div className="boot">Opening your story…</div>
 
@@ -57,6 +61,7 @@ export default function App() {
         </Routes>
         <BeatEditor />
         {progressOpen && <ProgressDialog />}
+        {searchOpen && <SearchDialog />}
         <UndoNotice />
         <ConfirmDialog />
         {saveFailed && (

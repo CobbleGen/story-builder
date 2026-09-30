@@ -79,6 +79,7 @@ export function ChapterColumn({
       className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}`}
       style={{ transform: CSS.Translate.toString(transform), transition, '--pov': pov?.color } as React.CSSProperties}
       aria-label={`Chapter ${number}`}
+      data-chapter={chapter.id}
     >
       <header className="chapter-head">
         <div className="chapter-top">

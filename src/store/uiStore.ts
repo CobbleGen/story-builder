@@ -38,6 +38,8 @@ interface UiState {
   theme: ThemeSetting
   /** The word count and goals dialog is open. */
   progressOpen: boolean
+  /** The search dialog is open. */
+  searchOpen: boolean
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -52,6 +54,7 @@ interface UiState {
   toggleMapPalette: () => void
   setTheme: (theme: ThemeSetting) => void
   setProgressOpen: (open: boolean) => void
+  setSearchOpen: (open: boolean) => void
 }
 
 export const useUi = create<UiState>()(
@@ -72,6 +75,7 @@ export const useUi = create<UiState>()(
       mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
       theme: 'system',
       progressOpen: false,
+      searchOpen: false,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -87,6 +91,7 @@ export const useUi = create<UiState>()(
       toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
       setTheme: (theme) => set({ theme }),
       setProgressOpen: (progressOpen) => set({ progressOpen }),
+      setSearchOpen: (searchOpen) => set({ searchOpen }),
     }),
     {
       name: 'story-builder:ui',

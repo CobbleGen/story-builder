@@ -8,6 +8,7 @@ import {
   Moon,
   Network,
   PenLine,
+  Search,
   Sparkles,
   SquareKanban,
   Sun,
@@ -24,6 +25,7 @@ import { BackupsDialog } from './BackupsDialog'
 import { UndoButtons } from './UndoControls'
 import { useUi } from '../store/uiStore'
 import { totalWords } from '../lib/progress'
+import { SEARCH_KEYS } from '../lib/searchShortcut'
 
 function slug(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
@@ -38,6 +40,7 @@ export function TopBar() {
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
+  const setSearchOpen = useUi((s) => s.setSearchOpen)
   const total = useStory((s) => totalWords(s.texts))
   const goal = useStory((s) => s.goals.draft)
 
@@ -127,6 +130,11 @@ export function TopBar() {
         </NavLink>
       </nav>
       <div className="topbar-actions">
+        <button className="topbar-search" onClick={() => setSearchOpen(true)} aria-label="Search your story" title={`Search your story (${SEARCH_KEYS})`}>
+          <Search size={16} />
+          <span className="topbar-search-text">Search</span>
+          <kbd className="topbar-kbd">{SEARCH_KEYS}</kbd>
+        </button>
         <UndoButtons />
         <button
           className="topbar-progress"

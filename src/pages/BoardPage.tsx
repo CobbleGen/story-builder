@@ -20,6 +20,7 @@ import {
   type KeyboardCoordinateGetter,
 } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useStory } from '../store/storyStore'
 import type { ChapterLayout } from '../store/storyOps'
@@ -27,6 +28,7 @@ import { insertionIndex, moveInLayout } from '../lib/placement'
 import { Sidebar } from '../components/Sidebar'
 import { BeatCardView } from '../components/BeatCard'
 import { chapterSortId, type BeatDragData, type ChapterDragData, type DragData } from '../lib/dnd'
+import { flash } from '../lib/flash'
 import { ChapterColumn, ChapterOverlay } from './ChapterColumn'
 
 const dragData = (item: { data: { current?: unknown } } | null | undefined) =>
@@ -112,6 +114,20 @@ export function BoardPage() {
   const previewRef = useRef<ChapterLayout | null>(null)
   const originalRef = useRef<ChapterLayout | null>(null)
   const pointerY = useRef<number | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Opened from a search result: bring the chapter into view and make it glow.
+  const searched = (location.state as { focusChapter?: string } | null)?.focusChapter
+  useEffect(() => {
+    if (!searched) return
+    const column = document.querySelector<HTMLElement>(`.board .chapter[data-chapter="${CSS.escape(searched)}"]`)
+    if (column) {
+      column.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+      flash(column)
+    }
+    navigate('.', { replace: true, state: null })
+  }, [searched, navigate, location.key])
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
