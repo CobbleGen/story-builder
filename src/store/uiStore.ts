@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { DEFAULT_EXPORT, type ExportOptions } from '../lib/manuscript'
 
 export type SidebarMode = 'arcs' | 'characters' | 'world'
 /** Light or dark colours, or whichever the device is set to. */
@@ -40,6 +41,8 @@ interface UiState {
   progressOpen: boolean
   /** The search dialog is open. */
   searchOpen: boolean
+  /** How the manuscript was last exported. */
+  exportOptions: ExportOptions
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -55,6 +58,7 @@ interface UiState {
   setTheme: (theme: ThemeSetting) => void
   setProgressOpen: (open: boolean) => void
   setSearchOpen: (open: boolean) => void
+  setExportOptions: (patch: Partial<ExportOptions>) => void
 }
 
 export const useUi = create<UiState>()(
@@ -76,6 +80,7 @@ export const useUi = create<UiState>()(
       theme: 'system',
       progressOpen: false,
       searchOpen: false,
+      exportOptions: DEFAULT_EXPORT,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -92,6 +97,7 @@ export const useUi = create<UiState>()(
       setTheme: (theme) => set({ theme }),
       setProgressOpen: (progressOpen) => set({ progressOpen }),
       setSearchOpen: (searchOpen) => set({ searchOpen }),
+      setExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
     }),
     {
       name: 'story-builder:ui',
@@ -101,7 +107,8 @@ export const useUi = create<UiState>()(
         const saved = (persisted ?? {}) as Partial<UiState> & { mapViewport?: MapViewport | null }
         const { mapViewport, ...rest } = saved
         const mapViewports = rest.mapViewports ?? (mapViewport ? { map_main: mapViewport } : {})
-        return { ...current, ...rest, mapViewports }
+        const exportOptions = { ...DEFAULT_EXPORT, ...rest.exportOptions }
+        return { ...current, ...rest, mapViewports, exportOptions }
       },
       partialize: (s) => ({
         sidebarOpen: s.sidebarOpen,
@@ -115,6 +122,7 @@ export const useUi = create<UiState>()(
         lastMapId: s.lastMapId,
         mapPaletteOpen: s.mapPaletteOpen,
         theme: s.theme,
+        exportOptions: s.exportOptions,
       }),
     },
   ),

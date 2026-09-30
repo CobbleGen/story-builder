@@ -9,4 +9,7 @@ export default defineConfig({
     __BUILD_ID__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || `local-${Date.now()}`),
   },
   plugins: [react()],
+  // The Word exporter is only imported when exporting; bundle it up front so
+  // the dev server doesn't reload the page the first time it's used.
+  optimizeDeps: { include: ['docx'] },
 })

@@ -3177,6 +3177,130 @@ a {
   width: min(760px, 100%);
 }
 
+/* ---------- Manuscript export ---------- */
+
+.export-formats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.export-formats legend {
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.format-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.format-option:hover {
+  background: var(--hover);
+}
+
+.format-option.active {
+  border-color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 8%, var(--surface));
+  color: var(--focus);
+}
+
+.format-option:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.format-option > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+/* The radio itself is hidden; the card is the choice. */
+.format-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.format-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.format-text strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.format-text small {
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.export-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.export-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.export-check input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--focus);
+}
+
+.export-author {
+  width: calc(100% - 24px);
+  margin: -2px 0 2px 24px;
+}
+
+.export-summary {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.export-error {
+  margin: 14px 0 0;
+  color: var(--danger);
+}
+
+/* Phones: the choices without their notes, so the whole dialog fits. */
+@media (max-width: 520px) {
+  .format-option {
+    align-items: center;
+    padding: 10px;
+  }
+
+  .format-text small {
+    display: none;
+  }
+}
+
 /* ---------- Search ---------- */
 
 .topbar-search {

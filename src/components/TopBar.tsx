@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import {
+  BookDown,
   Download,
   FilePlus2,
   Feather,
@@ -22,14 +23,12 @@ import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
 import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
+import { ExportDialog } from './ExportDialog'
+import { downloadBlob, slug } from '../lib/download'
 import { UndoButtons } from './UndoControls'
 import { useUi } from '../store/uiStore'
 import { totalWords } from '../lib/progress'
 import { SEARCH_KEYS } from '../lib/searchShortcut'
-
-function slug(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story'
-}
 
 export function TopBar() {
   const title = useStory((s) => s.title)
@@ -37,6 +36,7 @@ export function TopBar() {
   const replaceStory = useStory((s) => s.replaceStory)
   const fileRef = useRef<HTMLInputElement>(null)
   const [showBackups, setShowBackups] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
@@ -46,13 +46,7 @@ export function TopBar() {
 
   const exportStory = () => {
     const story = pickData(useStory.getState())
-    const blob = new Blob([JSON.stringify(story, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${slug(story.title)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(new Blob([JSON.stringify(story, null, 2)], { type: 'application/json' }), `${slug(story.title)}.json`)
   }
 
   const importStory = async (file: File) => {
@@ -153,6 +147,7 @@ export function TopBar() {
         <Menu
           label="Story options"
           items={[
+            { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true) },
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: exportStory },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
@@ -176,6 +171,7 @@ export function TopBar() {
         />
       </div>
       {showBackups && <BackupsDialog onClose={() => setShowBackups(false)} />}
+      {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
     </header>
   )
 }
