@@ -5,6 +5,12 @@ export type SidebarMode = 'arcs' | 'characters'
 /** Light or dark colours, or whichever the device is set to. */
 export type ThemeSetting = 'system' | 'light' | 'dark'
 
+export interface MapViewport {
+  x: number
+  y: number
+  zoom: number
+}
+
 /** What the board is emphasising (hovering an arc or character in the sidebar). */
 export type Highlight = { kind: 'arc' | 'character'; id: string } | null
 
@@ -23,8 +29,10 @@ interface UiState {
   beatsPanelOpen: boolean
   /** Chapter last opened in the manuscript. */
   lastChapterId: string | null
-  /** Where the mind map was last scrolled and zoomed to. */
-  mapViewport: { x: number; y: number; zoom: number } | null
+  /** Where each mind map was last scrolled and zoomed to, by map id. */
+  mapViewports: Record<string, MapViewport>
+  /** The mind map last opened. */
+  lastMapId: string | null
   /** Mind map: the "add to map" panel is open. */
   mapPaletteOpen: boolean
   theme: ThemeSetting
@@ -39,7 +47,8 @@ interface UiState {
   toggleArcColors: () => void
   toggleBeatsPanel: () => void
   setLastChapterId: (chapterId: string) => void
-  setMapViewport: (viewport: { x: number; y: number; zoom: number }) => void
+  setMapViewport: (mapId: string, viewport: MapViewport) => void
+  setLastMapId: (mapId: string) => void
   toggleMapPalette: () => void
   setTheme: (theme: ThemeSetting) => void
   setProgressOpen: (open: boolean) => void
@@ -58,7 +67,8 @@ export const useUi = create<UiState>()(
       showArcColors: true,
       beatsPanelOpen: typeof window === 'undefined' || window.innerWidth > 760,
       lastChapterId: null,
-      mapViewport: null,
+      mapViewports: {},
+      lastMapId: null,
       mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
       theme: 'system',
       progressOpen: false,
@@ -72,7 +82,8 @@ export const useUi = create<UiState>()(
       toggleArcColors: () => set((s) => ({ showArcColors: !s.showArcColors })),
       toggleBeatsPanel: () => set((s) => ({ beatsPanelOpen: !s.beatsPanelOpen })),
       setLastChapterId: (lastChapterId) => set({ lastChapterId }),
-      setMapViewport: (mapViewport) => set({ mapViewport }),
+      setMapViewport: (mapId, viewport) => set((s) => ({ mapViewports: { ...s.mapViewports, [mapId]: viewport } })),
+      setLastMapId: (lastMapId) => set({ lastMapId }),
       toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
       setTheme: (theme) => set({ theme }),
       setProgressOpen: (progressOpen) => set({ progressOpen }),
@@ -80,6 +91,13 @@ export const useUi = create<UiState>()(
     {
       name: 'story-builder:ui',
       storage: createJSONStorage(() => localStorage),
+      // From before several maps: the one map's view is the first map's.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<UiState> & { mapViewport?: MapViewport | null }
+        const { mapViewport, ...rest } = saved
+        const mapViewports = rest.mapViewports ?? (mapViewport ? { map_main: mapViewport } : {})
+        return { ...current, ...rest, mapViewports }
+      },
       partialize: (s) => ({
         sidebarOpen: s.sidebarOpen,
         sidebarMode: s.sidebarMode,
@@ -88,7 +106,8 @@ export const useUi = create<UiState>()(
         showArcColors: s.showArcColors,
         beatsPanelOpen: s.beatsPanelOpen,
         lastChapterId: s.lastChapterId,
-        mapViewport: s.mapViewport,
+        mapViewports: s.mapViewports,
+        lastMapId: s.lastMapId,
         mapPaletteOpen: s.mapPaletteOpen,
         theme: s.theme,
       }),

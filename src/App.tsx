@@ -42,7 +42,7 @@ export default function App() {
             }
           />
           <Route
-            path="/map"
+            path="/map/:mapId?"
             element={
               <Suspense fallback={<div className="boot">Opening the mind map…</div>}>
                 <MapPage />

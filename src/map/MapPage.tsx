@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
   BackgroundVariant,
@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import './map.css'
 import { PanelLeftOpen } from 'lucide-react'
-import type { MapNode } from '../types'
+import type { MapNode, MindMap } from '../types'
 import { useStory } from '../store/storyStore'
 import { anchorOfHandle } from '../lib/anchors'
 import { useResolvedTheme } from '../lib/theme'
@@ -27,6 +27,7 @@ import { ArcNode, BeatNode, ChapterNode, CharacterNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
 import { MapPalette } from './MapPalette'
+import { MapSwitcher } from './MapSwitcher'
 import {
   DRAG_MIME,
   MapContext,
@@ -104,16 +105,29 @@ function freeSpot(nodes: StoryFlowNode[], x: number, y: number, w: number, h: nu
   return { x, y }
 }
 
+/** The mind map in the address (/map/:mapId), else the last one opened, else the first. */
 export default function MapPage() {
+  const { mapId } = useParams()
+  const maps = useStory((s) => s.mindMaps)
+  const lastMapId = useUi((s) => s.lastMapId)
+  const setLastMapId = useUi((s) => s.setLastMapId)
+  const current = maps.find((m) => m.id === mapId)
+  const fallback = maps.find((m) => m.id === lastMapId) ?? maps[0]
+
+  useEffect(() => {
+    if (current && current.id !== lastMapId) setLastMapId(current.id)
+  }, [current, lastMapId, setLastMapId])
+
+  if (!current) return fallback ? <Navigate to={`/map/${fallback.id}`} replace /> : null
+  // Each map gets its own canvas, so switching maps starts from that map's view.
   return (
-    <ReactFlowProvider>
-      <MapCanvas />
+    <ReactFlowProvider key={current.id}>
+      <MapCanvas mindMap={current} />
     </ReactFlowProvider>
   )
 }
 
-function MapCanvas() {
-  const mindMap = useStory((s) => s.mindMap)
+function MapCanvas({ mindMap }: { mindMap: MindMap }) {
   const addMapNode = useStory((s) => s.addMapNode)
   const moveMapNodes = useStory((s) => s.moveMapNodes)
   const removeMapNodes = useStory((s) => s.removeMapNodes)
@@ -124,7 +138,7 @@ function MapCanvas() {
   const setMapViewport = useUi((s) => s.setMapViewport)
   const openBeat = useUi((s) => s.openBeat)
   // Where the map was left last time; read once, so panning doesn't re-render the page.
-  const [savedViewport] = useState(() => useUi.getState().mapViewport)
+  const [savedViewport] = useState(() => useUi.getState().mapViewports[mindMap.id] ?? null)
   const navigate = useNavigate()
   const { screenToFlowPosition, deleteElements } = useReactFlow()
   const wrapper = useRef<HTMLDivElement>(null)
@@ -188,10 +202,10 @@ function MapCanvas() {
     (item: PaletteItem, clientX: number, clientY: number) => {
       const p = screenToFlowPosition({ x: clientX, y: clientY })
       const c = NEW_NODE_CENTER[item.kind]
-      const id = addMapNode(newNodeFor(item, Math.round(p.x - c.x), Math.round(p.y - c.y)))
+      const id = addMapNode(newNodeFor(item, Math.round(p.x - c.x), Math.round(p.y - c.y)), mindMap.id)
       if (id && (item.kind === 'note' || item.kind === 'text')) setEditingId(id)
     },
-    [addMapNode, screenToFlowPosition],
+    [addMapNode, screenToFlowPosition, mindMap.id],
   )
 
   /** Clicked in the palette: add it near the middle of the view, in a free spot. */
@@ -201,7 +215,7 @@ function MapCanvas() {
     const c = NEW_NODE_CENTER[item.kind]
     const middle = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
     const spot = freeSpot(nodes, middle.x - c.x, middle.y - c.y, c.x * 2, c.y * 2)
-    const id = addMapNode(newNodeFor(item, Math.round(spot.x), Math.round(spot.y)))
+    const id = addMapNode(newNodeFor(item, Math.round(spot.x), Math.round(spot.y)), mindMap.id)
     if (id && (item.kind === 'note' || item.kind === 'text')) setEditingId(id)
     // On a phone the panel covers the map; get it out of the way of the new card.
     if (window.matchMedia('(max-width: 760px)').matches) togglePalette()
@@ -294,7 +308,7 @@ function MapCanvas() {
               if ((e.target as Element).closest('.nodrag')) return
               if (n.data.node.kind !== 'note' && n.data.node.kind !== 'text') openItem(n.data.node)
             }}
-            onMoveEnd={(_, viewport) => setMapViewport(viewport)}
+            onMoveEnd={(_, viewport) => setMapViewport(mindMap.id, viewport)}
             onPaneClick={() => setEditingId(null)}
             defaultViewport={savedViewport ?? undefined}
             fitView={!savedViewport}
@@ -324,6 +338,7 @@ function MapCanvas() {
               maskColor={dark ? 'rgba(23, 22, 20, 0.7)' : 'rgba(239, 236, 229, 0.7)'}
             />
           </ReactFlow>
+          <MapSwitcher map={mindMap} />
           {nodes.length === 0 && (
             <div className="map-empty">
               <strong>Your mind map is empty</strong>

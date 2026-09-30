@@ -43,6 +43,7 @@ const GROUPED = new Set([
   'updateMapNode',
   'updateMapEdge',
   'setGoals',
+  'renameMindMap',
 ])
 
 const LABELS: Record<string, string> = {
@@ -79,6 +80,9 @@ const LABELS: Record<string, string> = {
   addMapEdge: 'draw line',
   updateMapEdge: 'edit line',
   removeMapEdges: 'delete line',
+  addMindMap: 'new map',
+  renameMindMap: 'rename map',
+  deleteMindMap: 'delete map',
   replaceStory: 'replace story',
 }
 

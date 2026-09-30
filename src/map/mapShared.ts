@@ -128,7 +128,7 @@ export function useSavedAnchors(prefix: string): string[] {
   const nodeId = useNodeId()
   return useStory(
     useShallow((s) =>
-      s.mindMap.edges.flatMap((e) =>
+      s.mindMaps.flatMap((m) => m.edges).flatMap((e) =>
         [e.source === nodeId ? e.sourceAnchor : undefined, e.target === nodeId ? e.targetAnchor : undefined].filter(
           (a): a is string => !!a && a.startsWith(prefix),
         ),

@@ -10,6 +10,7 @@ import {
   addMapNode,
   emptyStory,
   linkMentions,
+  renameMindMap,
   setChapterText,
   updateChapter,
   updateMapEdge,
@@ -156,6 +157,7 @@ export function buildSampleStory(): StoryData {
   data = updateChapter(data, ch3, { status: 'draft', targetWords: 3000 })
 
   // A small mind map: who's who, and an open question.
+  data = renameMindMap(data, data.mindMaps[0].id, 'Who knows what')
   const place = (node: NewMapNode) => {
     let id: string | null
     ;[data, id] = addMapNode(data, node)

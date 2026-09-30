@@ -12,6 +12,7 @@ import type {
   MapListStyle,
   MapNode,
   MapSize,
+  MindMap,
   NoteColor,
   RichNode,
   StoryData,
@@ -103,17 +104,17 @@ export function mapStoryText(data: StoryData, fn: (text: string) => string): Sto
       })
       return changed ? { ...c, description, attributes } : c
     }),
-    mindMap: (() => {
+    mindMaps: data.mindMaps.map((map) => {
       let changed = false
-      const nodes = data.mindMap.nodes.map((n) => {
+      const nodes = map.nodes.map((n) => {
         if (n.kind !== 'note' && n.kind !== 'text') return n
         const text = fn(n.text)
         if (text === n.text) return n
         changed = true
         return { ...n, text }
       })
-      return changed ? { ...data.mindMap, nodes } : data.mindMap
-    })(),
+      return changed ? { ...map, nodes } : map
+    }),
   }
 }
 
@@ -215,11 +216,15 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     beats: {},
     characters: [],
     texts: {},
-    mindMap: { nodes: [], edges: [] },
+    mindMaps: [defaultMindMap()],
     goals: {},
     wordLog: {},
   }
 }
+
+/** The map every story starts with. */
+export const DEFAULT_MAP_ID = 'map_main'
+export const defaultMindMap = (): MindMap => ({ id: DEFAULT_MAP_ID, name: 'Mind map', nodes: [], edges: [] })
 
 export function moveChapter(data: StoryData, from: number, to: number): StoryData {
   return { ...data, chapters: moveItem(data.chapters, from, to) }
@@ -584,57 +589,87 @@ function refExists(data: StoryData, node: NewMapNode): boolean {
   }
 }
 
+/** Applies `fn` to every mind map; maps it leaves alone (and the story) keep their identity. */
+function mapMaps(data: StoryData, fn: (map: MindMap) => MindMap): StoryData {
+  let changed = false
+  const mindMaps = data.mindMaps.map((m) => {
+    const next = fn(m)
+    if (next !== m) changed = true
+    return next
+  })
+  return changed ? { ...data, mindMaps } : data
+}
+
+/** The map a card is on. */
+export const mapOfNode = (data: StoryData, nodeId: string) =>
+  data.mindMaps.find((m) => m.nodes.some((n) => n.id === nodeId))
+
+/** A card, on whichever map it is. */
+export function findMapNode(data: StoryData, nodeId: string): MapNode | undefined {
+  for (const map of data.mindMaps) {
+    const node = map.nodes.find((n) => n.id === nodeId)
+    if (node) return node
+  }
+  return undefined
+}
+
 /** Removes mind map cards for deleted story items, with their lines. */
 function dropMapRefs(data: StoryData, refIds: Set<string>): StoryData {
-  const gone = new Set(data.mindMap.nodes.filter((n) => isEntity(n) && refIds.has(n.refId)).map((n) => n.id))
-  const next = gone.size ? removeMapNodes(data, [...gone]) : data
+  const gone = data.mindMaps.flatMap((m) => m.nodes.filter((n) => isEntity(n) && refIds.has(n.refId)).map((n) => n.id))
+  const next = gone.length ? removeMapNodes(data, gone) : data
   // Lines drawn from a deleted beat, attribute, arc or chapter inside a card go too.
   const anchoredToGone = (anchor?: string) => {
     const id = anchor ? anchorItemId(anchor) : null
     return !!id && refIds.has(id)
   }
-  const edges = next.mindMap.edges.filter((e) => !anchoredToGone(e.sourceAnchor) && !anchoredToGone(e.targetAnchor))
-  return edges.length === next.mindMap.edges.length ? next : { ...next, mindMap: { ...next.mindMap, edges } }
+  return mapMaps(next, (m) => {
+    const edges = m.edges.filter((e) => !anchoredToGone(e.sourceAnchor) && !anchoredToGone(e.targetAnchor))
+    return edges.length === m.edges.length ? m : { ...m, edges }
+  })
 }
 
-export function addMapNode(data: StoryData, node: NewMapNode): [StoryData, string | null] {
-  if (!refExists(data, node)) return [data, null]
+/** Adds a card to a map (the first map if none is given). */
+export function addMapNode(data: StoryData, node: NewMapNode, mapId?: string): [StoryData, string | null] {
+  const target = data.mindMaps.find((m) => m.id === mapId) ?? data.mindMaps[0]
+  if (!target || !refExists(data, node)) return [data, null]
   const full = { ...node, id: makeId('node') } as MapNode
-  return [{ ...data, mindMap: { ...data.mindMap, nodes: [...data.mindMap.nodes, full] } }, full.id]
+  return [mapMaps(data, (m) => (m === target ? { ...m, nodes: [...m.nodes, full] } : m)), full.id]
 }
 
 export function updateMapNode(data: StoryData, id: string, patch: MapNodePatch): StoryData {
-  return {
-    ...data,
-    mindMap: {
-      ...data.mindMap,
-      nodes: data.mindMap.nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as MapNode) : n)),
-    },
-  }
+  return mapMaps(data, (m) =>
+    m.nodes.some((n) => n.id === id)
+      ? { ...m, nodes: m.nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as MapNode) : n)) }
+      : m,
+  )
 }
 
 /** Sets new positions for several cards at once (the end of a drag). */
 export function moveMapNodes(data: StoryData, moves: Record<string, { x: number; y: number }>): StoryData {
-  let changed = false
-  const nodes = data.mindMap.nodes.map((n) => {
-    const m = moves[n.id]
-    if (!m || (m.x === n.x && m.y === n.y)) return n
-    changed = true
-    return { ...n, x: m.x, y: m.y }
+  return mapMaps(data, (m) => {
+    let changed = false
+    const nodes = m.nodes.map((n) => {
+      const move = moves[n.id]
+      if (!move || (move.x === n.x && move.y === n.y)) return n
+      changed = true
+      return { ...n, x: move.x, y: move.y }
+    })
+    return changed ? { ...m, nodes } : m
   })
-  return changed ? { ...data, mindMap: { ...data.mindMap, nodes } } : data
 }
 
-/** Takes cards off the map (never deletes the story items), with their lines. */
+/** Takes cards off their maps (never deletes the story items), with their lines. */
 export function removeMapNodes(data: StoryData, ids: string[]): StoryData {
   const gone = new Set(ids)
-  return {
-    ...data,
-    mindMap: {
-      nodes: data.mindMap.nodes.filter((n) => !gone.has(n.id)),
-      edges: data.mindMap.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
-    },
-  }
+  return mapMaps(data, (m) =>
+    m.nodes.some((n) => gone.has(n.id))
+      ? {
+          ...m,
+          nodes: m.nodes.filter((n) => !gone.has(n.id)),
+          edges: m.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
+        }
+      : m,
+  )
 }
 
 /** Where inside each card a new line attaches (see lib/anchors). */
@@ -647,17 +682,17 @@ export interface EdgeAnchors {
 const isLoop = (source: string, target: string, a: EdgeAnchors) =>
   source === target && (!a.source || !a.target || a.source === a.target)
 
-/** Connects two cards, or spots inside them; ignores loops and repeats of an existing line. */
+/** Connects two cards on one map, or spots inside them; ignores loops and repeats of an existing line. */
 export function addMapEdge(
   data: StoryData,
   source: string,
   target: string,
   anchors: EdgeAnchors = {},
 ): [StoryData, string | null] {
-  const ids = new Set(data.mindMap.nodes.map((n) => n.id))
+  const map = mapOfNode(data, source)
   const a = { source: cleanAnchor(anchors.source), target: cleanAnchor(anchors.target) }
-  if (isLoop(source, target, a) || !ids.has(source) || !ids.has(target)) return [data, null]
-  const exists = data.mindMap.edges.some(
+  if (!map || isLoop(source, target, a) || !map.nodes.some((n) => n.id === target)) return [data, null]
+  const exists = map.edges.some(
     (e) =>
       (e.source === source && e.target === target && e.sourceAnchor === a.source && e.targetAnchor === a.target) ||
       (e.source === target && e.target === source && e.sourceAnchor === a.target && e.targetAnchor === a.source),
@@ -672,19 +707,36 @@ export function addMapEdge(
     ...(a.source ? { sourceAnchor: a.source } : {}),
     ...(a.target ? { targetAnchor: a.target } : {}),
   }
-  return [{ ...data, mindMap: { ...data.mindMap, edges: [...data.mindMap.edges, edge] } }, edge.id]
+  return [mapMaps(data, (m) => (m === map ? { ...m, edges: [...m.edges, edge] } : m)), edge.id]
 }
 
 export function updateMapEdge(data: StoryData, id: string, patch: Partial<Pick<MapEdge, 'label' | 'arrow'>>): StoryData {
-  return {
-    ...data,
-    mindMap: { ...data.mindMap, edges: data.mindMap.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) },
-  }
+  return mapMaps(data, (m) =>
+    m.edges.some((e) => e.id === id) ? { ...m, edges: m.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) } : m,
+  )
 }
 
 export function removeMapEdges(data: StoryData, ids: string[]): StoryData {
   const gone = new Set(ids)
-  return { ...data, mindMap: { ...data.mindMap, edges: data.mindMap.edges.filter((e) => !gone.has(e.id)) } }
+  return mapMaps(data, (m) => (m.edges.some((e) => gone.has(e.id)) ? { ...m, edges: m.edges.filter((e) => !gone.has(e.id)) } : m))
+}
+
+// ---------- Mind maps ----------
+
+export function addMindMap(data: StoryData, name = 'Untitled map'): [StoryData, string] {
+  const map: MindMap = { id: makeId('map'), name, nodes: [], edges: [] }
+  return [{ ...data, mindMaps: [...data.mindMaps, map] }, map.id]
+}
+
+export function renameMindMap(data: StoryData, id: string, name: string): StoryData {
+  return mapMaps(data, (m) => (m.id === id && m.name !== name ? { ...m, name } : m))
+}
+
+/** Deletes a map (never the story items on it). The last map is replaced by an empty one. */
+export function deleteMindMap(data: StoryData, id: string): StoryData {
+  if (!data.mindMaps.some((m) => m.id === id)) return data
+  const rest = data.mindMaps.filter((m) => m.id !== id)
+  return { ...data, mindMaps: rest.length ? rest : [{ ...defaultMindMap(), id: makeId('map') }] }
 }
 
 // ---------- Integrity ----------
@@ -839,82 +891,110 @@ export function normalizeStory(input: unknown): StoryData {
     if (checked.length) out.checked = checked
     return out
   }
-  const rawMap = isRecord(raw.mindMap) ? raw.mindMap : {}
-  const nodes: MapNode[] = []
-  for (const n of list(rawMap.nodes)) {
-    const id = str(n.id) || makeId('node')
-    const x = num(n.x, 0)
-    const y = num(n.y, 0)
-    const kind = str(n.kind)
-    if (kind in refs) {
-      const refId = str(n.refId)
-      if (!refs[kind].has(refId)) continue
-      const node: MapNode = { id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y }
-      const views = MAP_CARD_VIEWS[kind as MapEntityKind]
-      if (views.includes(n.expanded as MapCardView)) node.expanded = n.expanded as MapCardView
-      const rawSizes = isRecord(n.sizes) ? n.sizes : {}
-      const sizes: Partial<Record<MapCardView, MapSize>> = {}
-      for (const view of views) {
-        const size = rawSizes[view]
-        if (isRecord(size) && typeof size.width === 'number' && typeof size.height === 'number') {
-          sizes[view] = { width: num(size.width, 300, 160, 4000), height: num(size.height, 300, 120, 4000) }
+  // Saves from before several maps had one `mindMap`; it becomes the first map.
+  const rawMaps: Record<string, unknown>[] = Array.isArray(raw.mindMaps)
+    ? list(raw.mindMaps)
+    : isRecord(raw.mindMap)
+      ? [{ id: DEFAULT_MAP_ID, name: 'Mind map', ...raw.mindMap }]
+      : []
+  const seenNodes = new Set<string>()
+  const seenMaps = new Set<string>()
+  const mindMaps: MindMap[] = rawMaps.map((rawMap) => {
+    let mapId = str(rawMap.id) || makeId('map')
+    if (seenMaps.has(mapId)) mapId = makeId('map')
+    seenMaps.add(mapId)
+    const nodes: MapNode[] = []
+    for (const n of list(rawMap.nodes)) {
+      const id = str(n.id) || makeId('node')
+      const x = num(n.x, 0)
+      const y = num(n.y, 0)
+      const kind = str(n.kind)
+      if (kind in refs) {
+        const refId = str(n.refId)
+        if (!refs[kind].has(refId)) continue
+        const node: MapNode = { id, kind: kind as Extract<MapNode, { refId: string }>['kind'], refId, x, y }
+        const views = MAP_CARD_VIEWS[kind as MapEntityKind]
+        if (views.includes(n.expanded as MapCardView)) node.expanded = n.expanded as MapCardView
+        const rawSizes = isRecord(n.sizes) ? n.sizes : {}
+        const sizes: Partial<Record<MapCardView, MapSize>> = {}
+        for (const view of views) {
+          const size = rawSizes[view]
+          if (isRecord(size) && typeof size.width === 'number' && typeof size.height === 'number') {
+            sizes[view] = { width: num(size.width, 300, 160, 4000), height: num(size.height, 300, 120, 4000) }
+          }
         }
+        if (Object.keys(sizes).length) node.sizes = sizes
+        nodes.push(node)
+      } else if (kind === 'note') {
+        const color = str(n.color) as NoteColor
+        const text = str(n.text)
+        nodes.push({
+          id,
+          kind,
+          x,
+          y,
+          width: num(n.width, 220, 80, 2000),
+          height: num(n.height, 160, 60, 2000),
+          text,
+          color: NOTE_COLORS.includes(color) ? color : 'yellow',
+          ...listOf(n, text),
+        })
+      } else if (kind === 'text') {
+        const size = str(n.size) as TextSize
+        const text = str(n.text)
+        const node: MapNode = {
+          id,
+          kind,
+          x,
+          y,
+          width: num(n.width, 280, 60, 3000),
+          text,
+          size: size === 'sm' || size === 'lg' ? size : 'md',
+        }
+        const bg = str(n.bg) as NoteColor
+        if (NOTE_COLORS.includes(bg)) node.bg = bg
+        nodes.push({ ...node, ...listOf(n, text) })
       }
-      if (Object.keys(sizes).length) node.sizes = sizes
-      nodes.push(node)
-    } else if (kind === 'note') {
-      const color = str(n.color) as NoteColor
-      const text = str(n.text)
-      nodes.push({
-        id,
-        kind,
-        x,
-        y,
-        width: num(n.width, 220, 80, 2000),
-        height: num(n.height, 160, 60, 2000),
-        text,
-        color: NOTE_COLORS.includes(color) ? color : 'yellow',
-        ...listOf(n, text),
-      })
-    } else if (kind === 'text') {
-      const size = str(n.size) as TextSize
-      const text = str(n.text)
-      const node: MapNode = {
-        id,
-        kind,
-        x,
-        y,
-        width: num(n.width, 280, 60, 3000),
-        text,
-        size: size === 'sm' || size === 'lg' ? size : 'md',
-      }
-      const bg = str(n.bg) as NoteColor
-      if (NOTE_COLORS.includes(bg)) node.bg = bg
-      nodes.push({ ...node, ...listOf(n, text) })
     }
-  }
-  const nodeIds = new Set(nodes.map((n) => n.id))
-  const edges: MapEdge[] = list(rawMap.edges)
-    .map((e) => {
-      const edge: MapEdge = {
-        id: str(e.id) || makeId('edge'),
-        source: str(e.source),
-        target: str(e.target),
-        label: str(e.label),
-        arrow: e.arrow === true,
+    const nodeIds = new Set(nodes.map((n) => n.id))
+    const edges: MapEdge[] = list(rawMap.edges)
+      .map((e) => {
+        const edge: MapEdge = {
+          id: str(e.id) || makeId('edge'),
+          source: str(e.source),
+          target: str(e.target),
+          label: str(e.label),
+          arrow: e.arrow === true,
+        }
+        const sourceAnchor = cleanAnchor(e.sourceAnchor)
+        const targetAnchor = cleanAnchor(e.targetAnchor)
+        if (sourceAnchor) edge.sourceAnchor = sourceAnchor
+        if (targetAnchor) edge.targetAnchor = targetAnchor
+        return edge
+      })
+      .filter(
+        (e) =>
+          !isLoop(e.source, e.target, { source: e.sourceAnchor, target: e.targetAnchor }) &&
+          nodeIds.has(e.source) &&
+          nodeIds.has(e.target),
+      )
+
+    // Card ids must be unique across maps (a copied map in a hand-edited save, say).
+    const renamed = new Map<string, string>()
+    for (const n of nodes) {
+      if (seenNodes.has(n.id)) {
+        const fresh = makeId('node')
+        renamed.set(n.id, fresh)
+        n.id = fresh
       }
-      const sourceAnchor = cleanAnchor(e.sourceAnchor)
-      const targetAnchor = cleanAnchor(e.targetAnchor)
-      if (sourceAnchor) edge.sourceAnchor = sourceAnchor
-      if (targetAnchor) edge.targetAnchor = targetAnchor
-      return edge
-    })
-    .filter(
-      (e) =>
-        !isLoop(e.source, e.target, { source: e.sourceAnchor, target: e.targetAnchor }) &&
-        nodeIds.has(e.source) &&
-        nodeIds.has(e.target),
+      seenNodes.add(n.id)
+    }
+    const mapEdges = edges.map((e) =>
+      renamed.size ? { ...e, source: renamed.get(e.source) ?? e.source, target: renamed.get(e.target) ?? e.target } : e,
     )
+    return { id: mapId, name: str(rawMap.name).trim() || 'Untitled map', nodes, edges: mapEdges }
+  })
+  if (!mindMaps.length) mindMaps.push(defaultMindMap())
 
   const rawGoals = isRecord(raw.goals) ? raw.goals : {}
   const goals: StoryGoals = {}
@@ -938,7 +1018,7 @@ export function normalizeStory(input: unknown): StoryData {
     beats,
     characters,
     texts,
-    mindMap: { nodes, edges },
+    mindMaps,
     goals,
     wordLog,
   })

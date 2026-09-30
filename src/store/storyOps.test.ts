@@ -26,6 +26,10 @@ import {
   moveChapter,
   normalizeStory,
   emptyStory,
+  addMindMap,
+  renameMindMap,
+  deleteMindMap,
+  updateMapNode,
   setGoals,
   placeBeat,
   setBeatArc,
@@ -366,10 +370,10 @@ describe('mind map', () => {
     expect(addMapEdge(data, a!, a!)[1]).toBeNull()
     expect(addMapNode(data, { kind: 'arc', refId: 'arc_missing', x: 0, y: 0 })[1]).toBeNull()
     data = moveMapNodes(data, { [a!]: { x: 50, y: 60 } })
-    expect(data.mindMap.nodes[0]).toMatchObject({ x: 50, y: 60 })
+    expect(data.mindMaps[0].nodes[0]).toMatchObject({ x: 50, y: 60 })
     data = removeMapNodes(data, [a!])
-    expect(data.mindMap.nodes.map((n) => n.id)).toEqual([b])
-    expect(data.mindMap.edges).toEqual([])
+    expect(data.mindMaps[0].nodes.map((n) => n.id)).toEqual([b])
+    expect(data.mindMaps[0].edges).toEqual([])
     expect(data.chapters.map((c) => c.id)).toContain(ch1)
     void main
   })
@@ -384,10 +388,10 @@ describe('mind map', () => {
     ;[data, nMara] = addMapNode(data, { kind: 'character', refId: mara, x: 0, y: 0 })
     ;[data] = addMapEdge(data, nMara!, nArc!)
     data = deleteCharacter(data, mara)
-    expect(data.mindMap.nodes.map((n) => n.id)).toEqual([nBeat, nArc])
-    expect(data.mindMap.edges).toEqual([])
+    expect(data.mindMaps[0].nodes.map((n) => n.id)).toEqual([nBeat, nArc])
+    expect(data.mindMaps[0].edges).toEqual([])
     data = deleteArc(data, main)
-    expect(data.mindMap.nodes).toEqual([])
+    expect(data.mindMaps[0].nodes).toEqual([])
   })
 
   it('follows renames in notes and turns deleted characters into plain names', () => {
@@ -398,7 +402,7 @@ describe('mind map', () => {
       kind: 'note', x: 0, y: 0, width: 200, height: 150, color: 'pink', text: `Ask ${mentionToken(mara)}`,
     })
     data = deleteCharacter(data, mara)
-    expect(data.mindMap.nodes.find((n) => n.id === note)).toMatchObject({ text: 'Ask Mara' })
+    expect(data.mindMaps[0].nodes.find((n) => n.id === note)).toMatchObject({ text: 'Ask Mara' })
   })
 
   it('draws lines between spots inside cards, and drops them with the item', () => {
@@ -412,7 +416,7 @@ describe('mind map', () => {
     ;[data, maraCard] = addMapNode(data, { kind: 'character', refId: mara, x: 400, y: 0 })
     const fromBeat = { source: `beat:${beat}`, target: `attr:${attr}` }
     const [withLine, line] = addMapEdge(data, arcCard!, maraCard!, fromBeat)
-    expect(withLine.mindMap.edges[0]).toMatchObject({ id: line, sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
+    expect(withLine.mindMaps[0].edges[0]).toMatchObject({ id: line, sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
     // The same line again (either way round) is a repeat; card to card is a different line.
     expect(addMapEdge(withLine, maraCard!, arcCard!, { source: `attr:${attr}`, target: `beat:${beat}` })[1]).toBeNull()
     expect(addMapEdge(withLine, arcCard!, maraCard!)[1]).not.toBeNull()
@@ -421,12 +425,12 @@ describe('mind map', () => {
     expect(addMapEdge(withLine, arcCard!, arcCard!)[1]).toBeNull()
     expect(addMapEdge(withLine, arcCard!, arcCard!, { source: `beat:${beat}`, target: `beat:${beat}` })[1]).toBeNull()
     // Deleting the attribute or the beat takes the line with it; the cards stay.
-    expect(deleteAttribute(withLine, mara, attr).mindMap.edges).toEqual([])
-    expect(deleteBeat(withLine, beat).mindMap.edges).toEqual([])
-    expect(deleteCharacter(withLine, mara).mindMap.edges).toEqual([])
-    expect(deleteBeat(withLine, beat).mindMap.nodes).toHaveLength(2)
+    expect(deleteAttribute(withLine, mara, attr).mindMaps[0].edges).toEqual([])
+    expect(deleteBeat(withLine, beat).mindMaps[0].edges).toEqual([])
+    expect(deleteCharacter(withLine, mara).mindMaps[0].edges).toEqual([])
+    expect(deleteBeat(withLine, beat).mindMaps[0].nodes).toHaveLength(2)
     // Anchors survive a reload.
-    expect(normalizeStory(withLine).mindMap.edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
+    expect(normalizeStory(withLine).mindMaps[0].edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
   })
 
   it('tallies the words written each day, and keeps goals', () => {
@@ -468,6 +472,57 @@ describe('mind map', () => {
     expect(old.chapters[2]).not.toHaveProperty('targetWords')
   })
 
+  it('keeps several mind maps, each with its own cards', () => {
+    let { data, ch1, main } = setup()
+    let second: string
+    ;[data, second] = addMindMap(data, 'Clues')
+    expect(data.mindMaps.map((m) => m.name)).toEqual(['Mind map', 'Clues'])
+    let a: string | null, b: string | null, c: string | null
+    ;[data, a] = addMapNode(data, { kind: 'chapter', refId: ch1, x: 0, y: 0 })
+    ;[data, b] = addMapNode(data, { kind: 'arc', refId: main, x: 0, y: 0 }, second)
+    ;[data, c] = addMapNode(data, { kind: 'chapter', refId: ch1, x: 0, y: 0 }, second)
+    expect(data.mindMaps.map((m) => m.nodes.length)).toEqual([1, 2])
+    // Lines join cards on the same map only.
+    expect(addMapEdge(data, a!, b!)[1]).toBeNull()
+    ;[data] = addMapEdge(data, b!, c!)
+    expect(data.mindMaps[1].edges).toHaveLength(1)
+    // Edits find the card on whichever map it's on.
+    data = updateMapNode(data, c!, { x: 99 })
+    expect(data.mindMaps[1].nodes[1]).toMatchObject({ x: 99 })
+    // Deleting the chapter takes its cards off every map.
+    const gone = deleteChapter(data, ch1)
+    expect(gone.mindMaps.map((m) => m.nodes.length)).toEqual([0, 1])
+    expect(gone.mindMaps[1].edges).toEqual([])
+    data = renameMindMap(data, second, 'Clues and red herrings')
+    expect(data.mindMaps[1].name).toBe('Clues and red herrings')
+    data = deleteMindMap(data, data.mindMaps[0].id)
+    expect(data.mindMaps.map((m) => m.id)).toEqual([second])
+    const last = deleteMindMap(data, second)
+    expect(last.mindMaps).toHaveLength(1)
+    expect(last.mindMaps[0].nodes).toEqual([])
+  })
+
+  it('moves a save’s single mind map into the list of maps', () => {
+    const data = normalizeStory({
+      chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
+      mindMap: { nodes: [{ id: 'n1', kind: 'chapter', refId: 'c1', x: 5, y: 5 }], edges: [] },
+    })
+    expect(data.mindMaps).toEqual([{ id: 'map_main', name: 'Mind map', nodes: [{ id: 'n1', kind: 'chapter', refId: 'c1', x: 5, y: 5 }], edges: [] }])
+    // Card ids stay unique across maps.
+    const copied = normalizeStory({
+      chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
+      mindMaps: [
+        { id: 'm1', name: 'A', nodes: [{ id: 'n1', kind: 'chapter', refId: 'c1', x: 0, y: 0 }] },
+        { id: 'm1', name: '', nodes: [{ id: 'n1', kind: 'note', x: 0, y: 0, text: 'x', color: 'blue' }, { id: 'n2', kind: 'note', x: 0, y: 0, text: 'y', color: 'blue' }], edges: [{ id: 'e1', source: 'n1', target: 'n2' }] },
+      ],
+    })
+    const [first, other] = copied.mindMaps
+    expect(other.id).not.toBe(first.id)
+    expect(other.name).toBe('Untitled map')
+    expect(other.nodes[0].id).not.toBe('n1')
+    expect(other.edges[0].source).toBe(other.nodes[0].id)
+  })
+
   it('repairs a loaded map', () => {
     const data = normalizeStory({
       chapters: [{ id: 'c1', title: 'One', beatIds: [] }],
@@ -485,10 +540,10 @@ describe('mind map', () => {
         ],
       },
     })
-    expect(data.mindMap.nodes.map((n) => n.id)).toEqual(['n1', 'n3'])
-    expect(data.mindMap.nodes[0]).toMatchObject({ x: 10, y: 0 })
-    expect(data.mindMap.nodes[1]).toMatchObject({ color: 'yellow', width: 220, height: 160 })
-    expect(data.mindMap.edges).toEqual([{ id: 'e1', source: 'n1', target: 'n3', label: 'why', arrow: false }])
+    expect(data.mindMaps[0].nodes.map((n) => n.id)).toEqual(['n1', 'n3'])
+    expect(data.mindMaps[0].nodes[0]).toMatchObject({ x: 10, y: 0 })
+    expect(data.mindMaps[0].nodes[1]).toMatchObject({ color: 'yellow', width: 220, height: 160 })
+    expect(data.mindMaps[0].edges).toEqual([{ id: 'e1', source: 'n1', target: 'n3', label: 'why', arrow: false }])
   })
 
   it('keeps how cards are opened up and how text boxes look', () => {
@@ -517,7 +572,7 @@ describe('mind map', () => {
       },
       characters: [{ id: 'ch1', name: 'Mara', color: '#123456' }],
     })
-    const [chapter, arc, badArc, list, plain, sized, note, character] = data.mindMap.nodes
+    const [chapter, arc, badArc, list, plain, sized, note, character] = data.mindMaps[0].nodes
     expect(sized).toMatchObject({ expanded: 'beats', sizes: { text: { width: 500, height: 4000 } } })
     expect(sized).not.toHaveProperty('sizes.beats')
     expect(sized).not.toHaveProperty('sizes.details')

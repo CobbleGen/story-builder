@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { Check, List, ListChecks, ListOrdered } from 'lucide-react'
 import type { MapListStyle, MapNode } from '../types'
 import { useStory } from '../store/storyStore'
+import { findMapNode } from '../store/storyOps'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { insertItem, listItems, listPatch, removeItem, setItem, toggleItem, type ListState } from './listLines'
@@ -103,7 +104,7 @@ export function ListEditor({ node, onDone }: { node: ListNode; onDone: () => voi
 
   // Read the saved list at the moment of the edit, so quick keystrokes build on each other.
   const current = (): ListState => {
-    const saved = useStory.getState().mindMap.nodes.find((n) => n.id === node.id)
+    const saved = findMapNode(useStory.getState(), node.id)
     return saved && (saved.kind === 'text' || saved.kind === 'note')
       ? { text: saved.text, checked: saved.checked ?? [] }
       : { text: node.text, checked }

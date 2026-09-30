@@ -135,6 +135,8 @@ export interface MapEdge {
 }
 
 export interface MindMap {
+  id: string
+  name: string
   nodes: MapNode[]
   edges: MapEdge[]
 }
@@ -154,7 +156,8 @@ export interface StoryData {
   characters: Character[]
   /** Chapter id -> the chapter's written text. */
   texts: Record<string, ChapterText>
-  mindMap: MindMap
+  /** A story can have several mind maps (card and line ids are unique across them). */
+  mindMaps: MindMap[]
   goals: StoryGoals
   /** Local date (YYYY-MM-DD) -> words added that day, less words cut. */
   wordLog: Record<string, number>

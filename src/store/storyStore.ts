@@ -45,6 +45,9 @@ interface StoryActions {
   addMapEdge: (...args: Tail<Parameters<typeof ops.addMapEdge>>) => string | null
   updateMapEdge: (...args: Tail<Parameters<typeof ops.updateMapEdge>>) => void
   removeMapEdges: (...args: Tail<Parameters<typeof ops.removeMapEdges>>) => void
+  addMindMap: (...args: Tail<Parameters<typeof ops.addMindMap>>) => string
+  renameMindMap: (...args: Tail<Parameters<typeof ops.renameMindMap>>) => void
+  deleteMindMap: (...args: Tail<Parameters<typeof ops.deleteMindMap>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
   undo: () => void
@@ -53,7 +56,7 @@ interface StoryActions {
 
 export type StoryStore = StoryData & StoryActions
 
-const STORY_KEYS = ['title', 'chapters', 'arcs', 'beats', 'characters', 'texts', 'mindMap', 'goals', 'wordLog'] as const satisfies readonly (keyof StoryData)[]
+const STORY_KEYS = ['title', 'chapters', 'arcs', 'beats', 'characters', 'texts', 'mindMaps', 'goals', 'wordLog'] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
 export const pickData = (s: StoryData): StoryData => ({
@@ -63,7 +66,7 @@ export const pickData = (s: StoryData): StoryData => ({
   beats: s.beats,
   characters: s.characters,
   texts: s.texts,
-  mindMap: s.mindMap,
+  mindMaps: s.mindMaps,
   goals: s.goals,
   wordLog: s.wordLog,
 })
@@ -120,6 +123,9 @@ export const useStory = create<StoryStore>()(
         addMapEdge: (...a) => withId(ops.addMapEdge(data(), ...a), 'addMapEdge', a[0]),
         updateMapEdge: (...a) => apply(ops.updateMapEdge(data(), ...a), 'updateMapEdge', a[0]),
         removeMapEdges: (...a) => apply(ops.removeMapEdges(data(), ...a), 'removeMapEdges', a[0]),
+        addMindMap: (...a) => withId(ops.addMindMap(data(), ...a), 'addMindMap'),
+        renameMindMap: (...a) => apply(ops.renameMindMap(data(), ...a), 'renameMindMap', a[0]),
+        deleteMindMap: (...a) => apply(ops.deleteMindMap(data(), ...a), 'deleteMindMap', a[0]),
         replaceStory: (input) => apply(ops.normalizeStory(input), 'replaceStory'),
         undo: () => travel('undo', data(), (next) => set(pickData(next))),
         redo: () => travel('redo', data(), (next) => set(pickData(next))),
