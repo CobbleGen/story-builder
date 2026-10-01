@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { TopBar } from './components/TopBar'
 import { BeatEditor } from './components/BeatEditor'
@@ -17,6 +17,7 @@ import { TimelinePage } from './pages/TimelinePage'
 import { useStoryLoaded } from './store/storyStore'
 import { useSaveStatus } from './store/persistence'
 import { useApplyTheme } from './lib/theme'
+import { tidyPicturesSoon } from './store/tidyPictures'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
@@ -30,6 +31,9 @@ export default function App() {
   const saveFailed = useSaveStatus((s) => s.status === 'error')
   const progressOpen = useUi((s) => s.progressOpen)
   const searchOpen = useUi((s) => s.searchOpen)
+  useEffect(() => {
+    if (loaded) tidyPicturesSoon()
+  }, [loaded])
 
   if (!loaded) return <div className="boot">Opening your story…</div>
 

@@ -26,6 +26,7 @@ import { backupNow } from '../store/persistence'
 import { BackupsDialog } from './BackupsDialog'
 import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
+import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
 import { useUi } from '../store/uiStore'
 import { totalWords } from '../lib/progress'
@@ -45,9 +46,12 @@ export function TopBar() {
   const total = useStory((s) => totalWords(s.texts))
   const goal = useStory((s) => s.goals.draft)
 
-  const exportStory = () => {
+  // The story file carries its pictures too, so it's complete on another device.
+  const exportStory = async () => {
     const story = pickData(useStory.getState())
-    downloadBlob(new Blob([JSON.stringify(story, null, 2)], { type: 'application/json' }), `${slug(story.title)}.json`)
+    const ids = imageIdsIn(JSON.stringify(story))
+    const file = ids.length ? { ...story, images: await exportImages(ids) } : story
+    downloadBlob(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }), `${slug(story.title)}.json`)
   }
 
   const importStory = async (file: File) => {
@@ -70,6 +74,8 @@ export function TopBar() {
     })
     if (ok) {
       await backupNow()
+      // Pictures first, so the story finds them; a story without them still imports.
+      await importImages((data as { images?: unknown } | null)?.images).catch(() => {})
       replaceStory(data)
     }
   }
@@ -154,7 +160,7 @@ export function TopBar() {
           items={[
             { label: 'Word count and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
             { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
-            { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: exportStory },
+            { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
             { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },

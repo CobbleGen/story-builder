@@ -1,7 +1,10 @@
+import { useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 import { useEditorState } from '@tiptap/react'
+import { insertPictures } from './picture'
 import {
   Bold,
+  ImagePlus,
   Italic,
   List,
   ListOrdered,
@@ -45,6 +48,7 @@ const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator
 type Block = 'paragraph' | 'h1' | 'h2' | 'h3'
 
 export function Toolbar({ editor }: { editor: Editor }) {
+  const fileInput = useRef<HTMLInputElement>(null)
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -119,6 +123,21 @@ export function Toolbar({ editor }: { editor: Editor }) {
       <ToolButton label="Scene break" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
         <SeparatorHorizontal size={17} />
       </ToolButton>
+      <ToolButton label="Picture (or paste or drop one into the text)" onClick={() => fileInput.current?.click()}>
+        <ImagePlus size={17} />
+      </ToolButton>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])]
+          e.target.value = ''
+          if (files.length) void insertPictures(editor.view, files, editor.state.selection.from)
+        }}
+      />
       <ToolButton
         label="Clear formatting"
         onClick={() => editor.chain().focus().unsetBold().unsetItalic().unsetUnderline().unsetStrike().run()}

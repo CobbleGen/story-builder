@@ -1094,6 +1094,10 @@ export function normalizeStory(input: unknown): StoryData {
           color: NOTE_COLORS.includes(color) ? color : 'yellow',
           ...listOf(n, text),
         })
+      } else if (kind === 'image') {
+        const imageId = str(n.imageId)
+        if (!/^img_[a-z0-9]+$/.test(imageId)) continue
+        nodes.push({ id, kind, x, y, width: num(n.width, 240, 30, 4000), height: num(n.height, 180, 30, 4000), imageId })
       } else if (kind === 'text') {
         const size = str(n.size) as TextSize
         const text = str(n.text)

@@ -4,7 +4,18 @@ import type { RichNode, StoryData } from '../types'
 import { addChapter, addCharacter, emptyStory, mentionables, setChapterText } from '../store/storyOps'
 import { buildSampleStory } from '../store/sampleStory'
 import { lookupOf } from './mentions'
-import { DEFAULT_EXPORT, aboutWords, blocksOf, buildManuscript, toMarkdown, toPlainText, toPrintHtml, type ExportOptions } from './manuscript'
+import {
+  DEFAULT_EXPORT,
+  aboutWords,
+  blocksOf,
+  buildManuscript,
+  picturesOf,
+  toMarkdown,
+  toPlainText,
+  toPrintHtml,
+  type ExportOptions,
+  type ExportPictures,
+} from './manuscript'
 import { manuscriptDocx } from './docxExport'
 
 const t = (text: string, ...marks: string[]): RichNode => ({ type: 'text', text, ...(marks.length ? { marks: marks.map((type) => ({ type })) } : {}) })
@@ -138,5 +149,49 @@ describe('manuscript export', () => {
     expect(m.chapters.map((c) => c.title)).toEqual(['The Logbook'])
     expect(toPlainText(m)).toContain('The keeper’s cottage had not changed')
     expect((await manuscriptDocx(m)).size).toBeGreaterThan(3000)
+  })
+})
+
+describe('pictures in the exported manuscript', () => {
+  // A one-pixel PNG.
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  const pictures: ExportPictures = new Map([
+    ['img_abc', { format: 'png', dataUrl: `data:image/png;base64,${PNG}`, bytes: Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0)), width: 400, height: 300 }],
+  ])
+
+  function withPicture() {
+    let data = emptyStory('Pictures')
+    let ch: string
+    ;[data, ch] = addChapter(data, { title: 'Maps' })
+    const picture: RichNode = { type: 'picture', attrs: { imageId: 'img_abc', size: 'small', width: 400, height: 300, alt: 'The harbour' } }
+    data = setChapterText(data, ch, { doc: doc(p(t('Here it is.')), picture, { type: 'picture', attrs: { imageId: 'img_gone' } }), words: 3, updatedAt: 1 }, null)
+    return build(data, { titlePage: false })
+  }
+
+  it('keeps pictures in their place, with their size', () => {
+    const m = withPicture()
+    expect(m.chapters[0].blocks[1]).toEqual({ type: 'picture', imageId: 'img_abc', size: 'small', width: 400, height: 300, alt: 'The harbour' })
+    expect(picturesOf(m)).toEqual(['img_abc', 'img_gone'])
+    // A chapter with only a picture in it isn't empty.
+    let data = emptyStory()
+    let ch: string
+    ;[data, ch] = addChapter(data, { title: 'Art' })
+    data = setChapterText(data, ch, { doc: doc({ type: 'picture', attrs: { imageId: 'img_abc' } }), words: 0, updatedAt: 1 }, null)
+    expect(build(data).chapters).toHaveLength(1)
+  })
+
+  it('puts them in each format, and leaves out ones that are missing', async () => {
+    const m = withPicture()
+    expect(toPlainText(m)).toContain('Here it is.\n\n[Picture: The harbour]\n\n[Picture]')
+    const md = toMarkdown(m, pictures)
+    expect(md).toContain(`![The harbour](data:image/png;base64,${PNG})`)
+    expect(md).toContain('*[Picture]*')
+    const html = toPrintHtml(m, pictures)
+    expect(html).toContain(`<figure class="picture" style="width:35%"><img src="data:image/png;base64,${PNG}" alt="The harbour"></figure>`)
+    expect(html.match(/<figure/g)).toHaveLength(1)
+    const zip = await JSZip.loadAsync(await (await manuscriptDocx(m, pictures)).arrayBuffer())
+    expect(Object.keys(zip.files).filter((f) => f.startsWith('word/media/') && !f.endsWith('/'))).toHaveLength(1)
+    const xml = await zip.file('word/document.xml')!.async('string')
+    expect(xml).toContain('descr="The harbour"')
   })
 })

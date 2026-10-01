@@ -790,3 +790,27 @@ describe('timeline', () => {
     expect(placed).toEqual([...placed].sort((x, y) => x - y))
   })
 })
+
+describe('pictures on the mind map', () => {
+  it('keeps picture cards, and drops ones that don’t name a picture', () => {
+    const loaded = normalizeStory({
+      mindMaps: [
+        {
+          id: 'map_main',
+          name: 'Map',
+          nodes: [
+            { id: 'p1', kind: 'image', imageId: 'img_abc123', x: 10, y: 20, width: 300, height: 200 },
+            { id: 'p2', kind: 'image', imageId: 'not a picture', x: 0, y: 0, width: 10, height: 10 },
+            { id: 'p3', kind: 'image', imageId: 'img_def', x: 0, y: 0 },
+          ],
+          edges: [{ id: 'e1', source: 'p1', target: 'p3', label: '', arrow: false }],
+        },
+      ],
+    })
+    const nodes = loaded.mindMaps[0].nodes
+    expect(nodes.map((n) => n.id)).toEqual(['p1', 'p3'])
+    expect(nodes[0]).toEqual({ id: 'p1', kind: 'image', imageId: 'img_abc123', x: 10, y: 20, width: 300, height: 200 })
+    expect(nodes[1]).toMatchObject({ width: 240, height: 180 })
+    expect(loaded.mindMaps[0].edges).toHaveLength(1)
+  })
+})

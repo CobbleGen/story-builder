@@ -11,5 +11,5 @@ export default defineConfig({
   plugins: [react()],
   // The Word exporter is only imported when exporting; bundle it up front so
   // the dev server doesn't reload the page the first time it's used.
-  optimizeDeps: { include: ['docx'] },
+  optimizeDeps: { include: ['docx', '@tiptap/pm/state', '@tiptap/pm/view'] },
 })

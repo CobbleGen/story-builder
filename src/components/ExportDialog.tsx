@@ -2,7 +2,17 @@ import { useMemo, useState } from 'react'
 import { FileCode2, FileText, FileType2, Printer, type LucideIcon } from 'lucide-react'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
-import { aboutWords, buildManuscript, toMarkdown, toPlainText, toPrintHtml, type ExportFormat, type HeadingStyle } from '../lib/manuscript'
+import {
+  aboutWords,
+  buildManuscript,
+  picturesOf,
+  toMarkdown,
+  toPlainText,
+  toPrintHtml,
+  type ExportFormat,
+  type HeadingStyle,
+} from '../lib/manuscript'
+import { loadPictures } from '../lib/exportPictures'
 import { downloadBlob, printHtml, slug } from '../lib/download'
 import { plainText } from '../lib/mentions'
 import { Modal } from './Modal'
@@ -41,15 +51,16 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     setFailed(false)
     try {
       const name = slug(manuscript.title)
+      const pictures = options.format === 'txt' ? new Map() : await loadPictures(picturesOf(manuscript))
       if (options.format === 'docx') {
         const { manuscriptDocx } = await import('../lib/docxExport')
-        downloadBlob(await manuscriptDocx(manuscript), `${name}.docx`)
+        downloadBlob(await manuscriptDocx(manuscript, pictures), `${name}.docx`)
       } else if (options.format === 'pdf') {
-        printHtml(toPrintHtml(manuscript))
+        printHtml(toPrintHtml(manuscript, pictures))
       } else if (options.format === 'txt') {
         downloadBlob(new Blob([toPlainText(manuscript)], { type: 'text/plain;charset=utf-8' }), `${name}.txt`)
       } else {
-        downloadBlob(new Blob([toMarkdown(manuscript)], { type: 'text/markdown;charset=utf-8' }), `${name}.md`)
+        downloadBlob(new Blob([toMarkdown(manuscript, pictures)], { type: 'text/markdown;charset=utf-8' }), `${name}.md`)
       }
       onClose()
     } catch {

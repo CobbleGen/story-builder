@@ -27,6 +27,9 @@ import { useResolvedTheme } from '../lib/theme'
 import { useUi } from '../store/uiStore'
 import { ArcNode, BeatNode, ChapterNode, CharacterNode, ElementNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
+import { PictureNode } from './PictureNode'
+import { addPicture, picturesIn } from '../lib/pictures'
+import { askConfirm } from '../lib/confirm'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
 import { MapPalette } from './MapPalette'
 import { MapSwitcher } from './MapSwitcher'
@@ -48,6 +51,7 @@ const nodeTypes = {
   beat: BeatNode,
   note: NoteNode,
   text: TextNode,
+  image: PictureNode,
 }
 const edgeTypes = { story: StoryEdge }
 
@@ -73,15 +77,21 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
       data: { node: n },
       selected: was?.selected ?? false,
       measured: was?.measured,
-      // Notes sit under the other cards; an opened-up card sits over its neighbours.
-      zIndex: n.kind === 'note' ? 0 : 'expanded' in n && n.expanded ? 2 : 1,
+      // Notes and pictures sit under the other cards; an opened-up card sits over its neighbours.
+      zIndex: n.kind === 'note' || n.kind === 'image' ? 0 : 'expanded' in n && n.expanded ? 2 : 1,
     }
-    if (n.kind === 'note') return { ...node, width: n.width, height: n.height }
+    if (n.kind === 'note' || n.kind === 'image') return { ...node, width: n.width, height: n.height }
     if (n.kind === 'text') return { ...node, width: n.width }
     // An opened-up card keeps the size it was given for that view.
     const size = n.expanded ? n.sizes?.[n.expanded] : undefined
     return size ? { ...node, width: size.width, height: size.height } : node
   })
+}
+
+/** A new picture's size on the map: as it is, unless that's bigger than a large card. */
+function pictureSize(width: number, height: number) {
+  const scale = Math.min(1, 320 / width, 320 / height)
+  return { width: Math.max(40, Math.round(width * scale)), height: Math.max(40, Math.round(height * scale)) }
 }
 
 /** The nearest place to (x, y) where a w × h card doesn't overlap another card. */
@@ -156,6 +166,11 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
   // React Flow keeps its own copy of the nodes for dragging and selection; it
   // follows the story whenever the map there changes.
   const [nodes, setNodes] = useState<StoryFlowNode[]>(() => toFlow(mindMap.nodes, []))
+  // The latest cards, for work that finishes later (pictures still being read).
+  const nodesRef = useRef(nodes)
+  useEffect(() => {
+    nodesRef.current = nodes
+  })
   const [synced, setSynced] = useState(mindMap.nodes)
   if (synced !== mindMap.nodes) {
     setSynced(mindMap.nodes)
@@ -236,6 +251,50 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     if (window.matchMedia('(max-width: 760px)').matches) togglePalette()
   }
 
+  /**
+   * Adds pictures to the map: where they were dropped, or else in a free spot
+   * in the middle of the view. Several are fanned out a little.
+   */
+  const addPictures = useCallback(
+    async (files: File[], drop?: { x: number; y: number }) => {
+      const r = wrapper.current?.getBoundingClientRect()
+      const at = screenToFlowPosition(drop ?? { x: (r?.left ?? 0) + (r?.width ?? 0) / 2, y: (r?.top ?? 0) + (r?.height ?? 0) / 2 })
+      let shift = 0
+      for (const file of files) {
+        try {
+          const picture = await addPicture(file)
+          const size = pictureSize(picture.width, picture.height)
+          let x = at.x - size.width / 2 + shift
+          let y = at.y - size.height / 2 + shift
+          if (!drop) ({ x, y } = freeSpot(nodesRef.current, x, y, size.width, size.height))
+          addMapNode({ kind: 'image', imageId: picture.id, x: Math.round(x), y: Math.round(y), ...size }, mindMap.id)
+          shift += 28
+        } catch (error) {
+          await askConfirm({
+            title: 'That picture couldn’t be added',
+            message: error instanceof Error ? error.message : undefined,
+            notice: true,
+          })
+        }
+      }
+    },
+    [addMapNode, screenToFlowPosition, mindMap.id],
+  )
+
+  // Pasting a picture (copied from anywhere) puts it on the map, unless you're typing.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as Element | null
+      if (target?.closest?.('input, textarea, [contenteditable="true"]')) return
+      const files = picturesIn(e.clipboardData)
+      if (!files.length) return
+      e.preventDefault()
+      void addPictures(files)
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [addPictures])
+
   const openItem = useCallback(
     (node: MapNode) => {
       if (node.kind === 'arc') navigate(`/arcs/${node.refId}`)
@@ -262,7 +321,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     <MapContext.Provider value={context}>
       <div className="map-page">
         {paletteOpen ? (
-          <MapPalette onMap={onMap} onAdd={addInView} />
+          <MapPalette onMap={onMap} onAdd={addInView} onAddPictures={(files) => void addPictures(files)} />
         ) : (
           <button className="beats-rail" onClick={togglePalette} title="Show the panel" aria-label="Show the add to map panel">
             <PanelLeftOpen size={18} />
@@ -272,11 +331,17 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
           ref={wrapper}
           className={`map-canvas${connecting ? ' connecting' : ''}`}
           onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+            if (!e.dataTransfer.types.includes(DRAG_MIME) && !e.dataTransfer.types.includes('Files')) return
             e.preventDefault()
             e.dataTransfer.dropEffect = 'copy'
           }}
           onDrop={(e) => {
+            const files = picturesIn(e.dataTransfer)
+            if (files.length) {
+              e.preventDefault()
+              void addPictures(files, { x: e.clientX, y: e.clientY })
+              return
+            }
             const raw = e.dataTransfer.getData(DRAG_MIME)
             if (!raw) return
             e.preventDefault()
@@ -322,7 +387,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             onNodeDoubleClick={(e, n) => {
               // Not from inside an opened-up card (its lists and pages have their own clicks).
               if ((e.target as Element).closest('.nodrag')) return
-              if (n.data.node.kind !== 'note' && n.data.node.kind !== 'text') openItem(n.data.node)
+              if (n.data.node.kind !== 'note' && n.data.node.kind !== 'text' && n.data.node.kind !== 'image') openItem(n.data.node)
             }}
             onMoveEnd={(_, viewport) => setMapViewport(mindMap.id, viewport)}
             onPaneClick={() => setEditingId(null)}
@@ -349,6 +414,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
               nodeColor={(n) => {
                 const node = (n as StoryFlowNode).data.node
                 if (node.kind === 'note') return node.color === 'white' ? '#e4e0d7' : NOTE_COLOR_VALUES[node.color]
+                if (node.kind === 'image') return dark ? '#5a554d' : '#bdb6a8'
                 return node.kind === 'text' ? 'transparent' : dark ? '#4a463f' : '#d6d1c6'
               }}
               maskColor={dark ? 'rgba(23, 22, 20, 0.7)' : 'rgba(239, 236, 229, 0.7)'}
@@ -359,8 +425,8 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             <div className="map-empty">
               <strong>Your mind map is empty</strong>
               <span>
-                Drag chapters, arcs, characters, places and beats here from the left, or double-click anywhere for a
-                sticky note.
+                Drag chapters, arcs, characters, places and beats here from the left, drop or paste pictures, or
+                double-click anywhere for a sticky note.
               </span>
             </div>
           )}

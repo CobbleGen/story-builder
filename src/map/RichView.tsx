@@ -3,7 +3,8 @@ import type { RichNode } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { displayName } from '../lib/mentions'
-import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
+import { BEAT_MARK, MENTION_NODE, PICTURE_NODE, pictureSizeOf } from '../lib/richText'
+import { useImageUrl } from '../store/images'
 import { MentionName } from '../components/MentionText'
 import { startsFlush, type PageBlock } from './pages'
 import { Anchor } from './Anchor'
@@ -81,9 +82,27 @@ function renderNode(node: RichNode, key: number, ctx: Context, className?: strin
       return <li key={key}>{children()}</li>
     case 'horizontalRule':
       return <hr key={key} />
+    case PICTURE_NODE:
+      return <PagePicture key={key} node={node} />
     default:
       return node.content ? <Fragment key={key}>{children()}</Fragment> : null
   }
+}
+
+/** The box a picture takes on a page: its width by size, its height by its shape (known before it loads). */
+function pictureBoxStyle(node: RichNode): React.CSSProperties {
+  const width = Number(node.attrs?.width) || 0
+  const height = Number(node.attrs?.height) || 0
+  return width && height ? { aspectRatio: `${width} / ${height}` } : { aspectRatio: '4 / 3' }
+}
+
+function PagePicture({ node }: { node: RichNode }) {
+  const url = useImageUrl(node.attrs?.imageId as string | undefined)
+  return (
+    <div className={`map-page-picture size-${pictureSizeOf(node.attrs?.size)}`} style={pictureBoxStyle(node)}>
+      {url && <img src={url} alt="" draggable={false} />}
+    </div>
+  )
 }
 
 interface Props {

@@ -3,6 +3,7 @@ import Typography from '@tiptap/extension-typography'
 import { CharacterCount, Placeholder } from '@tiptap/extensions'
 import { BeatLink } from './beatLinks'
 import { CharacterMention } from './mention'
+import { Picture } from './picture'
 
 /** Everything the manuscript editor supports. */
 export function manuscriptExtensions(placeholder: string) {
@@ -19,5 +20,6 @@ export function manuscriptExtensions(placeholder: string) {
     CharacterCount,
     BeatLink,
     CharacterMention,
+    Picture,
   ]
 }

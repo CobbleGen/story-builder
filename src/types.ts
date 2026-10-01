@@ -139,6 +139,16 @@ export type MapNode =
       /** Ticked items of a checklist, by line. */
       checked?: number[]
     }
+  | {
+      id: string
+      kind: 'image'
+      x: number
+      y: number
+      width: number
+      height: number
+      /** The picture, in the picture store (store/images). */
+      imageId: string
+    }
 
 /** A line between two things on the mind map. */
 export interface MapEdge {

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { ChevronRight, PanelLeftClose, Search, StickyNote, Type } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { ChevronRight, ImagePlus, PanelLeftClose, Search, StickyNote, Type } from 'lucide-react'
 import type { Beat } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -14,6 +14,8 @@ interface Props {
   /** Ids of story items already on the map. */
   onMap: Set<string>
   onAdd: (item: PaletteItem) => void
+  /** Pictures picked from the device. */
+  onAddPictures: (files: File[]) => void
 }
 
 function PaletteEntry({
@@ -65,7 +67,8 @@ function Section({ title, count, children, defaultOpen = true }: { title: string
 }
 
 /** The left panel of the mind map: everything that can be placed on it. */
-export function MapPalette({ onMap, onAdd }: Props) {
+export function MapPalette({ onMap, onAdd, onAddPictures }: Props) {
+  const fileInput = useRef<HTMLInputElement>(null)
   const chapters = useStory((s) => s.chapters)
   const arcs = useStory((s) => s.arcs)
   const characters = useStory((s) => s.characters)
@@ -97,6 +100,22 @@ export function MapPalette({ onMap, onAdd }: Props) {
       <div className="palette-tools">
         <PaletteToolTile item={{ kind: 'note' }} onAdd={onAdd} icon={<StickyNote size={18} />} label="Sticky note" />
         <PaletteToolTile item={{ kind: 'text' }} onAdd={onAdd} icon={<Type size={18} />} label="Text" />
+        <button className="palette-tool picture" onClick={() => fileInput.current?.click()} title="Add pictures from your device (you can also drop or paste them on the map)">
+          <ImagePlus size={18} />
+          Picture
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = [...(e.target.files ?? [])]
+            e.target.value = ''
+            if (files.length) onAddPictures(files)
+          }}
+        />
       </div>
       <label className="palette-search">
         <Search size={14} />

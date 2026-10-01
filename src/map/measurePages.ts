@@ -1,5 +1,5 @@
 import type { RichNode } from '../types'
-import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
+import { BEAT_MARK, MENTION_NODE, PICTURE_NODE, pictureSizeOf } from '../lib/richText'
 import { countWords, splitParagraph, startsFlush, type PageBlock } from './pages'
 
 // Splits a chapter into pages that exactly fill the paper on screen: each
@@ -28,6 +28,15 @@ function toDom(node: RichNode, name: (id: string) => string): Node {
     return el
   }
   if (node.type === 'hardBreak') return document.createElement('br')
+  if (node.type === PICTURE_NODE) {
+    // The same box the page shows, so it takes the same room.
+    const el = document.createElement('div')
+    el.className = `map-page-picture size-${pictureSizeOf(node.attrs?.size)}`
+    const width = Number(node.attrs?.width) || 0
+    const height = Number(node.attrs?.height) || 0
+    el.style.aspectRatio = width && height ? `${width} / ${height}` : '4 / 3'
+    return el
+  }
   const tag =
     node.type === 'paragraph'
       ? 'p'

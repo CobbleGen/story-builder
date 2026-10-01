@@ -58,6 +58,16 @@ It has four views: the **chapter board**, the **manuscript**, the
   the card, and a paragraph's lines follow it when text is added above it. Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
+- **Pictures**: on the mind map, use **Picture** in the left panel, or drop
+  picture files on the board, or paste one. A picture is a card: resize it
+  from its corners (it keeps its shape), draw lines to it, double-click it to
+  see it full size. In the manuscript, use the picture button in the toolbar,
+  or paste or drop one into the text; select it to make it small, medium or
+  full width, or drag it somewhere else. Pictures in the manuscript also show
+  on the mind map's chapter pages and go into Word, PDF and Markdown exports.
+  Big photos are scaled down to 2000 pixels on their longest side as they're
+  added. Pictures are kept in the browser apart from the story, and
+  **Export story (.json)** carries them along.
 - **Several mind maps**: the map's name sits at its top left; its menu
   switches maps, starts a new one, renames it or deletes it (the story items
   on it stay). Each map remembers where it was scrolled and zoomed to. Places
@@ -159,3 +169,6 @@ any static host or sub-folder.
 - `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
   (the Word library loads only when exporting)
 - `src/store/history.ts`: undo and redo
+- `src/store/images.ts` and `src/lib/pictures.ts`: the picture store (its own
+  IndexedDB database) and adding pictures; `src/editor/picture.ts` and
+  `src/map/PictureNode.tsx` show them

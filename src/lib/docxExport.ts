@@ -3,6 +3,8 @@ import {
   Document,
   Header,
   HeadingLevel,
+  ImageRun,
+  LineRuleType,
   LevelFormat,
   Packer,
   PageNumber,
@@ -10,7 +12,8 @@ import {
   TextRun,
   type ILevelsOptions,
 } from 'docx'
-import { SCENE_BREAK, aboutWords, type Manuscript, type Run } from './manuscript'
+import { SCENE_BREAK, aboutWords, type ExportPictures, type Manuscript, type Run } from './manuscript'
+import { PICTURE_WIDTH } from './richText'
 
 // The manuscript as a Word document, in the usual manuscript style: 12 point
 // Times New Roman, double spaced, one-inch margins, paragraphs indented half
@@ -22,6 +25,9 @@ const FONT = 'Times New Roman'
 const INCH = 1440
 const HALF_INCH = 720
 const DOUBLE = 480
+/** The text's width and the most a picture may be tall, in pixels (96 to the inch). */
+const TEXT_PX = 6.5 * 96
+const MAX_PICTURE_PX = 8 * 96
 
 function textRuns(runs: Run[]): TextRun[] {
   const out: TextRun[] = []
@@ -55,7 +61,7 @@ function listLevels(ordered: boolean): ILevelsOptions[] {
   }))
 }
 
-export async function manuscriptDocx(m: Manuscript): Promise<Blob> {
+export async function manuscriptDocx(m: Manuscript, pictures: ExportPictures = new Map()): Promise<Blob> {
   const children: Paragraph[] = []
 
   if (m.titlePage) {
@@ -84,6 +90,32 @@ export async function manuscriptDocx(m: Manuscript): Promise<Blob> {
     for (const b of c.blocks) {
       if (b.type === 'break') {
         children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(SCENE_BREAK)] }))
+        flush = true
+      } else if (b.type === 'picture') {
+        const picture = pictures.get(b.imageId)
+        if (picture) {
+          let width = TEXT_PX * PICTURE_WIDTH[b.size]
+          let height = (width * picture.height) / picture.width
+          if (height > MAX_PICTURE_PX) {
+            width = (width * MAX_PICTURE_PX) / height
+            height = MAX_PICTURE_PX
+          }
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              // Single spacing that grows to the picture (some readers otherwise cut it to one line's height).
+              spacing: { before: 120, after: 120, line: 240, lineRule: LineRuleType.AUTO },
+              children: [
+                new ImageRun({
+                  type: picture.format,
+                  data: picture.bytes,
+                  transformation: { width: Math.round(width), height: Math.round(height) },
+                  ...(b.alt ? { altText: { name: 'Picture', description: b.alt, title: b.alt } } : {}),
+                }),
+              ],
+            }),
+          )
+        }
         flush = true
       } else if (b.type === 'heading') {
         const level = [HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4][b.level - 1]

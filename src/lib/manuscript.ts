@@ -1,6 +1,6 @@
 import type { RichNode, StoryData } from '../types'
 import { displayName, plainText, type Lookup } from './mentions'
-import { MENTION_NODE } from './richText'
+import { MENTION_NODE, PICTURE_NODE, PICTURE_WIDTH, pictureSizeOf, type PictureSize } from './richText'
 
 // The manuscript as a document to hand to someone: every chapter's text in
 // order, with headings, as Word, PDF (by printing), plain text or Markdown.
@@ -43,6 +43,24 @@ export type Block =
   | { type: 'item'; runs: Run[]; ordered: boolean; number: number; depth: number; list: number; continued?: boolean }
   /** A scene break. */
   | { type: 'break' }
+  | { type: 'picture'; imageId: string; size: PictureSize; width: number; height: number; alt: string }
+
+/** A picture's data, read from the picture store for exporting. */
+export interface ExportPicture {
+  /** jpg, png or gif (anything else is turned into PNG first). */
+  format: 'jpg' | 'png' | 'gif'
+  dataUrl: string
+  bytes: Uint8Array
+  width: number
+  height: number
+}
+
+export type ExportPictures = Map<string, ExportPicture>
+
+/** The pictures a manuscript shows, by id. */
+export const picturesOf = (m: Manuscript): string[] => [
+  ...new Set(m.chapters.flatMap((c) => c.blocks.flatMap((b) => (b.type === 'picture' ? [b.imageId] : [])))),
+]
 
 export interface ManuscriptChapter {
   /** "Chapter 3", or null when headings show the title alone. */
@@ -107,6 +125,19 @@ export function blocksOf(doc: RichNode, nameOf: NameOf): Block[] {
         case 'horizontalRule':
           out.push({ type: 'break' })
           break
+        case PICTURE_NODE: {
+          const imageId = String(node.attrs?.imageId ?? '')
+          if (!imageId) break
+          out.push({
+            type: 'picture',
+            imageId,
+            size: pictureSizeOf(node.attrs?.size),
+            width: Number(node.attrs?.width) || 800,
+            height: Number(node.attrs?.height) || 600,
+            alt: String(node.attrs?.alt ?? ''),
+          })
+          break
+        }
         case 'blockquote':
           walk(node.content ?? [], quote + 1, depth)
           break
@@ -150,7 +181,7 @@ export function buildManuscript(data: Pick<StoryData, 'title' | 'chapters' | 'te
   data.chapters.forEach((c, i) => {
     const text = data.texts[c.id]
     const blocks = text ? blocksOf(text.doc, nameOf) : []
-    const empty = !blocks.some((b) => b.type === 'break' || b.runs.some((r) => r.text.trim()))
+    const empty = !blocks.some((b) => b.type === 'break' || b.type === 'picture' || b.runs.some((r) => r.text.trim()))
     if (empty && options.skipEmpty) return
     words += text?.words ?? 0
     const title = plainText(c.title, lookup).trim()
@@ -192,6 +223,7 @@ export function toPlainText(m: Manuscript): string {
     const lines: string[] = [headingLine(c)]
     for (const b of c.blocks) {
       if (b.type === 'break') lines.push(SCENE_BREAK)
+      else if (b.type === 'picture') lines.push(b.alt ? `[Picture: ${b.alt}]` : '[Picture]')
       else if (b.type === 'item') {
         const pad = '    '.repeat(b.depth)
         const text = runText(b.runs).replace(/\n/g, `\n${pad}    `)
@@ -235,7 +267,8 @@ function mdRuns(runs: Run[]): string {
 /** A paragraph that starts like a heading, quote or list item would turn into one. */
 const guardStart = (line: string) => line.replace(/^(\s*)([#>+-]|\d+\.)(?=\s|$)/, (_, space: string, mark: string) => `${space}${mark.replace(/([#>+.-])$/, '\\$1')}`)
 
-export function toMarkdown(m: Manuscript): string {
+/** Pictures go into the Markdown file itself, as data: links, so it needs nothing beside it. */
+export function toMarkdown(m: Manuscript, pictures: ExportPictures = new Map()): string {
   const parts: string[] = []
   const chapterLevel = m.titlePage ? 2 : 1
   if (m.titlePage) {
@@ -247,6 +280,10 @@ export function toMarkdown(m: Manuscript): string {
     for (const b of c.blocks) {
       let text: string
       if (b.type === 'break') text = '* * *'
+      else if (b.type === 'picture') {
+        const picture = pictures.get(b.imageId)
+        text = picture ? `![${escapeMd(b.alt)}](${picture.dataUrl})` : '*[Picture]*'
+      }
       else if (b.type === 'heading') text = `${'#'.repeat(Math.min(6, chapterLevel + b.level))} ${mdRuns(b.runs)}`
       else if (b.type === 'item') {
         const pad = '    '.repeat(b.depth)
@@ -286,7 +323,7 @@ function htmlRuns(runs: Run[]): string {
 }
 
 /** A standalone page laid out like a manuscript, for printing or saving as PDF. */
-export function toPrintHtml(m: Manuscript): string {
+export function toPrintHtml(m: Manuscript, pictures: ExportPictures = new Map()): string {
   const body: string[] = []
   if (m.titlePage) {
     body.push(
@@ -307,6 +344,16 @@ export function toPrintHtml(m: Manuscript): string {
       }
       if (b.type === 'heading') {
         html.push(`<h${b.level + 2}>${htmlRuns(b.runs)}</h${b.level + 2}>`)
+        flush = true
+        continue
+      }
+      if (b.type === 'picture') {
+        const picture = pictures.get(b.imageId)
+        if (picture) {
+          html.push(
+            `<figure class="picture" style="width:${PICTURE_WIDTH[b.size] * 100}%"><img src="${picture.dataUrl}" alt="${escapeHtml(b.alt)}"></figure>`,
+          )
+        }
         flush = true
         continue
       }
@@ -337,6 +384,8 @@ p.quote { margin: 0 0.5in; }
 p.item { padding-left: 0.3in; text-indent: -0.3in; }
 p.item .marker { display: inline-block; width: 0.3in; text-indent: 0; }
 p.scene { text-align: center; margin: 0.5em 0; }
+figure.picture { margin: 0.6em auto; break-inside: avoid; }
+figure.picture img { display: block; width: 100%; max-height: 8.5in; object-fit: contain; }
 h2.chapter { break-before: page; margin: 1.6in 0 0.6in; text-align: center; font-weight: normal; line-height: 1.4; }
 h2.chapter.first { break-before: auto; }
 h2.chapter .label { display: block; font-size: 12pt; letter-spacing: 0.08em; text-transform: uppercase; }

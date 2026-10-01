@@ -7,6 +7,17 @@ import type { RichNode } from '../types'
 export const BEAT_MARK = 'beatLink'
 /** Inline node for a mention of a character or element (attrs: id, label). */
 export const MENTION_NODE = 'mention'
+/** Block node for a picture (attrs: imageId, size, width, height, alt). */
+export const PICTURE_NODE = 'picture'
+
+/** How wide a picture is in the text: a third, two thirds, or the whole width. */
+export type PictureSize = 'small' | 'medium' | 'full'
+export const PICTURE_SIZES: PictureSize[] = ['small', 'medium', 'full']
+/** The share of the text's width each size takes. */
+export const PICTURE_WIDTH: Record<PictureSize, number> = { small: 0.35, medium: 0.65, full: 1 }
+
+export const pictureSizeOf = (value: unknown): PictureSize =>
+  PICTURE_SIZES.includes(value as PictureSize) ? (value as PictureSize) : 'medium'
 
 type Mark = NonNullable<RichNode['marks']>[number]
 
