@@ -1204,10 +1204,12 @@
   scale: 1.3;
 }
 
-/* Hide the dots while typing in a note. */
+/* Hide the dots while typing in a note. They keep their place, though: React
+   Flow measures where they are whenever the card changes size (as it grows
+   with typing), and lines drawn from them later start from there. */
 .map-note.editing .map-handle,
 .map-text.editing .map-handle {
-  display: none;
+  visibility: hidden;
 }
 
 /* ---------- Floating toolbars ---------- */
@@ -1508,15 +1510,37 @@
 
 /* ---------- Lines ---------- */
 
-/* Lines and their labels sit over the cards; the selected line's label and tools on top. */
+/* A label sits at its line's layer (set on it), under the cards the line
+   passes under; the selected line's label and tools go on top of everything. */
 .map-edge-label-wrap {
   position: absolute;
-  z-index: 2001;
   pointer-events: all;
 }
 
 .map-edge-label-wrap.selected {
   z-index: 2002;
+}
+
+/* The part of a line over the cards it joins, out to the row it ends at. */
+.map-edge-over {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.map-edge-over path {
+  fill: none;
+  stroke: var(--xy-edge-stroke);
+  stroke-width: var(--xy-edge-stroke-width);
+}
+
+.map-edge-over.selected path {
+  stroke: var(--xy-edge-stroke-selected);
 }
 
 /* Only the (shortened) hit path takes clicks, not the drawn line. */

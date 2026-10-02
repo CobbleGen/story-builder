@@ -43,6 +43,7 @@ import {
   resetTimeline,
   storyOrder,
   updateBeat,
+  setPortrait,
 } from './storyOps'
 import { timeJumps } from '../lib/timeline'
 import { buildSampleStory } from './sampleStory'
@@ -812,5 +813,39 @@ describe('pictures on the mind map', () => {
     expect(nodes[0]).toEqual({ id: 'p1', kind: 'image', imageId: 'img_abc123', x: 10, y: 20, width: 300, height: 200 })
     expect(nodes[1]).toMatchObject({ width: 240, height: 180 })
     expect(loaded.mindMaps[0].edges).toHaveLength(1)
+  })
+})
+
+describe('portraits', () => {
+  it('gives characters and elements a portrait, and takes it away', () => {
+    let data = emptyStory()
+    let mara: string
+    let lighthouse: string
+    ;[data, mara] = addCharacter(data, { name: 'Mara', color: '#2a9d8f' })
+    ;[data, lighthouse] = addElement(data, { name: 'Lighthouse', kind: 'place', color: '#457b9d' })
+    data = setPortrait(data, mara, 'img_mara1')
+    data = setPortrait(data, lighthouse, 'img_light1')
+    expect(data.characters[0].portrait).toBe('img_mara1')
+    expect(data.elements[0].portrait).toBe('img_light1')
+    // Mentions hand the portrait on to badges
+    expect(mentionables(data).map((m) => (m as { portrait?: string }).portrait)).toEqual(['img_mara1', 'img_light1'])
+    expect(setPortrait(data, mara, 'not a picture')).toBe(data)
+    data = setPortrait(data, mara, null)
+    expect('portrait' in data.characters[0]).toBe(false)
+    expect(data.elements[0].portrait).toBe('img_light1')
+  })
+
+  it('keeps portraits when loading, dropping ones that aren’t picture ids', () => {
+    const loaded = normalizeStory({
+      characters: [
+        { id: 'chr_a', name: 'A', color: '#111111', portrait: 'img_abc' },
+        { id: 'chr_b', name: 'B', color: '#111111', portrait: 'http://example.com/b.png' },
+      ],
+      elements: [{ id: 'elm_c', kind: 'place', name: 'C', color: '#111111', portrait: 'img_def' }],
+    })
+    expect(loaded.characters[0].portrait).toBe('img_abc')
+    expect('portrait' in loaded.characters[1]).toBe(false)
+    expect(loaded.elements[0].portrait).toBe('img_def')
+    expect(normalizeStory(loaded)).toEqual(loaded)
   })
 })

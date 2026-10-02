@@ -52,6 +52,8 @@ export interface Character {
   description: string
   /** Free-form attributes the writer defines (age, wants, fears…), in order. */
   attributes: CharacterAttribute[]
+  /** Their portrait: a picture's id (pictures are kept apart from the story). */
+  portrait?: string
 }
 
 /** What sort of thing a story element is. */
@@ -68,6 +70,8 @@ export interface StoryElement {
   color: string
   description: string
   attributes: CharacterAttribute[]
+  /** A picture of it, by id. */
+  portrait?: string
 }
 
 /** A ProseMirror/TipTap JSON node, as stored. */

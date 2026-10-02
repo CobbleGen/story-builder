@@ -55,7 +55,9 @@ It has four views: the **chapter board**, the **manuscript**, the
   attribute, a paragraph on a chapter's page or a list item, and drag from the
   dot at its side. Let go anywhere on a card or row to join it. While that row
   isn't showing (card closed, scrolled away, another page) its lines attach to
-  the card, and a paragraph's lines follow it when text is added above it. Pan by dragging
+  the card, and a paragraph's lines follow it when text is added above it.
+  Lines pass under every card except the two they join, and over sticky notes
+  and pictures (which sit under the other cards, as a backdrop). Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
 - **Pictures**: on the mind map, use **Picture** in the left panel, or drop
@@ -68,6 +70,11 @@ It has four views: the **chapter board**, the **manuscript**, the
   Big photos are scaled down to 2000 pixels on their longest side as they're
   added. Pictures are kept in the browser apart from the story, and
   **Export story (.json)** carries them along.
+- **Portraits**: a character's page has a spot for their portrait, and a
+  place's or thing's page for a picture of it. Click it to pick a file, or
+  drop or paste a picture on the page; click the picture to see it full size.
+  The portrait then stands in for their initials (or the place's icon)
+  wherever they appear: the sidebar, mind map cards, mentions and search.
 - **Several mind maps**: the map's name sits at its top left; its menu
   switches maps, starts a new one, renames it or deletes it (the story items
   on it stay). Each map remembers where it was scrolled and zoomed to. Places

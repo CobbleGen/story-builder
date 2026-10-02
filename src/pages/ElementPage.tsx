@@ -16,6 +16,7 @@ import { ColorSwatches } from '../components/ColorSwatches'
 import { KindPicker } from '../components/KindPicker'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
+import { PortraitPicker } from '../components/PortraitPicker'
 
 const SUGGESTED_ATTRIBUTES: Record<ElementKind, string[]> = {
   place: ['Where', 'Looks like', 'Sounds and smells', 'Who’s there', 'History', 'Secret'],
@@ -68,6 +69,7 @@ export function ElementPage() {
 function ElementView({ element }: { element: StoryElement }) {
   const updateElement = useStory((s) => s.updateElement)
   const deleteElement = useStory((s) => s.deleteElement)
+  const setPortrait = useStory((s) => s.setPortrait)
   const navigate = useNavigate()
   const [showColors, setShowColors] = useState(false)
   const places = useMentionPlaces(element.id)
@@ -96,7 +98,14 @@ function ElementView({ element }: { element: StoryElement }) {
       <Link to="/" className="back-link">
         <ArrowLeft size={16} /> Chapter board
       </Link>
-      <header className="arc-hero">
+      <header className="arc-hero with-portrait">
+        <PortraitPicker
+          imageId={element.portrait}
+          onChange={(imageId) => setPortrait(element.id, imageId)}
+          shape="wide"
+          noun="picture"
+        />
+        <div className="arc-hero-main">
         <div className="arc-hero-row">
           <button
             className="avatar-btn"
@@ -105,7 +114,7 @@ function ElementView({ element }: { element: StoryElement }) {
             aria-label="Change color"
             aria-expanded={showColors}
           >
-            <ElementIcon element={element} size="lg" />
+            <ElementIcon element={element} size="lg" portrait={false} />
             <ChevronDown size={14} />
           </button>
           <MentionTextarea
@@ -139,6 +148,7 @@ function ElementView({ element }: { element: StoryElement }) {
         <p className="arc-stats">
           Mentioned in {count} place{count === 1 ? '' : 's'}
         </p>
+        </div>
       </header>
 
       <AttributesEditor

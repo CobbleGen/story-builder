@@ -5,6 +5,9 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import { openDb, request, transactionDone } from './idb'
+import { IMAGE_ID } from '../lib/id'
+
+export { IMAGE_ID }
 
 export interface StoredImage {
   id: string
@@ -20,8 +23,6 @@ export interface StoredImage {
 const DB_NAME = 'story-builder-images'
 const STORE = 'images'
 
-/** Picture ids, as they appear in the story. */
-export const IMAGE_ID = /^img_[a-z0-9]+$/
 const IMAGE_IDS = /img_[a-z0-9]+/g
 
 let dbPromise: Promise<IDBDatabase> | null = null

@@ -21,7 +21,7 @@ import type {
   StoryGoals,
   TextSize,
 } from '../types'
-import { makeId } from '../lib/id'
+import { IMAGE_ID, makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
@@ -399,6 +399,19 @@ export function updateElement(
 ): StoryData {
   if (patch.kind && !ELEMENT_KINDS.includes(patch.kind)) return data
   return mapElements(data, (e) => (e.id === id ? { ...e, ...patch } : e))
+}
+
+/** Gives a character or element a portrait (a stored picture's id), or takes it away (null). */
+export function setPortrait(data: StoryData, ownerId: string, imageId: string | null): StoryData {
+  if (imageId !== null && !IMAGE_ID.test(imageId)) return data
+  const set = <T extends Character | StoryElement>(item: T): T => {
+    if (item.id !== ownerId) return item
+    if (imageId) return { ...item, portrait: imageId }
+    const rest = { ...item }
+    delete rest.portrait
+    return rest
+  }
+  return ownerId.startsWith('elm_') ? mapElements(data, set) : mapCharacters(data, set)
 }
 
 /** Removes an element; its mentions turn into its plain name. */
@@ -920,12 +933,14 @@ export function normalizeStory(input: unknown): StoryData {
       label: str(a.label),
       value: str(a.value),
     }))
+  const portraitOf = (value: unknown) => (IMAGE_ID.test(str(value)) ? { portrait: str(value) } : {})
   const characters: Character[] = list(raw.characters).map((c) => ({
     id: str(c.id) || makeId('chr'),
     name: str(c.name),
     color: str(c.color, '#6f7480'),
     description: str(c.description),
     attributes: attributesOf(c.attributes),
+    ...portraitOf(c.portrait),
   }))
   const characterIds = new Set(characters.map((c) => c.id))
   const elements: StoryElement[] = list(raw.elements).map((e) => ({
@@ -936,6 +951,7 @@ export function normalizeStory(input: unknown): StoryData {
     color: str(e.color, '#6f7480'),
     description: str(e.description),
     attributes: attributesOf(e.attributes),
+    ...portraitOf(e.portrait),
   }))
   const arcs: Arc[] = list(raw.arcs).map((a) => ({
     id: str(a.id) || makeId('arc'),
@@ -1096,7 +1112,7 @@ export function normalizeStory(input: unknown): StoryData {
         })
       } else if (kind === 'image') {
         const imageId = str(n.imageId)
-        if (!/^img_[a-z0-9]+$/.test(imageId)) continue
+        if (!IMAGE_ID.test(imageId)) continue
         nodes.push({ id, kind, x, y, width: num(n.width, 240, 30, 4000), height: num(n.height, 180, 30, 4000), imageId })
       } else if (kind === 'text') {
         const size = str(n.size) as TextSize

@@ -16,6 +16,7 @@ import { ColorSwatches } from '../components/ColorSwatches'
 import { ChapterTag } from '../components/ChapterTag'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
+import { PortraitPicker } from '../components/PortraitPicker'
 
 const SUGGESTED_ATTRIBUTES = ['Age', 'Role', 'Appearance', 'Personality', 'Wants', 'Fears', 'Secret', 'Backstory']
 
@@ -50,6 +51,7 @@ function CharacterView({ character }: { character: Character }) {
   const arcs = useStory((s) => s.arcs)
   const updateCharacter = useStory((s) => s.updateCharacter)
   const deleteCharacter = useStory((s) => s.deleteCharacter)
+  const setPortrait = useStory((s) => s.setPortrait)
   const navigate = useNavigate()
   const [showColors, setShowColors] = useState(false)
   const name = displayName(character)
@@ -83,7 +85,14 @@ function CharacterView({ character }: { character: Character }) {
       <Link to="/" className="back-link">
         <ArrowLeft size={16} /> Chapter board
       </Link>
-      <header className="arc-hero">
+      <header className="arc-hero with-portrait">
+        <PortraitPicker
+          imageId={character.portrait}
+          onChange={(imageId) => setPortrait(character.id, imageId)}
+          shape="tall"
+          noun="portrait"
+        />
+        <div className="arc-hero-main">
         <div className="arc-hero-row">
           <button
             className="avatar-btn"
@@ -92,7 +101,7 @@ function CharacterView({ character }: { character: Character }) {
             aria-label="Change character color"
             aria-expanded={showColors}
           >
-            <CharacterAvatar character={character} size="lg" />
+            <CharacterAvatar character={character} size="lg" portrait={false} />
             <ChevronDown size={14} />
           </button>
           <MentionTextarea
@@ -121,6 +130,7 @@ function CharacterView({ character }: { character: Character }) {
           onChange={(description) => updateCharacter(character.id, { description })}
         />
         <p className="arc-stats">{stats.join(' · ')}</p>
+        </div>
       </header>
 
       <AttributesEditor

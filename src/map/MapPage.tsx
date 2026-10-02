@@ -65,6 +65,17 @@ const FIT_VIEW: FitViewOptions = {
       : { x: '48px', top: '40px', bottom: '150px' },
 }
 
+/**
+ * How the map stacks, bottom up: lines between two sticky notes or pictures,
+ * then the notes and pictures (often used as a backdrop), then the other
+ * lines, then cards, and an opened-up card over its neighbours. So lines pass
+ * under every card but the ones they join (StoryEdge draws that bit on top).
+ */
+const LAYER = { backdropLine: 0, backdrop: 1, line: 2, card: 3, opened: 4 }
+
+const isBackdrop = (n: MapNode) => n.kind === 'note' || n.kind === 'image'
+const layerOf = (n: MapNode) => (isBackdrop(n) ? LAYER.backdrop : 'expanded' in n && n.expanded ? LAYER.opened : LAYER.card)
+
 /** Story map nodes as React Flow nodes, keeping React Flow's own state (selection, sizes). */
 function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
   const old = new Map(prev.map((n) => [n.id, n]))
@@ -77,10 +88,9 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
       data: { node: n },
       selected: was?.selected ?? false,
       measured: was?.measured,
-      // Notes and pictures sit under the other cards; an opened-up card sits over its neighbours.
-      zIndex: n.kind === 'note' || n.kind === 'image' ? 0 : 'expanded' in n && n.expanded ? 2 : 1,
+      zIndex: layerOf(n),
     }
-    if (n.kind === 'note' || n.kind === 'image') return { ...node, width: n.width, height: n.height }
+    if (isBackdrop(n)) return { ...node, width: n.width, height: n.height }
     if (n.kind === 'text') return { ...node, width: n.width }
     // An opened-up card keeps the size it was given for that view.
     const size = n.expanded ? n.sizes?.[n.expanded] : undefined
@@ -177,21 +187,23 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     setNodes((prev) => toFlow(mindMap.nodes, prev))
   }
 
-  const edges = useMemo<StoryFlowEdge[]>(
-    () =>
-      mindMap.edges.map((e) => ({
+  const edges = useMemo<StoryFlowEdge[]>(() => {
+    const backdrops = new Set(mindMap.nodes.filter(isBackdrop).map((n) => n.id))
+    return mindMap.edges.map((e) => {
+      // A line between two notes or pictures goes under other notes and pictures too.
+      const layer = backdrops.has(e.source) && backdrops.has(e.target) ? LAYER.backdropLine : LAYER.line
+      return {
         id: e.id,
         source: e.source,
         target: e.target,
         type: 'story',
-        data: { edge: e },
-        // Over the cards (even a selected one), so a line visibly reaches the row it's drawn from.
-        zIndex: 2000,
+        data: { edge: e, layer },
+        zIndex: layer,
         selected: !!edgeSelection[e.id],
         markerEnd: e.arrow ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: dark ? '#8c867b' : '#8f897f' } : undefined,
-      })),
-    [mindMap.edges, edgeSelection, dark],
-  )
+      }
+    })
+  }, [mindMap.nodes, mindMap.edges, edgeSelection, dark])
 
   // Opened from a search result: select the card and bring it to the middle.
   const searched = (location.state as { focusNode?: string } | null)?.focusNode

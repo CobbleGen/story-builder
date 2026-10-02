@@ -269,7 +269,8 @@ export function CharacterNode({ data, selected }: NodeProps<StoryFlowNode>) {
       node={node}
       selected={selected}
       item={character}
-      badge={<CharacterAvatar character={character} size="md" />}
+      // A portrait is shown big enough to make out the face.
+      badge={<CharacterAvatar character={character} size={character.portrait ? 'lg' : 'md'} />}
       className="character-card"
       kindLabel="Character"
       openLabel="Open character"
@@ -287,7 +288,7 @@ export function ElementNode({ data, selected }: NodeProps<StoryFlowNode>) {
       node={node}
       selected={selected}
       item={element}
-      badge={<ElementIcon element={element} size="md" />}
+      badge={<ElementIcon element={element} size={element.portrait ? 'lg' : 'md'} />}
       className="character-card element-card"
       kindLabel={
         <>

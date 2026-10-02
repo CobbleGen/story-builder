@@ -37,6 +37,7 @@ interface StoryActions {
   addElement: (...args: Tail<Parameters<typeof ops.addElement>>) => string
   updateElement: (...args: Tail<Parameters<typeof ops.updateElement>>) => void
   deleteElement: (...args: Tail<Parameters<typeof ops.deleteElement>>) => void
+  setPortrait: (...args: Tail<Parameters<typeof ops.setPortrait>>) => void
   addAttribute: (...args: Tail<Parameters<typeof ops.addAttribute>>) => string
   updateAttribute: (...args: Tail<Parameters<typeof ops.updateAttribute>>) => void
   deleteAttribute: (...args: Tail<Parameters<typeof ops.deleteAttribute>>) => void
@@ -133,6 +134,7 @@ export const useStory = create<StoryStore>()(
         addElement: (...a) => withId(ops.addElement(data(), ...a), 'addElement', a[0]),
         updateElement: (...a) => apply(ops.updateElement(data(), ...a), 'updateElement', a[0]),
         deleteElement: (...a) => apply(ops.deleteElement(data(), ...a), 'deleteElement', a[0]),
+        setPortrait: (...a) => apply(ops.setPortrait(data(), ...a), 'setPortrait', a[0]),
         addAttribute: (...a) => withId(ops.addAttribute(data(), ...a), 'addAttribute', a[0]),
         updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a), 'updateAttribute', a[0]),
         deleteAttribute: (...a) => apply(ops.deleteAttribute(data(), ...a), 'deleteAttribute', a[0]),

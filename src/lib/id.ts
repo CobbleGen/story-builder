@@ -7,3 +7,6 @@ export function makeId(prefix: string): string {
   const rand = Math.random().toString(36).slice(2, 8)
   return `${prefix}_${time}${counter.toString(36).padStart(2, '0')}${rand}`
 }
+
+/** Picture ids, as they appear in the story (pictures themselves are stored apart). */
+export const IMAGE_ID = /^img_[a-z0-9]+$/

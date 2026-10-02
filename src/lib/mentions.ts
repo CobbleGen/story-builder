@@ -17,6 +17,8 @@ export interface Mentionable {
   name: string
   color: string
   kind?: ElementKind
+  /** Picture id of their portrait, if they have one. */
+  portrait?: string
 }
 
 /** The name a character or element is shown (and typed) by. */

@@ -76,6 +76,8 @@ const LABELS: Record<string, string> = {
   addElement: 'add',
   updateElement: 'edit',
   deleteElement: 'delete',
+  // "change portrait", or "change picture" for an element; see labelOf.
+  setPortrait: 'change',
   addAttribute: 'add attribute',
   updateAttribute: 'edit attribute',
   deleteAttribute: 'delete attribute',
@@ -105,6 +107,7 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
         : (target as { kind?: ElementKind } | undefined)?.kind
     return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
   }
+  if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
   return labelFor(name)
 }
 

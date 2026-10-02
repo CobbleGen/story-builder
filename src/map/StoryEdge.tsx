@@ -15,7 +15,7 @@ import type { MapEdge } from '../types'
 import { anchorHandle } from '../lib/anchors'
 import { useStory } from '../store/storyStore'
 
-export type StoryFlowEdge = Edge<{ edge: MapEdge }, 'story'>
+export type StoryFlowEdge = Edge<{ edge: MapEdge; layer: number }, 'story'>
 
 type End = { x: number; y: number; position: Position }
 type Point = { x: number; y: number }
@@ -78,7 +78,17 @@ function rowEnd(node: InternalNode, anchor: string | undefined, toward: Point, l
     : { x: rx, y: ry, position: Position.Right }
 }
 
-/** A curved line with an optional label; when selected it offers label, arrow and delete. */
+/** A card's outline, rounded like the card. */
+function CardOutline({ node }: { node: InternalNode }) {
+  const { x, y } = node.internals.positionAbsolute
+  return <rect x={x} y={y} width={node.measured.width ?? 0} height={node.measured.height ?? 0} rx={12} />
+}
+
+/**
+ * A curved line with an optional label; when selected it offers label, arrow
+ * and delete. Lines pass under the cards (MapPage stacks them), except over
+ * the cards they join from a row inside, so they visibly reach the row.
+ */
 export function StoryEdge({ id, source, target, data, selected, markerEnd }: EdgeProps<StoryFlowEdge>) {
   const updateMapEdge = useStory((s) => s.updateMapEdge)
   const removeMapEdges = useStory((s) => s.removeMapEdges)
@@ -105,18 +115,34 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
       targetPosition: b.position,
     })
   const [path, labelX, labelY] = curve(from, to)
-  // Lines are drawn over the cards, so the part that takes clicks stops short
-  // of each end: the connection points there stay free to draw new lines from.
+  // A line can pass over a sticky note or picture, so the part that takes
+  // clicks stops short of each end: connection points there stay free to
+  // draw new lines from.
   const [clickPath] = curve(inset(from, END_GAP), inset(to, END_GAP))
+  // Drawn again over its own cards, where it ends at a row inside them. That
+  // copy is in the label layer, which is stacked with the cards.
+  const overCards = [fromRow ? sourceNode : null, toRow && !loop ? targetNode : null].filter((n) => n !== null)
+  const clipId = `map-edge-over-${id}`
 
   return (
     <>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`map-edge${selected ? ' selected' : ''}`} interactionWidth={0} />
       <path d={clickPath} className="react-flow__edge-interaction map-edge-hit" fill="none" strokeOpacity={0} strokeWidth={14} />
       <EdgeLabelRenderer>
+        {overCards.length > 0 && (
+          <svg className={`map-edge-over${selected ? ' selected' : ''}`} aria-hidden>
+            <clipPath id={clipId}>
+              {overCards.map((n) => (
+                <CardOutline key={n.id} node={n} />
+              ))}
+            </clipPath>
+            <path d={path} clipPath={`url(#${clipId})`} markerEnd={markerEnd} />
+          </svg>
+        )}
         <div
           className={`map-edge-label-wrap nodrag nopan${selected ? ' selected' : ''}`}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          // The label sits at its line's layer: under cards it passes under.
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: selected ? undefined : data.layer }}
         >
           {editing ? (
             <input
