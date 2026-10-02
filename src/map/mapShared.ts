@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useStory } from '../store/storyStore'
 import type { MapNode, NoteColor } from '../types'
 import type { NewMapNode } from '../store/storyOps'
+import { TEXT_BOX_SIZE } from '../lib/textSize'
 
 /** Data type for things dragged from the palette onto the canvas. */
 export const DRAG_MIME = 'application/x-story-map-node'
@@ -16,7 +17,7 @@ export type PaletteItem =
 /** A palette item as a new card at a position (top-left corner). */
 export function newNodeFor(item: PaletteItem, x: number, y: number): NewMapNode {
   if (item.kind === 'note') return { kind: 'note', x, y, width: 220, height: 160, text: '', color: 'yellow' }
-  if (item.kind === 'text') return { kind: 'text', x, y, width: 280, text: '', size: 'md' }
+  if (item.kind === 'text') return { kind: 'text', x, y, width: 280, text: '', size: TEXT_BOX_SIZE }
   return { kind: item.kind, refId: item.refId, x, y }
 }
 
@@ -74,7 +75,7 @@ export function useToolbarPlacement(id: string, selected: boolean): { position: 
     const { x, y } = n.internals.positionAbsolute
     const side = y * zoom + ty < 56 ? 'bottom' : 'top'
     const center = (x + (n.measured.width ?? 0) / 2) * zoom + tx
-    const half = Math.min(440, s.width - 24) / 2
+    const half = Math.min(540, s.width - 24) / 2
     const align = center - half < 8 ? 'start' : center + half > s.width - 8 ? 'end' : 'center'
     return `${side} ${align}`
   })

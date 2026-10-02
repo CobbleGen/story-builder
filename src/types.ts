@@ -93,7 +93,6 @@ export interface ChapterText {
 /** Story items that can be placed on the mind map; the card shows the live item. */
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'element' | 'beat'
 export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
-export type TextSize = 'sm' | 'md' | 'lg'
 /** A text box shown as a list: each line is an item. */
 export type MapListStyle = 'bullet' | 'number' | 'check'
 /** What an opened-up card shows: a chapter's pages, the beats of a chapter or arc, or a character's details. */
@@ -125,6 +124,8 @@ export type MapNode =
       height: number
       text: string
       color: NoteColor
+      /** Text size in pixels; the usual size when absent. */
+      size?: number
       list?: MapListStyle
       /** Ticked items of a checklist, by line. */
       checked?: number[]
@@ -136,7 +137,8 @@ export type MapNode =
       y: number
       width: number
       text: string
-      size: TextSize
+      /** Text size in pixels. */
+      size: number
       /** Background colour; none when absent. */
       bg?: NoteColor
       list?: MapListStyle

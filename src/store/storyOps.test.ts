@@ -44,6 +44,7 @@ import {
   storyOrder,
   updateBeat,
   setPortrait,
+  pasteMapItems,
 } from './storyOps'
 import { timeJumps } from '../lib/timeline'
 import { buildSampleStory } from './sampleStory'
@@ -599,6 +600,25 @@ describe('mind map', () => {
     expect(plain).not.toHaveProperty('list')
     expect(plain).not.toHaveProperty('checked')
   })
+
+  it('keeps text sizes, turning the old small, medium and large into sizes', () => {
+    const data = normalizeStory({
+      mindMap: {
+        nodes: [
+          { id: 't1', kind: 'text', x: 0, y: 0, text: 'a', size: 'sm' },
+          { id: 't2', kind: 'text', x: 0, y: 0, text: 'b', size: 'lg' },
+          { id: 't3', kind: 'text', x: 0, y: 0, text: 'c' },
+          { id: 't4', kind: 'text', x: 0, y: 0, text: 'd', size: 500 },
+          { id: 't5', kind: 'text', x: 0, y: 0, text: 'e', size: 22.25 },
+          { id: 'n1', kind: 'note', x: 0, y: 0, text: 'f', color: 'yellow', size: 30 },
+          { id: 'n2', kind: 'note', x: 0, y: 0, text: 'g', color: 'yellow', size: 'huge' },
+        ],
+      },
+    })
+    const sizes = data.mindMaps[0].nodes.map((n) => ('size' in n ? n.size : undefined))
+    expect(sizes).toEqual([14, 34, 20, 200, 22.3, 30, undefined])
+    expect('size' in data.mindMaps[0].nodes[6]).toBe(false)
+  })
 })
 
 describe('places and other elements', () => {
@@ -847,5 +867,57 @@ describe('portraits', () => {
     expect('portrait' in loaded.characters[1]).toBe(false)
     expect(loaded.elements[0].portrait).toBe('img_def')
     expect(normalizeStory(loaded)).toEqual(loaded)
+  })
+})
+
+describe('copy and paste on the map', () => {
+  it('pastes copied cards and the lines between them, with new ids, moved over', () => {
+    const data = buildSampleStory()
+    const map = data.mindMaps[0]
+    const [a, b] = map.nodes.filter((n) => n.kind === 'character')
+    const line = map.edges.find((e) => [a.id, b.id].includes(e.source) && [a.id, b.id].includes(e.target))
+    const copied = { nodes: [a, b], edges: line ? [line] : [] }
+    let n = 0
+    const [next, ids] = pasteMapItems(data, map.id, copied, { x: 32, y: 32 }, () => `node_new${++n}`)
+    expect(ids).toEqual(['node_new1', 'node_new2'])
+    const after = next.mindMaps[0]
+    expect(after.nodes).toHaveLength(map.nodes.length + 2)
+    const pasted = after.nodes.slice(-2)
+    expect(pasted.map((p) => [p.x, p.y])).toEqual([
+      [a.x + 32, a.y + 32],
+      [b.x + 32, b.y + 32],
+    ])
+    expect(pasted.map((p) => ('refId' in p ? p.refId : null))).toEqual([
+      'refId' in a ? a.refId : null,
+      'refId' in b ? b.refId : null,
+    ])
+    if (line) {
+      const added = after.edges.at(-1)!
+      expect(added.id).not.toBe(line.id)
+      expect([added.source, added.target].sort()).toEqual(['node_new1', 'node_new2'])
+      expect(added.label).toBe(line.label)
+    }
+  })
+
+  it('leaves out cards for things the story doesn’t have, and garbage', () => {
+    const data = emptyStory()
+    const mapId = data.mindMaps[0].id
+    const [next, ids] = pasteMapItems(
+      data,
+      mapId,
+      {
+        nodes: [
+          { id: 'x1', kind: 'character', refId: 'chr_gone', x: 0, y: 0 },
+          { id: 'x2', kind: 'note', x: 10, y: 10, width: 200, height: 100, text: 'Keep me', color: 'pink', size: 22 },
+          'nonsense',
+        ],
+        edges: [{ id: 'e', source: 'x1', target: 'x2', label: '', arrow: false }],
+      },
+      { x: 0, y: 0 },
+    )
+    expect(ids).toHaveLength(1)
+    expect(next.mindMaps[0].nodes[0]).toMatchObject({ kind: 'note', text: 'Keep me', color: 'pink', size: 22, x: 10, y: 10 })
+    expect(next.mindMaps[0].edges).toHaveLength(0)
+    expect(pasteMapItems(data, mapId, { nodes: 'junk' }, { x: 0, y: 0 })).toEqual([data, []])
   })
 })

@@ -33,6 +33,7 @@ import { askConfirm } from '../lib/confirm'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
 import { MapPalette } from './MapPalette'
 import { MapSwitcher } from './MapSwitcher'
+import { useMapClipboard } from './useMapClipboard'
 import {
   DRAG_MIME,
   MapContext,
@@ -66,18 +67,21 @@ const FIT_VIEW: FitViewOptions = {
 }
 
 /**
- * How the map stacks, bottom up: lines between two sticky notes or pictures,
- * then the notes and pictures (often used as a backdrop), then the other
- * lines, then cards, and an opened-up card over its neighbours. So lines pass
- * under every card but the ones they join (StoryEdge draws that bit on top).
+ * How the map stacks, bottom up: lines, then sticky notes and pictures (often
+ * used as a backdrop), then cards, and an opened-up card over its neighbours.
+ * So lines pass under everything but the cards they join (StoryEdge draws
+ * that bit on top).
  */
-const LAYER = { backdropLine: 0, backdrop: 1, line: 2, card: 3, opened: 4 }
+const LAYER = { line: 0, backdrop: 1, card: 2, opened: 3 }
 
 const isBackdrop = (n: MapNode) => n.kind === 'note' || n.kind === 'image'
 const layerOf = (n: MapNode) => (isBackdrop(n) ? LAYER.backdrop : 'expanded' in n && n.expanded ? LAYER.opened : LAYER.card)
 
-/** Story map nodes as React Flow nodes, keeping React Flow's own state (selection, sizes). */
-function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
+/**
+ * Story map nodes as React Flow nodes, keeping React Flow's own state
+ * (selection, sizes). `select`, when given, is the new selection.
+ */
+function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[], select?: Set<string> | null): StoryFlowNode[] {
   const old = new Map(prev.map((n) => [n.id, n]))
   return mapNodes.map((n) => {
     const was = old.get(n.id)
@@ -86,7 +90,7 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[]): StoryFlowNode[] {
       type: n.kind,
       position: { x: n.x, y: n.y },
       data: { node: n },
-      selected: was?.selected ?? false,
+      selected: select ? select.has(n.id) : (was?.selected ?? false),
       measured: was?.measured,
       zIndex: layerOf(n),
     }
@@ -182,28 +186,31 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     nodesRef.current = nodes
   })
   const [synced, setSynced] = useState(mindMap.nodes)
+  // Cards just pasted, to select once they're on the map.
+  const [selectNext, setSelectNext] = useState<Set<string> | null>(null)
   if (synced !== mindMap.nodes) {
     setSynced(mindMap.nodes)
-    setNodes((prev) => toFlow(mindMap.nodes, prev))
+    setNodes((prev) => toFlow(mindMap.nodes, prev, selectNext))
+    if (selectNext) {
+      setSelectNext(null)
+      setEdgeSelection({})
+    }
   }
 
-  const edges = useMemo<StoryFlowEdge[]>(() => {
-    const backdrops = new Set(mindMap.nodes.filter(isBackdrop).map((n) => n.id))
-    return mindMap.edges.map((e) => {
-      // A line between two notes or pictures goes under other notes and pictures too.
-      const layer = backdrops.has(e.source) && backdrops.has(e.target) ? LAYER.backdropLine : LAYER.line
-      return {
+  const edges = useMemo<StoryFlowEdge[]>(
+    () =>
+      mindMap.edges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
         type: 'story',
-        data: { edge: e, layer },
-        zIndex: layer,
+        data: { edge: e },
+        zIndex: LAYER.line,
         selected: !!edgeSelection[e.id],
         markerEnd: e.arrow ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: dark ? '#8c867b' : '#8f897f' } : undefined,
-      }
-    })
-  }, [mindMap.nodes, mindMap.edges, edgeSelection, dark])
+      })),
+    [mindMap.edges, edgeSelection, dark],
+  )
 
   // Opened from a search result: select the card and bring it to the middle.
   const searched = (location.state as { focusNode?: string } | null)?.focusNode
@@ -293,19 +300,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     [addMapNode, screenToFlowPosition, mindMap.id],
   )
 
-  // Pasting a picture (copied from anywhere) puts it on the map, unless you're typing.
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const target = e.target as Element | null
-      if (target?.closest?.('input, textarea, [contenteditable="true"]')) return
-      const files = picturesIn(e.clipboardData)
-      if (!files.length) return
-      e.preventDefault()
-      void addPictures(files)
-    }
-    window.addEventListener('paste', onPaste)
-    return () => window.removeEventListener('paste', onPaste)
-  }, [addPictures])
+  // Ctrl+C, Ctrl+X and Ctrl+V for cards; pasting a picture (copied from anywhere) puts it on the map.
+  const pastePictures = useCallback((files: File[]) => void addPictures(files), [addPictures])
+  useMapClipboard({ mapId: mindMap.id, wrapper, addPictures: pastePictures, select: setSelectNext })
 
   const openItem = useCallback(
     (node: MapNode) => {

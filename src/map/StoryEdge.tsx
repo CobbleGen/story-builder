@@ -15,7 +15,7 @@ import type { MapEdge } from '../types'
 import { anchorHandle } from '../lib/anchors'
 import { useStory } from '../store/storyStore'
 
-export type StoryFlowEdge = Edge<{ edge: MapEdge; layer: number }, 'story'>
+export type StoryFlowEdge = Edge<{ edge: MapEdge }, 'story'>
 
 type End = { x: number; y: number; position: Position }
 type Point = { x: number; y: number }
@@ -24,23 +24,6 @@ const centre = (node: InternalNode): Point => ({
   x: node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2,
   y: node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2,
 })
-
-/** Room left at each end of a line that doesn't take clicks. */
-const END_GAP = 10
-
-/** A line's end moved a little way along the line. */
-function inset(end: End, by: number): End {
-  switch (end.position) {
-    case Position.Left:
-      return { ...end, x: end.x - by }
-    case Position.Right:
-      return { ...end, x: end.x + by }
-    case Position.Top:
-      return { ...end, y: end.y - by }
-    default:
-      return { ...end, y: end.y + by }
-  }
-}
 
 /** Middle of a card's side, facing a point. */
 function cardEnd(node: InternalNode, toward: Point): End {
@@ -105,20 +88,14 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
   const toRow = rowEnd(targetNode, edge.targetAnchor, fromRow ?? centre(sourceNode), loop)
   const from = fromRow ?? cardEnd(sourceNode, toRow ?? centre(targetNode))
   const to = toRow ?? cardEnd(targetNode, from)
-  const curve = (a: End, b: End) =>
-    getBezierPath({
-      sourceX: a.x,
-      sourceY: a.y,
-      sourcePosition: a.position,
-      targetX: b.x,
-      targetY: b.y,
-      targetPosition: b.position,
-    })
-  const [path, labelX, labelY] = curve(from, to)
-  // A line can pass over a sticky note or picture, so the part that takes
-  // clicks stops short of each end: connection points there stay free to
-  // draw new lines from.
-  const [clickPath] = curve(inset(from, END_GAP), inset(to, END_GAP))
+  const [path, labelX, labelY] = getBezierPath({
+    sourceX: from.x,
+    sourceY: from.y,
+    sourcePosition: from.position,
+    targetX: to.x,
+    targetY: to.y,
+    targetPosition: to.position,
+  })
   // Drawn again over its own cards, where it ends at a row inside them. That
   // copy is in the label layer, which is stacked with the cards.
   const overCards = [fromRow ? sourceNode : null, toRow && !loop ? targetNode : null].filter((n) => n !== null)
@@ -127,7 +104,7 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
   return (
     <>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`map-edge${selected ? ' selected' : ''}`} interactionWidth={0} />
-      <path d={clickPath} className="react-flow__edge-interaction map-edge-hit" fill="none" strokeOpacity={0} strokeWidth={14} />
+      <path d={path} className="react-flow__edge-interaction map-edge-hit" fill="none" strokeOpacity={0} strokeWidth={14} />
       <EdgeLabelRenderer>
         {overCards.length > 0 && (
           <svg className={`map-edge-over${selected ? ' selected' : ''}`} aria-hidden>
@@ -141,8 +118,7 @@ export function StoryEdge({ id, source, target, data, selected, markerEnd }: Edg
         )}
         <div
           className={`map-edge-label-wrap nodrag nopan${selected ? ' selected' : ''}`}
-          // The label sits at its line's layer: under cards it passes under.
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: selected ? undefined : data.layer }}
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
           {editing ? (
             <input

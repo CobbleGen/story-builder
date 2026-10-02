@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NodeResizer, NodeToolbar, type NodeProps } from '@xyflow/react'
-import { PenLine, Trash2 } from 'lucide-react'
-import type { MapNode, NoteColor, TextSize } from '../types'
+import { Minus, PenLine, Plus, Trash2 } from 'lucide-react'
+import type { MapNode, NoteColor } from '../types'
 import { useStory } from '../store/storyStore'
 import { NOTE_COLORS } from '../store/storyOps'
 import { MentionText } from '../components/MentionText'
@@ -9,15 +9,63 @@ import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
 import { ListButtons, ListEditor, TextList } from './TextList'
 import { NOTE_COLOR_VALUES, focusSoon, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, NOTE_TEXT_SIZE, cleanTextSize, stepTextSize, textLook } from '../lib/textSize'
 
 type NoteMapNode = Extract<MapNode, { kind: 'note' }>
 type TextMapNode = Extract<MapNode, { kind: 'text' }>
 
-const SIZES: { size: TextSize; label: string }[] = [
-  { size: 'sm', label: 'S' },
-  { size: 'md', label: 'M' },
-  { size: 'lg', label: 'L' },
-]
+/** Text size: smaller and larger buttons, with the size between them to type over. */
+function TextSizeControl({ size, onChange }: { size: number; onChange: (size: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    const typed = draft === null ? undefined : cleanTextSize(Number.parseFloat(draft.replace(',', '.')))
+    if (typed !== undefined && typed !== size) onChange(typed)
+    setDraft(null)
+  }
+  return (
+    <span className="map-size" role="group" aria-label="Text size">
+      <button
+        className="map-tool icon-only"
+        onClick={() => onChange(stepTextSize(size, -1))}
+        disabled={size <= MIN_TEXT_SIZE}
+        aria-label="Smaller text"
+        title="Smaller text"
+      >
+        <Minus size={14} />
+      </button>
+      <input
+        className="map-size-input"
+        value={draft ?? String(size)}
+        inputMode="decimal"
+        aria-label="Text size"
+        title={`Text size (${MIN_TEXT_SIZE}–${MAX_TEXT_SIZE})`}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+          else if (e.key === 'Escape') {
+            setDraft(null)
+            e.currentTarget.blur()
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            setDraft(null)
+            onChange(stepTextSize(size, e.key === 'ArrowUp' ? 1 : -1))
+          }
+        }}
+      />
+      <button
+        className="map-tool icon-only"
+        onClick={() => onChange(stepTextSize(size, 1))}
+        disabled={size >= MAX_TEXT_SIZE}
+        aria-label="Larger text"
+        title="Larger text"
+      >
+        <Plus size={14} />
+      </button>
+    </span>
+  )
+}
 
 
 /** Shared editing behaviour: double-click to write, click away or Escape to stop. */
@@ -46,7 +94,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   return (
     <div
       className={`map-note note-${node.color}${editing ? ' editing' : ''}`}
-      style={{ background: NOTE_COLOR_VALUES[node.color] }}
+      style={{ background: NOTE_COLOR_VALUES[node.color], fontSize: node.size }}
       onDoubleClick={start}
     >
       <NodeResizer
@@ -68,6 +116,8 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
             title={color[0].toUpperCase() + color.slice(1)}
           />
         ))}
+        <span className="map-tool-sep" />
+        <TextSizeControl size={node.size ?? NOTE_TEXT_SIZE} onChange={(size) => updateMapNode(id, { size })} />
         <span className="map-tool-sep" />
         <ListButtons node={node} />
         <span className="map-tool-sep" />
@@ -118,8 +168,8 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
 
   return (
     <div
-      className={`map-text size-${node.size}${node.bg ? ` has-bg bg-${node.bg}` : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
-      style={node.bg ? { background: NOTE_COLOR_VALUES[node.bg] } : undefined}
+      className={`map-text look-${textLook(node.size)}${node.bg ? ` has-bg bg-${node.bg}` : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
+      style={{ fontSize: node.size, background: node.bg ? NOTE_COLOR_VALUES[node.bg] : undefined }}
       onDoubleClick={start}
     >
       <NodeResizer
@@ -131,17 +181,7 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
-        {SIZES.map((s) => (
-          <button
-            key={s.size}
-            className={`map-tool size-btn${s.size === node.size ? ' active' : ''}`}
-            onClick={() => updateMapNode(id, { size: s.size })}
-            aria-label={`Text size ${s.label}`}
-            title={`Text size ${s.label}`}
-          >
-            {s.label}
-          </button>
-        ))}
+        <TextSizeControl size={node.size} onChange={(size) => updateMapNode(id, { size })} />
         <span className="map-tool-sep" />
         <button
           className={`map-swatch none${node.bg ? '' : ' active'}`}

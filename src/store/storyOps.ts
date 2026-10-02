@@ -19,13 +19,13 @@ import type {
   StoryData,
   StoryElement,
   StoryGoals,
-  TextSize,
 } from '../types'
 import { IMAGE_ID, makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
+import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -716,7 +716,7 @@ export type MapNodePatch = Partial<{
   height: number
   text: string
   color: NoteColor
-  size: TextSize
+  size: number | undefined
   bg: NoteColor | undefined
   list: MapListStyle | undefined
   checked: number[]
@@ -823,6 +823,37 @@ export function removeMapNodes(data: StoryData, ids: string[]): StoryData {
         }
       : m,
   )
+}
+
+/** Cards and the lines between them, as copied from a map. */
+export interface CopiedMapItems {
+  nodes: MapNode[]
+  edges: MapEdge[]
+}
+
+/**
+ * Adds copied cards to a map, moved by `offset`, with the lines between them.
+ * Each card gets a new id (`idOf` picks it from the copied one's). The copies
+ * come from the clipboard, so they're checked the way a loaded save is: cards
+ * for things this story doesn't have are left out. Returns the new ids.
+ */
+export function pasteMapItems(
+  data: StoryData,
+  mapId: string,
+  items: { nodes?: unknown; edges?: unknown },
+  offset: { x: number; y: number },
+  idOf: (copiedId: string) => string = () => makeId('node'),
+): [StoryData, string[]] {
+  const target = data.mindMaps.find((m) => m.id === mapId)
+  if (!target) return [data, []]
+  const checked = normalizeStory({ ...data, mindMaps: [{ id: mapId, name: target.name, nodes: items.nodes, edges: items.edges }] })
+    .mindMaps[0]
+  const ids = new Map(checked.nodes.map((n) => [n.id, idOf(n.id)]))
+  const nodes = checked.nodes.map((n) => ({ ...n, id: ids.get(n.id)!, x: Math.round(n.x + offset.x), y: Math.round(n.y + offset.y) }))
+  if (!nodes.length) return [data, []]
+  const edges = checked.edges.map((e) => ({ ...e, id: makeId('edge'), source: ids.get(e.source)!, target: ids.get(e.target)! }))
+  const next = mapMaps(data, (m) => (m === target ? { ...m, nodes: [...m.nodes, ...nodes], edges: [...m.edges, ...edges] } : m))
+  return [next, nodes.map((n) => n.id)]
 }
 
 /** Where inside each card a new line attaches (see lib/anchors). */
@@ -1050,6 +1081,10 @@ export function normalizeStory(input: unknown): StoryData {
   }
   const num = (v: unknown, fallback: number, min = -1e7, max = 1e7) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
+  const sizeOf = (value: unknown) => {
+    const size = cleanTextSize(value)
+    return size === undefined ? {} : { size }
+  }
   /** A note's or text box's list style, and its ticked lines that still exist. */
   const listOf = (n: Record<string, unknown>, text: string): { list?: MapListStyle; checked?: number[] } => {
     const out: { list?: MapListStyle; checked?: number[] } = {}
@@ -1108,6 +1143,7 @@ export function normalizeStory(input: unknown): StoryData {
           height: num(n.height, 160, 60, 2000),
           text,
           color: NOTE_COLORS.includes(color) ? color : 'yellow',
+          ...sizeOf(n.size),
           ...listOf(n, text),
         })
       } else if (kind === 'image') {
@@ -1115,7 +1151,6 @@ export function normalizeStory(input: unknown): StoryData {
         if (!IMAGE_ID.test(imageId)) continue
         nodes.push({ id, kind, x, y, width: num(n.width, 240, 30, 4000), height: num(n.height, 180, 30, 4000), imageId })
       } else if (kind === 'text') {
-        const size = str(n.size) as TextSize
         const text = str(n.text)
         const node: MapNode = {
           id,
@@ -1124,7 +1159,8 @@ export function normalizeStory(input: unknown): StoryData {
           y,
           width: num(n.width, 280, 60, 3000),
           text,
-          size: size === 'sm' || size === 'lg' ? size : 'md',
+          // Saves from before sizes could be set say small, medium or large.
+          size: cleanTextSize(n.size) ?? TEXT_BOX_SIZE,
         }
         const bg = str(n.bg) as NoteColor
         if (NOTE_COLORS.includes(bg)) node.bg = bg

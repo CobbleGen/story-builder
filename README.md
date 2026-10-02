@@ -47,7 +47,9 @@ It has four views: the **chapter board**, the **manuscript**, the
   arcs, characters and beats onto it from the panel on the left (or click
   one to drop it in the middle); the cards show the live item and open it on
   double-click. Add sticky notes (double-click the empty board, pick a colour,
-  resize them) and text boxes in three sizes, both with `@` mentions. Notes
+  resize them) and text boxes, both with `@` mentions. Set their text size
+  from the toolbar: the − and + buttons, or type a size (bigger text in a text
+  box turns bolder, and from 28 up a serif title). Notes
   and text boxes can become a bulleted, numbered or tick-box list, and text
   boxes can have a background colour (white included). Drag from the dot on a card's edge to another card to draw a
   line, then select the line to label it or give it an arrow. Lines can also
@@ -56,10 +58,16 @@ It has four views: the **chapter board**, the **manuscript**, the
   dot at its side. Let go anywhere on a card or row to join it. While that row
   isn't showing (card closed, scrolled away, another page) its lines attach to
   the card, and a paragraph's lines follow it when text is added above it.
-  Lines pass under every card except the two they join, and over sticky notes
-  and pictures (which sit under the other cards, as a backdrop). Pan by dragging
+  Lines pass under every card, sticky note and picture except the two they
+  join. Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
+- **Copy and paste on the map**: select cards (click; Ctrl-click or
+  Shift-drag for several) and press Ctrl+C, Ctrl+X or Ctrl+V (⌘ on a Mac) to
+  copy, cut and paste them, with the lines between them, on the same map or
+  another. Pasted cards land a step down and to the right (cut ones go back
+  where they were) and come selected, ready to drag. Copied cards pasted into
+  a text field, or another app, give their words.
 - **Pictures**: on the mind map, use **Picture** in the left panel, or drop
   picture files on the board, or paste one. A picture is a card: resize it
   from its corners (it keeps its shape), draw lines to it, double-click it to

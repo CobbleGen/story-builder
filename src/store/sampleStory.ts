@@ -206,7 +206,7 @@ export function buildSampleStory(): StoryData {
     ;[data, id] = addMapEdge(data, a, b)
     if (id) data = updateMapEdge(data, id, { label })
   }
-  place({ kind: 'text', x: -40, y: -230, width: 360, text: 'Who knows what at Gull Point', size: 'lg' })
+  place({ kind: 'text', x: -40, y: -230, width: 360, text: 'Who knows what at Gull Point', size: 34 })
   const nMara = place({ kind: 'character', refId: mara, x: 0, y: 0 })
   const nTheo = place({ kind: 'character', refId: theo, x: 340, y: -40 })
   const nElias = place({ kind: 'character', refId: elias, x: -360, y: 40 })
