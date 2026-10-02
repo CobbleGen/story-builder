@@ -49,6 +49,8 @@ interface StoryActions {
   moveMapNodes: (...args: Tail<Parameters<typeof ops.moveMapNodes>>) => void
   removeMapNodes: (...args: Tail<Parameters<typeof ops.removeMapNodes>>) => void
   pasteMapItems: (...args: Tail<Parameters<typeof ops.pasteMapItems>>) => string[]
+  dropMapNodes: (...args: Tail<Parameters<typeof ops.dropMapNodes>>) => void
+  setContainerLayout: (...args: Tail<Parameters<typeof ops.setContainerLayout>>) => void
   addMapEdge: (...args: Tail<Parameters<typeof ops.addMapEdge>>) => string | null
   updateMapEdge: (...args: Tail<Parameters<typeof ops.updateMapEdge>>) => void
   removeMapEdges: (...args: Tail<Parameters<typeof ops.removeMapEdges>>) => void
@@ -147,6 +149,8 @@ export const useStory = create<StoryStore>()(
         updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0]),
         moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a), 'moveMapNodes', a[0]),
         removeMapNodes: (...a) => apply(ops.removeMapNodes(data(), ...a), 'removeMapNodes', a[0]),
+        dropMapNodes: (...a) => apply(ops.dropMapNodes(data(), ...a), 'dropMapNodes'),
+        setContainerLayout: (...a) => apply(ops.setContainerLayout(data(), ...a), 'setContainerLayout', a[0]),
         pasteMapItems: (...a) => {
           const [next, ids] = ops.pasteMapItems(data(), ...a)
           apply(next, 'pasteMapItems')

@@ -2,7 +2,7 @@ import { useEffect, type RefObject } from 'react'
 import { useReactFlow, useStoreApi } from '@xyflow/react'
 import type { MapNode, StoryData } from '../types'
 import { useStory } from '../store/storyStore'
-import { mentionables, type CopiedMapItems } from '../store/storyOps'
+import { mentionables, parentOf, type CopiedMapItems } from '../store/storyOps'
 import { displayName, lookupOf, plainText } from '../lib/mentions'
 import { makeId } from '../lib/id'
 import { picturesIn } from '../lib/pictures'
@@ -77,11 +77,23 @@ export function useMapClipboard({ mapId, wrapper, addPictures, select }: Options
     let pasting = false
 
     const copySelected = () => {
-      const ids = new Set(flowStore.getState().nodes.filter((n) => n.selected).map((n) => n.id))
+      const flow = flowStore.getState()
+      const ids = new Set(flow.nodes.filter((n) => n.selected).map((n) => n.id))
       const data = useStory.getState()
       const map = data.mindMaps.find((m) => m.id === mapId)
-      const nodes = map?.nodes.filter((n) => ids.has(n.id)) ?? []
-      if (!map || !nodes.length) return null
+      if (!map) return null
+      // A container comes with the cards on it.
+      for (const n of map.nodes) if (ids.has(parentOf(n) ?? '')) ids.add(n.id)
+      const nodes = map.nodes
+        .filter((n) => ids.has(n.id))
+        .map((n) => {
+          // Where it's shown (cards stacked on a container are laid out there).
+          const shown = flow.nodeLookup.get(n.id)?.position
+          const copy = (shown ? { ...n, x: Math.round(shown.x), y: Math.round(shown.y) } : { ...n }) as MapNode & { parentId?: string }
+          if (copy.parentId && !ids.has(copy.parentId)) delete copy.parentId
+          return copy as MapNode
+        })
+      if (!nodes.length) return null
       const edges = map.edges.filter((e) => ids.has(e.source) && ids.has(e.target))
       return { items: { nodes, edges }, text: textOf(data, nodes) }
     }

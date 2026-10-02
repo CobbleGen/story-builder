@@ -176,16 +176,17 @@
 
 .palette-tools {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .palette-tool {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 11px 8px 9px;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  white-space: nowrap;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
@@ -202,6 +203,61 @@
 
 .palette-tool.picture {
   cursor: pointer;
+}
+
+.palette-tool svg {
+  flex: none;
+}
+
+.palette-tool:nth-child(3) svg {
+  color: #4f86c6;
+}
+
+/* ---------- Containers ---------- */
+
+/* A see-through area under the cards put on it. */
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1.5px solid color-mix(in srgb, var(--box) 80%, var(--ink-3));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--box) 34%, transparent);
+  transition: background 0.12s, box-shadow 0.12s;
+}
+
+/* On the dark board the colours are a softer wash. */
+:root[data-theme='dark'] .map-container {
+  border-color: color-mix(in srgb, var(--box) 45%, var(--line));
+  background: color-mix(in srgb, var(--box) 20%, transparent);
+}
+
+:root[data-theme='dark'] .map-container.drop-target {
+  background: color-mix(in srgb, var(--box) 32%, transparent);
+}
+
+.map-container.drop-target {
+  background: color-mix(in srgb, var(--box) 52%, transparent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.react-flow__node.selected > .map-container {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.map-canvas.connecting .react-flow__node:hover > .map-container {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.map-container-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--box) 30%, var(--ink-3));
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
 }
 
 .palette-tool.picture svg {
@@ -1535,7 +1591,7 @@
    tools go on top of everything. */
 .map-edge-label-wrap {
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   pointer-events: all;
 }
 

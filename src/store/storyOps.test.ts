@@ -45,6 +45,9 @@ import {
   updateBeat,
   setPortrait,
   pasteMapItems,
+  dropMapNodes,
+  setContainerLayout,
+  parentOf,
 } from './storyOps'
 import { timeJumps } from '../lib/timeline'
 import { buildSampleStory } from './sampleStory'
@@ -919,5 +922,95 @@ describe('copy and paste on the map', () => {
     expect(next.mindMaps[0].nodes[0]).toMatchObject({ kind: 'note', text: 'Keep me', color: 'pink', size: 22, x: 10, y: 10 })
     expect(next.mindMaps[0].edges).toHaveLength(0)
     expect(pasteMapItems(data, mapId, { nodes: 'junk' }, { x: 0, y: 0 })).toEqual([data, []])
+  })
+})
+
+describe('containers on the map', () => {
+  const setup = () => {
+    let data = emptyStory()
+    const mapId = data.mindMaps[0].id
+    const add = (node: Parameters<typeof addMapNode>[1], before?: string | null) => {
+      const [next, id] = addMapNode(data, node, mapId, before)
+      data = next
+      return id!
+    }
+    const box = add({ kind: 'container', x: 0, y: 0, width: 300, height: 200, color: 'blue', layout: 'vertical' })
+    const a = add({ kind: 'note', x: 10, y: 10, width: 100, height: 80, text: 'A', color: 'yellow', parentId: box })
+    const b = add({ kind: 'note', x: 10, y: 100, width: 100, height: 80, text: 'B', color: 'yellow', parentId: box })
+    const c = add({ kind: 'note', x: 500, y: 0, width: 100, height: 80, text: 'C', color: 'yellow' })
+    return { get data() { return data }, set data(d) { data = d }, add, mapId, box, a, b, c }
+  }
+  const order = (data: StoryData, box: string) =>
+    data.mindMaps[0].nodes.filter((n) => parentOf(n) === box).map((n) => ('text' in n ? n.text : n.id))
+
+  it('puts cards on a container, in order, and ignores ones that aren’t containers', () => {
+    const t = setup()
+    expect(order(t.data, t.box)).toEqual(['A', 'B'])
+    const first = t.add({ kind: 'note', x: 0, y: 0, width: 100, height: 80, text: 'Z', color: 'pink', parentId: t.box }, t.a)
+    expect(order(t.data, t.box)).toEqual(['Z', 'A', 'B'])
+    const stray = t.add({ kind: 'note', x: 0, y: 0, width: 100, height: 80, text: 'Q', color: 'pink', parentId: t.c })
+    expect(parentOf(t.data.mindMaps[0].nodes.find((n) => n.id === stray)!)).toBeUndefined()
+    expect(first).toBeTruthy()
+  })
+
+  it('drops cards onto, along and off a container', () => {
+    const t = setup()
+    t.data = dropMapNodes(t.data, [{ id: t.c, x: 20, y: 0, parentId: t.box, before: t.a }])
+    expect(order(t.data, t.box)).toEqual(['C', 'A', 'B'])
+    t.data = dropMapNodes(t.data, [{ id: t.c, x: 20, y: 300, before: null }])
+    expect(order(t.data, t.box)).toEqual(['A', 'B', 'C'])
+    t.data = dropMapNodes(t.data, [{ id: t.a, x: 900, y: 900, parentId: null }])
+    expect(order(t.data, t.box)).toEqual(['B', 'C'])
+    expect(t.data.mindMaps[0].nodes.find((n) => n.id === t.a)).toMatchObject({ x: 900, y: 900 })
+    // A container never goes on another one
+    t.data = dropMapNodes(t.data, [{ id: t.box, x: 5, y: 5, parentId: t.box }])
+    expect(parentOf(t.data.mindMaps[0].nodes.find((n) => n.id === t.box)!)).toBeUndefined()
+  })
+
+  it('stacks cards in the order they’re in on screen when it stops being freeform', () => {
+    const t = setup()
+    t.data = setContainerLayout(t.data, t.box, 'free', { [t.a]: { x: 40, y: 150 }, [t.b]: { x: 40, y: 20 } })
+    expect(t.data.mindMaps[0].nodes.find((n) => n.id === t.box)).toMatchObject({ layout: 'free' })
+    expect(t.data.mindMaps[0].nodes.find((n) => n.id === t.a)).toMatchObject({ x: 40, y: 150 })
+    expect(order(t.data, t.box)).toEqual(['A', 'B'])
+    t.data = setContainerLayout(t.data, t.box, 'vertical')
+    expect(order(t.data, t.box)).toEqual(['B', 'A'])
+  })
+
+  it('leaves a removed container’s cards on the map, where they were shown', () => {
+    const t = setup()
+    t.data = removeMapNodes(t.data, [t.box], { [t.a]: { x: 16, y: 16 } })
+    const nodes = t.data.mindMaps[0].nodes
+    expect(nodes.map((n) => n.id)).toEqual([t.a, t.b, t.c])
+    expect(nodes.every((n) => parentOf(n) === undefined)).toBe(true)
+    expect(nodes[0]).toMatchObject({ x: 16, y: 16 })
+  })
+
+  it('pastes a container with its cards, and loads them back', () => {
+    const t = setup()
+    const copied = { nodes: t.data.mindMaps[0].nodes.filter((n) => n.id !== t.c), edges: [] }
+    const [next, ids] = pasteMapItems(t.data, t.mapId, copied, { x: 40, y: 40 })
+    const pasted = next.mindMaps[0].nodes.filter((n) => ids.includes(n.id))
+    expect(pasted.map((n) => n.kind)).toEqual(['container', 'note', 'note'])
+    expect(pasted.slice(1).map(parentOf)).toEqual([ids[0], ids[0]])
+    expect(normalizeStory(next)).toEqual(next)
+  })
+
+  it('repairs containers and what’s on them when loading', () => {
+    const loaded = normalizeStory({
+      mindMap: {
+        nodes: [
+          { id: 'box', kind: 'container', x: 0, y: 0, width: 5, height: 'tall', color: 'neon', layout: 'diagonal', parentId: 'box2' },
+          { id: 'box2', kind: 'container', x: 0, y: 0, width: 400, height: 300, color: 'green', layout: 'free' },
+          { id: 'n1', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'box' },
+          { id: 'n2', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'n1' },
+          { id: 'n3', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'gone' },
+        ],
+      },
+    })
+    const [box, box2, n1, n2, n3] = loaded.mindMaps[0].nodes
+    expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, width: 80, height: 260, color: 'blue', layout: 'vertical' })
+    expect(box2).toMatchObject({ color: 'green', layout: 'free' })
+    expect([n1, n2, n3].map(parentOf)).toEqual(['box', undefined, undefined])
   })
 })

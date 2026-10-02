@@ -87,6 +87,8 @@ const LABELS: Record<string, string> = {
   updateMapNode: 'edit map card',
   moveMapNodes: 'move map cards',
   removeMapNodes: 'remove from map',
+  dropMapNodes: 'move map cards',
+  setContainerLayout: 'change container layout',
   pasteMapItems: 'paste',
   addMapEdge: 'draw line',
   updateMapEdge: 'edit line',

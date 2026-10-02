@@ -59,9 +59,16 @@ It has four views: the **chapter board**, the **manuscript**, the
   isn't showing (card closed, scrolled away, another page) its lines attach to
   the card, and a paragraph's lines follow it when text is added above it.
   Lines pass under every card, sticky note and picture except the two they
-  join. Pan by dragging
+  join (and over containers). Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
+- **Containers**: add one from the panel (**Container**), then drop cards on
+  it (from the map or the panel) to put them on it; drag a card off to take
+  it off. Moving a container moves everything on it. By default its cards
+  stack downwards; its toolbar switches to side by side, or freeform, where
+  cards stay wherever they're put. Resize it from its edges (stacked cards
+  never spill out; it grows to fit them) and give it a colour. Deleting a
+  container leaves its cards on the map.
 - **Copy and paste on the map**: select cards (click; Ctrl-click or
   Shift-drag for several) and press Ctrl+C, Ctrl+X or Ctrl+V (⌘ on a Mac) to
   copy, cut and paste them, with the lines between them, on the same map or
@@ -173,6 +180,8 @@ any static host or sub-folder.
   flashbacks are found
 - `src/pages/WritePage.tsx` and `src/editor/`: the manuscript editor (TipTap),
   its beat links, mentions and beats checklist
+- `src/map/containers.ts`: how cards stack on containers, move with them, and
+  go onto and off them when dropped
 - `src/map/`: the mind map (React Flow canvas, its cards, notes, lines and
   the add-to-map panel)
 - `src/store/persistence.ts`: saving to IndexedDB (batched writes, migration

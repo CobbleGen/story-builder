@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext } from 'react'
 import { Position, useNodeId, useStore, useUpdateNodeInternals, type Node } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStory } from '../store/storyStore'
-import type { MapNode, NoteColor } from '../types'
+import type { MapNode, MapSize, NoteColor } from '../types'
 import type { NewMapNode } from '../store/storyOps'
 import { TEXT_BOX_SIZE } from '../lib/textSize'
 
@@ -13,11 +13,13 @@ export type PaletteItem =
   | { kind: 'arc' | 'chapter' | 'character' | 'element' | 'beat'; refId: string }
   | { kind: 'note' }
   | { kind: 'text' }
+  | { kind: 'container' }
 
 /** A palette item as a new card at a position (top-left corner). */
 export function newNodeFor(item: PaletteItem, x: number, y: number): NewMapNode {
   if (item.kind === 'note') return { kind: 'note', x, y, width: 220, height: 160, text: '', color: 'yellow' }
   if (item.kind === 'text') return { kind: 'text', x, y, width: 280, text: '', size: TEXT_BOX_SIZE }
+  if (item.kind === 'container') return { kind: 'container', x, y, width: 360, height: 260, color: 'blue', layout: 'vertical' }
   return { kind: item.kind, refId: item.refId, x, y }
 }
 
@@ -25,6 +27,7 @@ export function newNodeFor(item: PaletteItem, x: number, y: number): NewMapNode 
 export const NEW_NODE_CENTER: Record<PaletteItem['kind'], { x: number; y: number }> = {
   note: { x: 110, y: 80 },
   text: { x: 140, y: 20 },
+  container: { x: 180, y: 130 },
   arc: { x: 120, y: 40 },
   chapter: { x: 120, y: 50 },
   character: { x: 120, y: 40 },
@@ -42,7 +45,15 @@ export const NOTE_COLOR_VALUES: Record<NoteColor, string> = {
   white: '#ffffff',
 }
 
-export type StoryFlowNode = Node<{ node: MapNode }, MapNode['kind']>
+export type StoryFlowNode = Node<
+  {
+    node: MapNode
+    /** On a container: the room the cards stacked on it take up, and how many cards are on it. */
+    content?: MapSize
+    count?: number
+  },
+  MapNode['kind']
+>
 
 interface MapContextValue {
   /** The note or text box being typed in, if any. */
@@ -51,6 +62,8 @@ interface MapContextValue {
   /** Opens the story item behind a card (its page, the manuscript, the beat). */
   openItem: (node: MapNode) => void
   removeNode: (id: string) => void
+  /** The container a dragged card would go onto if let go now. */
+  dropTarget: string | null
 }
 
 export const MapContext = createContext<MapContextValue>({
@@ -58,6 +71,7 @@ export const MapContext = createContext<MapContextValue>({
   setEditingId: () => {},
   openItem: () => {},
   removeNode: () => {},
+  dropTarget: null,
 })
 
 export const useMap = () => useContext(MapContext)

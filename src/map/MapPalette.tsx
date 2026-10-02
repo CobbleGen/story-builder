@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { ChevronRight, ImagePlus, PanelLeftClose, Search, StickyNote, Type } from 'lucide-react'
+import { ChevronRight, ImagePlus, PanelLeftClose, Search, SquareDashed, StickyNote, Type } from 'lucide-react'
 import type { Beat } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -100,6 +100,7 @@ export function MapPalette({ onMap, onAdd, onAddPictures }: Props) {
       <div className="palette-tools">
         <PaletteToolTile item={{ kind: 'note' }} onAdd={onAdd} icon={<StickyNote size={18} />} label="Sticky note" />
         <PaletteToolTile item={{ kind: 'text' }} onAdd={onAdd} icon={<Type size={18} />} label="Text" />
+        <PaletteToolTile item={{ kind: 'container' }} onAdd={onAdd} icon={<SquareDashed size={18} />} label="Container" />
         <button className="palette-tool picture" onClick={() => fileInput.current?.click()} title="Add pictures from your device (you can also drop or paste them on the map)">
           <ImagePlus size={18} />
           Picture

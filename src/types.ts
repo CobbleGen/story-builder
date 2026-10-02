@@ -93,6 +93,8 @@ export interface ChapterText {
 /** Story items that can be placed on the mind map; the card shows the live item. */
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'element' | 'beat'
 export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
+/** How a container lays out the cards on it: in a column, in a row, or wherever they're put. */
+export type ContainerLayout = 'vertical' | 'horizontal' | 'free'
 /** A text box shown as a list: each line is an item. */
 export type MapListStyle = 'bullet' | 'number' | 'check'
 /** What an opened-up card shows: a chapter's pages, the beats of a chapter or arc, or a character's details. */
@@ -114,6 +116,8 @@ export type MapNode =
       expanded?: MapCardView
       /** Sizes the writer gave the card while opened up, per view. */
       sizes?: Partial<Record<MapCardView, MapSize>>
+      /** The container it's on, if any. */
+      parentId?: string
     }
   | {
       id: string
@@ -129,6 +133,7 @@ export type MapNode =
       list?: MapListStyle
       /** Ticked items of a checklist, by line. */
       checked?: number[]
+      parentId?: string
     }
   | {
       id: string
@@ -144,6 +149,7 @@ export type MapNode =
       list?: MapListStyle
       /** Ticked items of a checklist, by line. */
       checked?: number[]
+      parentId?: string
     }
   | {
       id: string
@@ -154,6 +160,23 @@ export type MapNode =
       height: number
       /** The picture, in the picture store (store/images). */
       imageId: string
+      parentId?: string
+    }
+  | {
+      /**
+       * A see-through area that cards are put on: they move with it, and
+       * stack in a column or a row unless it's freeform. Cards on it say so
+       * with their parentId; in a column or row, they go in the map's order.
+       */
+      id: string
+      kind: 'container'
+      x: number
+      y: number
+      /** The size it was given; it grows to fit cards stacked on it. */
+      width: number
+      height: number
+      color: NoteColor
+      layout: ContainerLayout
     }
 
 /** A line between two things on the mind map. */

@@ -9,6 +9,7 @@ import type {
   ElementKind,
   MapCardView,
   MapEdge,
+  ContainerLayout,
   MapEntityKind,
   MapListStyle,
   MapNode,
@@ -720,11 +721,44 @@ export type MapNodePatch = Partial<{
   bg: NoteColor | undefined
   list: MapListStyle | undefined
   checked: number[]
+  layout: ContainerLayout
   expanded: MapCardView | undefined
   sizes: Partial<Record<MapCardView, MapSize>>
 }>
 
 const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refId' in n
+
+export const CONTAINER_LAYOUTS: ContainerLayout[] = ['vertical', 'horizontal', 'free']
+export const isContainer = (n: MapNode | NewMapNode): n is Extract<MapNode, { kind: 'container' }> => n.kind === 'container'
+/** The container a card is on, if any. */
+export const parentOf = (n: MapNode | NewMapNode): string | undefined => ('parentId' in n ? n.parentId : undefined)
+
+/** A card put on a container (or taken off, with undefined); containers don't go on containers. */
+function withParent<T extends MapNode>(node: T, parentId: string | undefined): T {
+  if (isContainer(node)) return node
+  if (parentId) return { ...node, parentId }
+  const rest = { ...node } as T & { parentId?: string }
+  delete rest.parentId
+  return rest
+}
+
+/**
+ * Moves a card in its map's list of cards, which is also the order cards
+ * stack in on a container: before the card `before`, or (null) after the
+ * last other card on its container.
+ */
+function placeAmong(nodes: MapNode[], id: string, before: string | null): MapNode[] {
+  const node = nodes.find((n) => n.id === id)
+  if (!node) return nodes
+  const rest = nodes.filter((n) => n.id !== id)
+  let at = before ? rest.findIndex((n) => n.id === before) : -1
+  if (at === -1) {
+    const parent = parentOf(node)
+    const last = rest.findLastIndex((n) => parent !== undefined && parentOf(n) === parent)
+    at = last === -1 ? rest.length : last + 1
+  }
+  return [...rest.slice(0, at), node, ...rest.slice(at)]
+}
 
 function refExists(data: StoryData, node: NewMapNode): boolean {
   if (!('refId' in node)) return true
@@ -781,12 +815,26 @@ function dropMapRefs(data: StoryData, refIds: Set<string>): StoryData {
   })
 }
 
-/** Adds a card to a map (the first map if none is given). */
-export function addMapNode(data: StoryData, node: NewMapNode, mapId?: string): [StoryData, string | null] {
+/**
+ * Adds a card to a map (the first map if none is given). One put on a
+ * container goes before the card `before` there, or at the end.
+ */
+export function addMapNode(
+  data: StoryData,
+  node: NewMapNode,
+  mapId?: string,
+  before: string | null = null,
+): [StoryData, string | null] {
   const target = data.mindMaps.find((m) => m.id === mapId) ?? data.mindMaps[0]
   if (!target || !refExists(data, node)) return [data, null]
-  const full = { ...node, id: makeId('node') } as MapNode
-  return [mapMaps(data, (m) => (m === target ? { ...m, nodes: [...m.nodes, full] } : m)), full.id]
+  const parent = parentOf(node)
+  const onContainer = !!parent && target.nodes.some((n) => n.id === parent && isContainer(n))
+  const full = withParent({ ...node, id: makeId('node') } as MapNode, onContainer ? parent : undefined)
+  const add = (m: MindMap) => {
+    const nodes = [...m.nodes, full]
+    return { ...m, nodes: onContainer ? placeAmong(nodes, full.id, before) : nodes }
+  }
+  return [mapMaps(data, (m) => (m === target ? add(m) : m)), full.id]
 }
 
 export function updateMapNode(data: StoryData, id: string, patch: MapNodePatch): StoryData {
@@ -811,14 +859,84 @@ export function moveMapNodes(data: StoryData, moves: Record<string, { x: number;
   })
 }
 
-/** Takes cards off their maps (never deletes the story items), with their lines. */
-export function removeMapNodes(data: StoryData, ids: string[]): StoryData {
+/** Where a dragged card ends up. */
+export interface MapDrop {
+  id: string
+  x: number
+  y: number
+  /** The container it's now on (null for none); unchanged when absent. */
+  parentId?: string | null
+  /** On a column or row: the card it goes before (null for the end); its place is kept when absent. */
+  before?: string | null
+}
+
+/** The end of a drag: cards move, and go onto, along or off containers. */
+export function dropMapNodes(data: StoryData, drops: MapDrop[]): StoryData {
+  const byId = new Map(drops.map((d) => [d.id, d]))
+  return mapMaps(data, (m) => {
+    if (!m.nodes.some((n) => byId.has(n.id))) return m
+    const containers = new Set(m.nodes.filter(isContainer).map((n) => n.id))
+    let nodes = m.nodes.map((n) => {
+      const drop = byId.get(n.id)
+      if (!drop) return n
+      const moved = { ...n, x: drop.x, y: drop.y } as MapNode
+      if (drop.parentId === undefined) return moved
+      return withParent(moved, drop.parentId && drop.parentId !== n.id && containers.has(drop.parentId) ? drop.parentId : undefined)
+    })
+    for (const drop of drops) {
+      if (drop.before !== undefined && drop.before !== drop.id) nodes = placeAmong(nodes, drop.id, drop.before)
+    }
+    return { ...m, nodes }
+  })
+}
+
+/**
+ * Changes how a container lays out its cards. `positions` are where its cards
+ * are on screen now, so they stay put when it becomes freeform; when it stacks
+ * them, they go in the order they're in now, down or across.
+ */
+export function setContainerLayout(
+  data: StoryData,
+  id: string,
+  layout: ContainerLayout,
+  positions: Record<string, { x: number; y: number }> = {},
+): StoryData {
+  if (!CONTAINER_LAYOUTS.includes(layout)) return data
+  return mapMaps(data, (m) => {
+    if (!m.nodes.some((n) => n.id === id && isContainer(n))) return m
+    let nodes = m.nodes.map((n) => {
+      if (n.id === id) return { ...n, layout } as MapNode
+      const at = positions[n.id]
+      return at && parentOf(n) === id ? { ...n, x: Math.round(at.x), y: Math.round(at.y) } : n
+    })
+    if (layout !== 'free') {
+      const key = (n: MapNode) => (layout === 'vertical' ? [n.y, n.x] : [n.x, n.y])
+      const sorted = nodes.filter((n) => parentOf(n) === id).sort((a, b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1])
+      let k = 0
+      nodes = nodes.map((n) => (parentOf(n) === id ? sorted[k++] : n))
+    }
+    return { ...m, nodes }
+  })
+}
+
+/**
+ * Takes cards off their maps (never deletes the story items), with their
+ * lines. Cards on a container that goes stay on the map, at `place` if given.
+ */
+export function removeMapNodes(data: StoryData, ids: string[], place: Record<string, { x: number; y: number }> = {}): StoryData {
   const gone = new Set(ids)
   return mapMaps(data, (m) =>
     m.nodes.some((n) => gone.has(n.id))
       ? {
           ...m,
-          nodes: m.nodes.filter((n) => !gone.has(n.id)),
+          nodes: m.nodes
+            .filter((n) => !gone.has(n.id))
+            .map((n) => {
+              const parent = parentOf(n)
+              if (!parent || !gone.has(parent)) return n
+              const at = place[n.id]
+              return withParent(at ? ({ ...n, x: Math.round(at.x), y: Math.round(at.y) } as MapNode) : n, undefined)
+            }),
           edges: m.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
         }
       : m,
@@ -849,7 +967,11 @@ export function pasteMapItems(
   const checked = normalizeStory({ ...data, mindMaps: [{ id: mapId, name: target.name, nodes: items.nodes, edges: items.edges }] })
     .mindMaps[0]
   const ids = new Map(checked.nodes.map((n) => [n.id, idOf(n.id)]))
-  const nodes = checked.nodes.map((n) => ({ ...n, id: ids.get(n.id)!, x: Math.round(n.x + offset.x), y: Math.round(n.y + offset.y) }))
+  const nodes = checked.nodes.map((n) => {
+    const parent = parentOf(n)
+    const moved = { ...n, id: ids.get(n.id)!, x: Math.round(n.x + offset.x), y: Math.round(n.y + offset.y) } as MapNode
+    return parent ? withParent(moved, ids.get(parent)) : moved
+  })
   if (!nodes.length) return [data, []]
   const edges = checked.edges.map((e) => ({ ...e, id: makeId('edge'), source: ids.get(e.source)!, target: ids.get(e.target)! }))
   const next = mapMaps(data, (m) => (m === target ? { ...m, nodes: [...m.nodes, ...nodes], edges: [...m.edges, ...edges] } : m))
@@ -1110,8 +1232,10 @@ export function normalizeStory(input: unknown): StoryData {
     if (seenMaps.has(mapId)) mapId = makeId('map')
     seenMaps.add(mapId)
     const nodes: MapNode[] = []
+    const parents = new Map<string, string>()
     for (const n of list(rawMap.nodes)) {
       const id = str(n.id) || makeId('node')
+      if (typeof n.parentId === 'string') parents.set(id, n.parentId)
       const x = num(n.x, 0)
       const y = num(n.y, 0)
       const kind = str(n.kind)
@@ -1150,6 +1274,19 @@ export function normalizeStory(input: unknown): StoryData {
         const imageId = str(n.imageId)
         if (!IMAGE_ID.test(imageId)) continue
         nodes.push({ id, kind, x, y, width: num(n.width, 240, 30, 4000), height: num(n.height, 180, 30, 4000), imageId })
+      } else if (kind === 'container') {
+        const color = str(n.color) as NoteColor
+        const layout = str(n.layout) as ContainerLayout
+        nodes.push({
+          id,
+          kind,
+          x,
+          y,
+          width: num(n.width, 360, 80, 8000),
+          height: num(n.height, 260, 60, 8000),
+          color: NOTE_COLORS.includes(color) ? color : 'blue',
+          layout: CONTAINER_LAYOUTS.includes(layout) ? layout : 'vertical',
+        })
       } else if (kind === 'text') {
         const text = str(n.text)
         const node: MapNode = {
@@ -1166,6 +1303,12 @@ export function normalizeStory(input: unknown): StoryData {
         if (NOTE_COLORS.includes(bg)) node.bg = bg
         nodes.push({ ...node, ...listOf(n, text) })
       }
+    }
+    // Cards on a container that's on this map (not another container).
+    const containerIds = new Set(nodes.filter(isContainer).map((n) => n.id))
+    for (const node of nodes) {
+      const parent = parents.get(node.id)
+      if (parent && containerIds.has(parent) && !isContainer(node)) (node as { parentId?: string }).parentId = parent
     }
     const nodeIds = new Set(nodes.map((n) => n.id))
     const edges: MapEdge[] = list(rawMap.edges)
@@ -1199,6 +1342,10 @@ export function normalizeStory(input: unknown): StoryData {
         n.id = fresh
       }
       seenNodes.add(n.id)
+    }
+    for (const n of nodes) {
+      const parent = parentOf(n)
+      if (parent && renamed.has(parent)) (n as { parentId?: string }).parentId = renamed.get(parent)
     }
     const mapEdges = edges.map((e) =>
       renamed.size ? { ...e, source: renamed.get(e.source) ?? e.source, target: renamed.get(e.target) ?? e.target } : e,

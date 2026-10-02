@@ -22,12 +22,15 @@ import './map.css'
 import { PanelLeftOpen } from 'lucide-react'
 import type { MapNode, MindMap } from '../types'
 import { useStory } from '../store/storyStore'
+import { parentOf, type NewMapNode } from '../store/storyOps'
 import { anchorOfHandle } from '../lib/anchors'
 import { useResolvedTheme } from '../lib/theme'
 import { useUi } from '../store/uiStore'
 import { ArcNode, BeatNode, ChapterNode, CharacterNode, ElementNode } from './EntityNodes'
 import { NoteNode, TextNode } from './NoteNodes'
 import { PictureNode } from './PictureNode'
+import { ContainerNode } from './ContainerNode'
+import { arrange, carryCards, placeOnContainer, planDrops } from './containers'
 import { addPicture, picturesIn } from '../lib/pictures'
 import { askConfirm } from '../lib/confirm'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
@@ -53,6 +56,7 @@ const nodeTypes = {
   note: NoteNode,
   text: TextNode,
   image: PictureNode,
+  container: ContainerNode,
 }
 const edgeTypes = { story: StoryEdge }
 
@@ -67,15 +71,23 @@ const FIT_VIEW: FitViewOptions = {
 }
 
 /**
- * How the map stacks, bottom up: lines, then sticky notes and pictures (often
- * used as a backdrop), then cards, and an opened-up card over its neighbours.
- * So lines pass under everything but the cards they join (StoryEdge draws
- * that bit on top).
+ * How the map stacks, bottom up: containers, lines, then sticky notes and
+ * pictures (often used as a backdrop), then cards, and an opened-up card over
+ * its neighbours. So lines pass under everything but the cards they join
+ * (StoryEdge draws that bit on top), and over containers. Selecting lifts a
+ * card by 1000, so containers start well below that and stay at the bottom.
  */
-const LAYER = { line: 0, backdrop: 1, card: 2, opened: 3 }
+const LAYER = { container: -1000, line: 1, backdrop: 2, card: 3, opened: 4 }
 
 const isBackdrop = (n: MapNode) => n.kind === 'note' || n.kind === 'image'
-const layerOf = (n: MapNode) => (isBackdrop(n) ? LAYER.backdrop : 'expanded' in n && n.expanded ? LAYER.opened : LAYER.card)
+const layerOf = (n: MapNode) =>
+  n.kind === 'container'
+    ? LAYER.container
+    : isBackdrop(n)
+      ? LAYER.backdrop
+      : 'expanded' in n && n.expanded
+        ? LAYER.opened
+        : LAYER.card
 
 /**
  * Story map nodes as React Flow nodes, keeping React Flow's own state
@@ -94,7 +106,7 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[], select?: Set<string>
       measured: was?.measured,
       zIndex: layerOf(n),
     }
-    if (isBackdrop(n)) return { ...node, width: n.width, height: n.height }
+    if (isBackdrop(n) || n.kind === 'container') return { ...node, width: n.width, height: n.height }
     if (n.kind === 'text') return { ...node, width: n.width }
     // An opened-up card keeps the size it was given for that view.
     const size = n.expanded ? n.sizes?.[n.expanded] : undefined
@@ -156,7 +168,7 @@ export default function MapPage() {
 
 function MapCanvas({ mindMap }: { mindMap: MindMap }) {
   const addMapNode = useStory((s) => s.addMapNode)
-  const moveMapNodes = useStory((s) => s.moveMapNodes)
+  const dropMapNodes = useStory((s) => s.dropMapNodes)
   const removeMapNodes = useStory((s) => s.removeMapNodes)
   const addMapEdge = useStory((s) => s.addMapEdge)
   const removeMapEdges = useStory((s) => s.removeMapEdges)
@@ -190,7 +202,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
   const [selectNext, setSelectNext] = useState<Set<string> | null>(null)
   if (synced !== mindMap.nodes) {
     setSynced(mindMap.nodes)
-    setNodes((prev) => toFlow(mindMap.nodes, prev, selectNext))
+    setNodes((prev) => arrange(toFlow(mindMap.nodes, prev, selectNext)))
     if (selectNext) {
       setSelectNext(null)
       setEdgeSelection({})
@@ -227,9 +239,43 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     [mindMap.nodes],
   )
 
+  // Cards stacked on containers are laid out again whenever anything moves or changes size.
   const onNodesChange = useCallback((changes: NodeChange<StoryFlowNode>[]) => {
-    setNodes((prev) => applyNodeChanges(changes, prev))
+    setNodes((prev) => arrange(carryCards(changes, prev, applyNodeChanges(changes, prev))))
   }, [])
+
+  // While a card is dragged, the container it would go onto (the one under the pointer) shows it.
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const pointerAt = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const p = 'changedTouches' in event ? event.changedTouches[0] : event
+      return screenToFlowPosition({ x: p.clientX, y: p.clientY })
+    },
+    [screenToFlowPosition],
+  )
+  const showDropTarget = useCallback(
+    (event: MouseEvent | TouchEvent, _held: StoryFlowNode, dragged: StoryFlowNode[]) => {
+      if (dragged.some((n) => n.type === 'container')) return setDropTarget(null)
+      const { parentId } = placeOnContainer(nodesRef.current, pointerAt(event), new Set(dragged.map((n) => n.id)))
+      setDropTarget(parentId)
+    },
+    [pointerAt],
+  )
+
+  /**
+   * Taking cards off the map; the cards on a container that goes stay where
+   * they're shown. Asked for by the Delete key, a card's own delete button, or cutting.
+   */
+  const removeCards = useCallback(
+    (ids: string[]) => {
+      const gone = new Set(ids)
+      const place = Object.fromEntries(
+        nodesRef.current.filter((n) => !gone.has(n.id) && gone.has(parentOf(n.data.node) ?? '')).map((n) => [n.id, n.position]),
+      )
+      removeMapNodes(ids, place)
+    },
+    [removeMapNodes],
+  )
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<StoryFlowEdge>[]) => {
@@ -251,7 +297,10 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     (item: PaletteItem, clientX: number, clientY: number) => {
       const p = screenToFlowPosition({ x: clientX, y: clientY })
       const c = NEW_NODE_CENTER[item.kind]
-      const id = addMapNode(newNodeFor(item, Math.round(p.x - c.x), Math.round(p.y - c.y)), mindMap.id)
+      const node = newNodeFor(item, Math.round(p.x - c.x), Math.round(p.y - c.y))
+      // Dropped on a container: it goes on it, where it was dropped.
+      const { parentId, before } = item.kind === 'container' ? { parentId: null, before: undefined } : placeOnContainer(nodesRef.current, p)
+      const id = addMapNode(parentId ? ({ ...node, parentId } as NewMapNode) : node, mindMap.id, before ?? null)
       if (id && (item.kind === 'note' || item.kind === 'text')) setEditingId(id)
     },
     [addMapNode, screenToFlowPosition, mindMap.id],
@@ -286,7 +335,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
           let x = at.x - size.width / 2 + shift
           let y = at.y - size.height / 2 + shift
           if (!drop) ({ x, y } = freeSpot(nodesRef.current, x, y, size.width, size.height))
-          addMapNode({ kind: 'image', imageId: picture.id, x: Math.round(x), y: Math.round(y), ...size }, mindMap.id)
+          const { parentId, before } = drop ? placeOnContainer(nodesRef.current, at) : { parentId: null, before: undefined }
+          const node = { kind: 'image' as const, imageId: picture.id, x: Math.round(x), y: Math.round(y), ...size }
+          addMapNode(parentId ? { ...node, parentId } : node, mindMap.id, before ?? null)
           shift += 28
         } catch (error) {
           await askConfirm({
@@ -322,8 +373,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
       setEditingId,
       openItem,
       removeNode: (id: string) => void deleteElements({ nodes: [{ id }] }),
+      dropTarget,
     }),
-    [editingId, openItem, deleteElements],
+    [editingId, openItem, deleteElements, dropTarget],
   )
 
   return (
@@ -368,12 +420,12 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onNodeDragStop={(_, __, dragged) =>
-              moveMapNodes(
-                Object.fromEntries(dragged.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }])),
-              )
-            }
-            onNodesDelete={(deleted) => removeMapNodes(deleted.map((n) => n.id))}
+            onNodeDrag={showDropTarget}
+            onNodeDragStop={(event, held, dragged) => {
+              setDropTarget(null)
+              dropMapNodes(planDrops(nodesRef.current, dragged, mindMap.nodes, { id: held.id, point: pointerAt(event) }))
+            }}
+            onNodesDelete={(deleted) => removeCards(deleted.map((n) => n.id))}
             onConnect={(c) =>
               addMapEdge(c.source, c.target, { source: anchorOfHandle(c.sourceHandle), target: anchorOfHandle(c.targetHandle) })
             }
@@ -396,7 +448,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             onNodeDoubleClick={(e, n) => {
               // Not from inside an opened-up card (its lists and pages have their own clicks).
               if ((e.target as Element).closest('.nodrag')) return
-              if (n.data.node.kind !== 'note' && n.data.node.kind !== 'text' && n.data.node.kind !== 'image') openItem(n.data.node)
+              if ('refId' in n.data.node) openItem(n.data.node)
             }}
             onMoveEnd={(_, viewport) => setMapViewport(mindMap.id, viewport)}
             onPaneClick={() => setEditingId(null)}
@@ -424,6 +476,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
                 const node = (n as StoryFlowNode).data.node
                 if (node.kind === 'note') return node.color === 'white' ? '#e4e0d7' : NOTE_COLOR_VALUES[node.color]
                 if (node.kind === 'image') return dark ? '#5a554d' : '#bdb6a8'
+                if (node.kind === 'container') return `${NOTE_COLOR_VALUES[node.color]}73`
                 return node.kind === 'text' ? 'transparent' : dark ? '#4a463f' : '#d6d1c6'
               }}
               maskColor={dark ? 'rgba(23, 22, 20, 0.7)' : 'rgba(239, 236, 229, 0.7)'}
