@@ -204,6 +204,7 @@ function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
   const expanded = useUi((s) => !!s.expandedArcs[arc.id])
   const toggleArc = useUi((s) => s.toggleArc)
   const setHighlight = useHighlightCleanup(arc.id)
+  const navigate = useNavigate()
   const unplaced = arc.beatIds.filter((id) => !beats[id]?.chapterId).length
 
   return (
@@ -214,7 +215,20 @@ function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
       onMouseLeave={() => setHighlight(null)}
     >
       <div className="arc-row">
-        <button className="arc-toggle" onClick={() => toggleArc(arc.id)} aria-expanded={expanded}>
+        <button
+          className="arc-toggle"
+          // A click opens or closes its beats; a double-click opens the arc (leaving them as they were).
+          onClick={(e) => {
+            if (e.detail < 2) toggleArc(arc.id)
+          }}
+          onDoubleClick={() => {
+            toggleArc(arc.id)
+            closeOnPhone()
+            navigate(`/arcs/${arc.id}`)
+          }}
+          aria-expanded={expanded}
+          title="Click to show its beats, double-click to open the arc"
+        >
           <ChevronRight size={16} className="chevron" />
           <span className="arc-dot" />
           <span className="arc-name">

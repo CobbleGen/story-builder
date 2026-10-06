@@ -3654,6 +3654,7 @@ a {
 .timeline-page {
   --tl-head: 168px;
   --tl-col: 172px;
+  --tl-gap: 26px;
   --tl-row: 96px;
   display: flex;
   flex: 1;
@@ -3696,8 +3697,8 @@ a {
 }
 
 .tl-grid {
+  position: relative;
   display: grid;
-  column-gap: 8px;
   width: max-content;
   min-width: 100%;
   padding: 0 24px 24px 0;
@@ -3759,6 +3760,14 @@ a {
   background: var(--board);
   font-size: 13px;
   font-weight: 600;
+  cursor: default;
+  user-select: none;
+}
+
+.tl-lane-head:hover .tl-lane-name {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--arc) 60%, transparent);
+  text-underline-offset: 3px;
 }
 
 .tl-lane-head .arc-dot {
@@ -3815,6 +3824,139 @@ a {
   z-index: 6;
   box-shadow: var(--shadow-lg);
   cursor: grabbing;
+}
+
+/* Where a dragged beat would go: a line in a gap, or a column to stand on top of. */
+.tl-slot {
+  position: relative;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.tl-slot.gap.over::after {
+  position: absolute;
+  inset: 6px calc(50% - 2px);
+  border-radius: 2px;
+  background: var(--focus);
+  content: '';
+}
+
+.tl-slot.gap.wide.over::after {
+  inset: 6px 6px;
+  border: 2px dashed var(--focus);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--focus) 7%, transparent);
+}
+
+.tl-slot.column.over {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--focus) 8%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+.tl-stack-ghost {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  margin: 8px 0;
+  border: 2px dashed color-mix(in srgb, var(--arc) 70%, var(--line-strong));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--arc) 10%, transparent);
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Beats happening at the same time, joined down their column. */
+.tl-together {
+  z-index: 0;
+  justify-self: center;
+  width: 0;
+  margin: 40px 0;
+  border-left: 2px dotted color-mix(in srgb, var(--ink-3) 70%, transparent);
+  pointer-events: none;
+}
+
+.tl-card.together {
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 3px var(--board);
+}
+
+/* Between chapters, in reading order. */
+.tl-divider {
+  z-index: 0;
+  justify-self: start;
+  width: 0;
+  border-left: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+
+/* + between beats, shown along the lane the pointer is in. */
+.tl-add {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  justify-self: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--arc) 55%, var(--line-strong));
+  border-radius: 999px;
+  background: var(--surface);
+  color: color-mix(in srgb, var(--arc) 70%, var(--ink-2));
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+
+.tl-add.shown {
+  opacity: 0.75;
+}
+
+.tl-add.wide {
+  width: 30px;
+  height: 30px;
+  opacity: 0.45;
+}
+
+.tl-add.wide.shown {
+  opacity: 0.85;
+}
+
+.tl-add:hover,
+.tl-add:focus-visible {
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+.tl-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tl-draft {
+  z-index: 3;
+  align-self: center;
+  cursor: text;
+}
+
+.tl-draft-input {
+  min-height: 36px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.tl-draft-hint {
+  color: var(--ink-3);
+  font-size: 11px;
 }
 
 .tl-card-title {
@@ -3886,6 +4028,7 @@ a {
   .timeline-page {
     --tl-head: 100px;
     --tl-col: 146px;
+    --tl-gap: 22px;
     --tl-row: 90px;
   }
 

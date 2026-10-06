@@ -674,13 +674,13 @@ export function readingOrder(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats'
  * timeline. Until it's arranged, that's the reading order. A beat not
  * arranged yet (a new one, say) happens just after everything read before it,
  * leaving out flashbacks and flash-forwards, which don't say when the story
- * around them is.
+ * around them is. Beats sharing a moment come one after another.
  */
 export function storyOrder(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats' | 'timeline'>): string[] {
   const reading = readingOrder(data)
   const seen = new Set<string>()
   const order = data.timeline.filter((b) => data.beats[b] && !seen.has(b) && !!seen.add(b))
-  if (!order.length) return reading
+  if (!order.length) return together(reading, data.beats)
   const jumps = timeJumps(order, data.chapters.flatMap((c) => c.beatIds))
   let latest: string | null = null
   for (const id of reading) {
@@ -690,16 +690,199 @@ export function storyOrder(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats' |
     }
     if (!jumps.has(id) && (!latest || order.indexOf(id) > order.indexOf(latest))) latest = id
   }
-  return order
+  return together(order, data.beats)
 }
 
-/** Moves a beat to another place in story time (an index in storyOrder). */
-export function moveInTimeline(data: StoryData, beatId: string, to: number): StoryData {
-  const order = storyOrder(data)
-  const from = order.indexOf(beatId)
-  if (from === -1) return data
-  const moved = moveItem(order, from, to)
-  return moved === order ? data : { ...data, timeline: moved }
+/** `order`, with the beats of each moment brought together after the first of them. */
+function together(order: string[], beats: Record<string, Beat>): string[] {
+  const moments = new Map<string, string[]>()
+  const groups: string[][] = []
+  for (const id of order) {
+    const moment = beats[id]?.moment
+    const group = moment ? moments.get(moment) : undefined
+    if (group) {
+      group.push(id)
+      continue
+    }
+    const fresh = [id]
+    if (moment) moments.set(moment, fresh)
+    groups.push(fresh)
+  }
+  return groups.flat()
+}
+
+/** Neighbouring beats in `order` that share a moment, in one column; never two of one arc in a column. */
+export function columnsOf(order: string[], beats: Record<string, Beat>): string[][] {
+  const columns: string[][] = []
+  for (const id of order) {
+    const beat = beats[id]
+    const last = columns[columns.length - 1]
+    const joins = last && beat?.moment && beats[last[0]]?.moment === beat.moment && !last.some((b) => beats[b]?.arcId === beat.arcId)
+    if (joins) last.push(id)
+    else columns.push([id])
+  }
+  return columns
+}
+
+/** The timeline in story time, a column for each moment: what happens at once is on top of each other. */
+export function storyColumns(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats' | 'timeline'>): string[][] {
+  return columnsOf(storyOrder(data), data.beats)
+}
+
+/** A chapter's part of the timeline in reading order (or, with no chapter, the beats in none). */
+export interface ReadingSection {
+  chapterId: string | null
+  columns: string[][]
+}
+
+/** The timeline in reading order: every chapter, even one with no beats yet, then the beats in no chapter (if any). */
+export function readingSections(data: Pick<StoryData, 'chapters' | 'arcs' | 'beats'>): ReadingSection[] {
+  const sections: ReadingSection[] = data.chapters.map((c) => ({
+    chapterId: c.id,
+    columns: columnsOf(c.beatIds.filter((b) => data.beats[b]), data.beats),
+  }))
+  const loose = data.arcs.flatMap((a) => a.beatIds.filter((b) => data.beats[b] && !data.beats[b].chapterId))
+  if (loose.length) sections.push({ chapterId: null, columns: columnsOf(loose, data.beats) })
+  return sections
+}
+
+/** A beat no longer happens at the same time as others (nor does one left alone in its moment). */
+function leaveMoment(data: StoryData, id: string): StoryData {
+  const moment = data.beats[id]?.moment
+  if (!moment) return data
+  const beats = { ...data.beats }
+  const others = Object.values(beats).filter((b) => b.moment === moment && b.id !== id)
+  for (const b of others.length === 1 ? [id, others[0].id] : [id]) {
+    const copy = { ...beats[b] }
+    delete copy.moment
+    beats[b] = copy
+  }
+  return { ...data, beats }
+}
+
+/** A beat happens at the same time as `others` (the beats of one moment, or a single beat). */
+function joinMoment(data: StoryData, id: string, others: string[]): StoryData {
+  const left = leaveMoment(data, id)
+  const moment = others.map((b) => left.beats[b]?.moment).find(Boolean) ?? makeId('moment')
+  const beats = { ...left.beats }
+  for (const b of [...others, id]) if (beats[b] && beats[b].moment !== moment) beats[b] = { ...beats[b], moment }
+  return { ...left, beats }
+}
+
+/**
+ * Where on the timeline a beat goes: at a moment of its own before column
+ * `gap` (`gap` = the number of columns: after them all), or on top of the
+ * beats in column `column`, at the same time as them.
+ */
+export type TimelineSpot = { gap: number } | { column: number }
+
+/** In reading order: a spot among the columns of a chapter's part (chapterId null: the beats in no chapter). */
+export type ReadingSpot = TimelineSpot & { chapterId: string | null }
+
+/**
+ * Moves a beat in story time (see storyColumns), arranging the timeline. On
+ * top of another column it happens at the same time as those beats, which
+ * can't be of its own arc.
+ */
+export function moveInStory(data: StoryData, id: string, spot: TimelineSpot): StoryData {
+  const beat = data.beats[id]
+  const columns = storyColumns(data)
+  const from = columns.findIndex((c) => c.includes(id))
+  if (!beat || from === -1) return data
+  const rest = columns.map((c) => c.filter((b) => b !== id))
+  if ('column' in spot) {
+    const target = columns[spot.column]
+    if (!target || spot.column === from || target.some((b) => data.beats[b]?.arcId === beat.arcId)) return data
+    rest[spot.column].push(id)
+    return joinMoment({ ...data, timeline: rest.flat() }, id, target)
+  }
+  const alone = columns[from].length === 1
+  if (spot.gap < 0 || spot.gap > columns.length || (alone && (spot.gap === from || spot.gap === from + 1))) return data
+  rest.splice(spot.gap, 0, [id])
+  return leaveMoment({ ...data, timeline: rest.flat() }, id)
+}
+
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i])
+
+/**
+ * Moves a beat in reading order (see readingSections): into the chapter of
+ * the spot, at that place among its beats, or out of every chapter. On top
+ * of another column it happens at the same time as those beats too (and so
+ * comes just after them in story time); taken off a stack, it no longer does.
+ */
+export function moveInReading(data: StoryData, id: string, spot: ReadingSpot): StoryData {
+  const beat = data.beats[id]
+  if (!beat || (spot.chapterId && !data.chapters.some((c) => c.id === spot.chapterId))) return data
+  const sections = readingSections(data)
+  const columns = sections.find((s) => s.chapterId === spot.chapterId)?.columns ?? []
+  const columnOf = (d: StoryData) => readingSections(d).flatMap((s) => s.columns).find((c) => c.includes(id)) ?? [id]
+  // Where in the chapter: after its beats in the columns before `n`, leaving this one out.
+  const indexBefore = (n: number) => (spot.chapterId ? columns.slice(0, n).flat().filter((b) => b !== id).length : undefined)
+  if ('column' in spot) {
+    const target = columns[spot.column]
+    if (!target || target.includes(id) || target.some((b) => data.beats[b]?.arcId === beat.arcId)) return data
+    const placed = leaveMoment(placeBeat(data, id, spot.chapterId, indexBefore(spot.column + 1)), id)
+    return joinMoment(afterInTime(placed, id, target), id, target)
+  }
+  let next = placeBeat(data, id, spot.chapterId, indexBefore(spot.gap))
+  // Taken off a stack, or put down by the others of its moment (which would stack it again).
+  if (columnOf(data).length > 1 || columnOf(next).length > 1) next = leaveMoment(next, id)
+  const unchanged =
+    next.beats[id].chapterId === beat.chapterId &&
+    next.beats[id].moment === beat.moment &&
+    data.chapters.every((c, i) => sameIds(c.beatIds, next.chapters[i].beatIds))
+  return unchanged ? data : next
+}
+
+/** On an arranged timeline, a beat moved to just after `others` in story time. */
+function afterInTime(data: StoryData, id: string, others: string[]): StoryData {
+  if (!data.timeline.length) return data
+  const order = storyOrder(data).filter((b) => b !== id)
+  const last = Math.max(...others.map((b) => order.indexOf(b)))
+  if (last === -1) return data
+  order.splice(last + 1, 0, id)
+  return { ...data, timeline: order }
+}
+
+/** Where a beat put at `at` in `order` goes in its arc: just after the arc's beats that come before it there. */
+function arcIndexAt(data: StoryData, arcId: string, order: string[], at: number): number {
+  const earlier = new Set(order.slice(0, at))
+  let index = 0
+  data.arcs.find((a) => a.id === arcId)?.beatIds.forEach((b, i) => {
+    if (earlier.has(b)) index = i + 1
+  })
+  return index
+}
+
+export interface TimelineBeat {
+  arcId: string
+  title: string
+}
+
+/** A new beat at a moment of its own in story time, before column `gap`; it's in no chapter yet. */
+export function addBeatInStory(data: StoryData, init: TimelineBeat, gap: number): [StoryData, string] {
+  const columns = storyColumns(data)
+  const at = Math.max(0, Math.min(gap, columns.length))
+  const earlier = columns.slice(0, at).flat()
+  const [next, id] = addBeat(data, { ...init, arcIndex: arcIndexAt(data, init.arcId, columns.flat(), earlier.length) })
+  return [{ ...next, timeline: [...earlier, id, ...columns.slice(at).flat()] }, id]
+}
+
+/** A new beat in reading order: in the spot's chapter (or in none), before its column `gap`. */
+export function addBeatInReading(data: StoryData, init: TimelineBeat, spot: { chapterId: string | null; gap: number }): [StoryData, string] {
+  const chapterId = spot.chapterId && data.chapters.some((c) => c.id === spot.chapterId) ? spot.chapterId : null
+  let at = 0
+  let inChapter = 0
+  for (const section of readingSections(data)) {
+    if (section.chapterId === chapterId) {
+      inChapter = section.columns.slice(0, Math.max(0, spot.gap)).flat().length
+      at += inChapter
+      break
+    }
+    at += section.columns.flat().length
+  }
+  const order = readingSections(data).flatMap((s) => s.columns.flat())
+  return addBeat(data, { ...init, chapterId, chapterIndex: chapterId ? inChapter : undefined, arcIndex: arcIndexAt(data, init.arcId, order, at) })
 }
 
 /** Story time goes back to following the reading order. */
@@ -1209,7 +1392,12 @@ export function normalizeStory(input: unknown): StoryData {
     }
     const when = cleanWhen(b.when)
     if (when) beats[id].when = when
+    if (typeof b.moment === 'string' && b.moment) beats[id].moment = b.moment.slice(0, 80)
   }
+  // A moment is shared by beats happening at once: one alone in it isn't in it.
+  const sharing = new Map<string, number>()
+  for (const beat of Object.values(beats)) if (beat.moment) sharing.set(beat.moment, (sharing.get(beat.moment) ?? 0) + 1)
+  for (const beat of Object.values(beats)) if (beat.moment && sharing.get(beat.moment)! < 2) delete beat.moment
 
   // Each beat appears once, in its own arc, keeping the stored order.
   for (const arc of arcs) {

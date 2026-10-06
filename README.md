@@ -18,7 +18,7 @@ It has four views: the **chapter board**, the **manuscript**, the
   dashed circle means it isn't in a chapter yet. Drag beats from here onto
   the board. Dropping a board beat on the sidebar takes it back out of its
   chapter. Hovering an arc dims every other arc's beats on the board.
-- **Arc pages** (the ↗ next to an arc) show all of an arc's beats in order.
+- **Arc pages** (the ↗ next to an arc, or double-click the arc) show all of an arc's beats in order.
   Add new beats (they start unplaced), drag to reorder, and pick a chapter
   from each beat's chapter pill. Assign the characters involved in the arc.
 - **Characters** live in the sidebar's Characters tab. Each has a colour and
@@ -106,12 +106,22 @@ It has four views: the **chapter board**, the **manuscript**, the
   on it stay). Each map remembers where it was scrolled and zoomed to. Places
   and things go on maps too, and open up to their details.
 - **Timeline** (fourth tab) puts every beat on one line of time, with a lane
-  per arc. **Story order** is when things happen in the story's world: drag
-  a beat to move it in time, and give beats a "when" ("The next morning") in
-  the beat editor; runs of the same "when" are labelled along the top.
-  **Reading order** is chapter by chapter, as readers meet them. Beats told
-  out of order are marked **Flashback** or **Flash-forward**, and **Match
-  reading order** puts story time back the way it's read.
+  per arc (double-click an arc's name to open it). **Story order** is when
+  things happen in the story's world: drag a beat to move it in time, and
+  give beats a "when" ("The next morning") in the beat editor; runs of the
+  same "when" are labelled along the top. **Reading order** is chapter by
+  chapter, as readers meet them, with every chapter shown (even an empty
+  one) and the beats in no chapter at the end: dragging a beat there moves
+  it into that chapter, at that place among its beats, as the chapter board
+  shows it. Drop a beat onto another arc's beat (in either order) and they
+  happen at the same moment, one above the other, joined by a dotted line:
+  one revelation closing several arcs, say. Drag it off again to part them.
+  Hover a lane and click a + between two beats to add one right there (in
+  story order it's in no chapter yet; in reading order it's in that
+  chapter). With the keyboard, Space picks a beat up, ← and → step it from
+  place to place, and Space puts it down. Beats told out of order are marked
+  **Flashback** or **Flash-forward**, and **Match reading order** puts story
+  time back the way it's read.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button
   shows the chapter's text a page at a time (arrows or the page picker to move
   through it), and **Beats** lists its beats. An arc card lists its beats in

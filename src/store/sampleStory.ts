@@ -11,7 +11,8 @@ import {
   addMapNode,
   emptyStory,
   linkMentions,
-  moveInTimeline,
+  moveInReading,
+  moveInStory,
   renameMindMap,
   setChapterText,
   updateBeat,
@@ -120,7 +121,9 @@ export function buildSampleStory(): StoryData {
   const village = arc('Village politics', 'Bronze', 'The @Harbour Council wants @Gull Point Light closed.', [harrow])
 
   beat(mystery, 'The Aurelia signals from the reef', 'A flash of lantern light, then nothing.', ch1, false, 'The night of the storm')
-  beat(secret, 'The lamp goes dark', '@Elias refuses to explain why the light failed.', ch1, false, 'The night of the storm')
+  const lamp = beat(secret, 'The lamp goes dark', '@Elias refuses to explain why the light failed.', ch1, false, 'The night of the storm')
+  // At the very moment the ship signals: the timeline shows them on top of each other.
+  data = moveInReading(data, lamp, { chapterId: ch1, column: 0 })
   beat(romance, '@Theo meets the bus', 'He is the last person @Mara wanted to see.', ch1, false, 'The night of the storm')
   beat(mystery, 'No bodies on the beach', 'Only cargo crates, all of them empty.', ch2, false, 'The next morning')
   beat(village, 'Emergency council meeting', '@Harrow moves to decommission @Gull Point Light.', ch2, false, 'The next morning')
@@ -129,7 +132,7 @@ export function buildSampleStory(): StoryData {
   const margin = beat(mystery, 'Coordinates in the margin', 'The same reef, circled every year on the same night.', ch3, true, 'That evening')
   // Read in chapter 3, but it happened first: the timeline shows it as a flashback.
   const firstRun = beat(secret, '@Elias’s first run', 'He guides a boat with no lights past the reef, and is paid in cash.', ch3, false, 'Twenty years earlier')
-  data = moveInTimeline(data, firstRun, 0)
+  data = moveInStory(data, firstRun, { gap: 0 })
   beat(village, '@Harrow buys the old boathouse', '', ch4, false, 'Two days later')
   beat(mystery, 'A survivor in the @Sea Caves', 'Someone was waiting for the tide to drop.')
   beat(romance, '@Theo admits he stayed for her', '')

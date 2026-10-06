@@ -10,6 +10,11 @@ export interface Beat {
   done: boolean
   /** When it happens in the story's world ("Day 3, evening"), if the writer has said. */
   when?: string
+  /**
+   * Beats that happen at the same time (in different arcs) share a moment:
+   * they stand on top of each other on the timeline.
+   */
+  moment?: string
 }
 
 /** How far along a chapter is. */
