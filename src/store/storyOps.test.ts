@@ -24,6 +24,7 @@ import {
   deleteBeat,
   deleteChapter,
   moveChapter,
+  logOutline,
   normalizeStory,
   emptyStory,
   addMindMap,
@@ -55,6 +56,7 @@ import {
   parentOf,
 } from './storyOps'
 import { timeJumps } from '../lib/timeline'
+import { outlineWords, wordsIn } from '../lib/progress'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, mentionToken, toDisplay } from '../lib/mentions'
 import { mentionPlaces, placeCount } from '../lib/mentionedIn'
@@ -472,6 +474,31 @@ describe('mind map', () => {
     const loaded = normalizeStory({ ...data, goals: { draft: -3, daily: 400 }, wordLog: { '2026-09-01': 10, nonsense: 5, '2026-09-02': 'x' } })
     expect(loaded.goals).toEqual({ daily: 400 })
     expect(loaded.wordLog).toEqual({ '2026-09-01': 10 })
+  })
+
+  it('counts the outline’s words apart from the manuscript, and tallies them each day', () => {
+    let { data, main, love } = setup()
+    // Chapters One, Two and Three; arcs Main and Love
+    expect(outlineWords(data)).toMatchObject({ chapters: 3, arcs: 2, beats: 0, total: 5 })
+    let tom: string
+    ;[data, tom] = addCharacter(data, { name: 'Old Tom', color: '#08f' })
+    const before = data
+    let b: string
+    ;[data, b] = addBeat(data, { arcId: main, title: `${mentionToken(tom)}’s boat sinks`, description: 'Nobody  saw it.' })
+    // A mention counts as one word, as in the manuscript
+    expect(wordsIn(`${mentionToken(tom)}’s boat sinks`)).toBe(3)
+    const counted = outlineWords(data)
+    expect([counted.beats, counted.byArc[main], counted.byArc[love], counted.total]).toEqual([6, 7, 1, 11])
+    data = logOutline(before, data, '2026-09-01')
+    expect(data.outlineLog).toEqual({ '2026-09-01': 6 })
+    // Words cut count against the day; changes with no words in them leave the log be
+    const longer = data
+    data = logOutline(longer, updateBeat(longer, b, { description: '' }), '2026-09-01')
+    expect(data.outlineLog).toEqual({ '2026-09-01': 3 })
+    const placed = placeBeat(data, b, data.chapters[0].id)
+    expect(logOutline(data, placed, '2026-09-02')).toBe(placed)
+    expect(normalizeStory({ ...data, outlineLog: { '2026-09-01': 3, nope: 4 } }).outlineLog).toEqual({ '2026-09-01': 3 })
+    expect(normalizeStory({ title: 'Old' }).outlineLog).toEqual({})
   })
 
   it('keeps each chapter’s status and word target', () => {

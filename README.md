@@ -143,10 +143,17 @@ It has four views: the **chapter board**, the **manuscript**, the
   Ctrl+Y, ⌘Z and ⇧⌘Z on a Mac) step through changes on the board, pages and
   mind maps; typing in one field is one step. The manuscript has the text
   editor's own undo.
-- **Word count and goals** (the target icon in the top bar, or ⋯): the whole
+- **Word counts and goals** (the target icon in the top bar, or ⋯): the whole
   draft's words, a goal for the draft and for each day, the last 30 days'
   writing as a chart (or a table), a streak, and every chapter's words
   against its target.
+- **Outline words** are counted separately from the manuscript: everything
+  written in beats (titles and descriptions), arcs (names and descriptions)
+  and chapters' titles and summaries. The top bar shows the count next to
+  the manuscript's (or alone, while there's no manuscript yet), and the
+  **Outline** tab of word counts has today's and the last 7 days' outline
+  words, a streak, a 30-day chart, and the words in each arc. An arc's page
+  shows its words too. Words cut, or undone, come off the day's count.
 - **Export the manuscript** (⋯ → Export manuscript…) as a Word document, a
   PDF (through the print window), plain text or Markdown, laid out as a
   manuscript: double spaced, each chapter on a new page, with an optional

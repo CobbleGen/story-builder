@@ -10,6 +10,8 @@ interface Props {
   days: Day[]
   /** Daily goal, drawn as a line across the chart. */
   goal?: number
+  /** What's counted ("Words written", "Outline words"). */
+  what?: string
 }
 
 const PAD = { top: 20, right: 10, bottom: 24, left: 42 }
@@ -42,7 +44,7 @@ function columnPath(x: number, w: number, base: number, end: number): string {
 }
 
 /** Words written each day, as columns; negative days (more cut than written) hang below the line. */
-export function WordsChart({ days, goal }: Props) {
+export function WordsChart({ days, goal, what = 'Words written' }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(520)
   const [active, setActive] = useState<number | null>(null)
@@ -89,7 +91,9 @@ export function WordsChart({ days, goal }: Props) {
   return (
     <div className="words-chart">
       <div className="words-chart-head">
-        <h3>Words written, last {days.length} days</h3>
+        <h3>
+          {what}, last {days.length} days
+        </h3>
         {goal && !asTable ? (
           <span className="chart-key">
             <span className="chart-key-line" aria-hidden />
@@ -125,7 +129,7 @@ export function WordsChart({ days, goal }: Props) {
           className="chart-plot"
           tabIndex={0}
           role="img"
-          aria-label={`${signed(total)} words over the last ${days.length} days; today ${signed(values[lastIndex] ?? 0)}. Use the arrow keys to read each day.`}
+          aria-label={`${what}: ${signed(total)} over the last ${days.length} days; today ${signed(values[lastIndex] ?? 0)}. Use the arrow keys to read each day.`}
           onKeyDown={onKey}
           onBlur={() => setActive(null)}
           onPointerLeave={() => setActive(null)}

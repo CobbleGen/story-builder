@@ -24,6 +24,7 @@ import { CharacterAvatar } from '../components/CharacterAvatar'
 import { displayName, plainText } from '../lib/mentions'
 import { ColorPicker } from '../components/ColorPicker'
 import { askConfirm } from '../lib/confirm'
+import { outlineWords } from '../lib/progress'
 
 export function ArcPage() {
   const { arcId } = useParams()
@@ -67,6 +68,7 @@ function ArcView({ arc }: { arc: Arc }) {
 
   const placed = arc.beatIds.filter((id) => beats[id]?.chapterId).length
   const unplaced = arc.beatIds.length - placed
+  const words = useStory((s) => outlineWords(s).byArc[arc.id] ?? 0)
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return
@@ -139,6 +141,10 @@ function ArcView({ arc }: { arc: Arc }) {
               </span>
             </>
           )}
+          {' · '}
+          <span title="Words in this arc and its beats, counted in the outline">
+            {words.toLocaleString()} word{words === 1 ? '' : 's'}
+          </span>
         </p>
       </header>
 

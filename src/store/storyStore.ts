@@ -81,6 +81,7 @@ const STORY_KEYS = [
   'mindMaps',
   'goals',
   'wordLog',
+  'outlineLog',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -96,18 +97,28 @@ export const pickData = (s: StoryData): StoryData => ({
   mindMaps: s.mindMaps,
   goals: s.goals,
   wordLog: s.wordLog,
+  outlineLog: s.outlineLog,
 })
 
 export const useStory = create<StoryStore>()(
   persist(
     (set, get) => {
       const data = () => pickData(get())
-      /** Saves a change; `name` (the action) puts it in the undo history. */
+      /**
+       * Saves a change; `name` (the action) puts it in the undo history. Words
+       * it adds to the outline (or cuts) go in today's tally, unless it's a
+       * whole other story coming in.
+       */
       const apply = (next: StoryData, name?: string, target?: unknown) => {
         const before = data()
         if (next === before || STORY_KEYS.every((k) => next[k] === before[k])) return
         if (name) remember(before, name, target)
-        set(pickData(next))
+        set(pickData(name === 'replaceStory' ? next : ops.logOutline(before, next)))
+      }
+      /** Undo and redo change the outline's words as much as any other change. */
+      const step = (direction: 'undo' | 'redo') => {
+        const before = data()
+        travel(direction, before, (next) => set(pickData(ops.logOutline(before, next))))
       }
       const withId = <Id extends string | null>([next, id]: [StoryData, Id], name: string, target?: unknown) => {
         apply(next, name, target)
@@ -171,8 +182,8 @@ export const useStory = create<StoryStore>()(
         renameMindMap: (...a) => apply(ops.renameMindMap(data(), ...a), 'renameMindMap', a[0]),
         deleteMindMap: (...a) => apply(ops.deleteMindMap(data(), ...a), 'deleteMindMap', a[0]),
         replaceStory: (input) => apply(ops.normalizeStory(input), 'replaceStory'),
-        undo: () => travel('undo', data(), (next) => set(pickData(next))),
-        redo: () => travel('redo', data(), (next) => set(pickData(next))),
+        undo: () => step('undo'),
+        redo: () => step('redo'),
       }
     },
     {

@@ -29,7 +29,7 @@ import { downloadBlob, slug } from '../lib/download'
 import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
 import { useUi } from '../store/uiStore'
-import { totalWords } from '../lib/progress'
+import { outlineWords, totalWords } from '../lib/progress'
 import { SEARCH_KEYS } from '../lib/searchShortcut'
 
 export function TopBar() {
@@ -44,6 +44,7 @@ export function TopBar() {
   const setProgressOpen = useUi((s) => s.setProgressOpen)
   const setSearchOpen = useUi((s) => s.setSearchOpen)
   const total = useStory((s) => totalWords(s.texts))
+  const outline = useStory((s) => outlineWords(s).total)
   const goal = useStory((s) => s.goals.draft)
 
   // The story file carries its pictures too, so it's complete on another device.
@@ -144,11 +145,19 @@ export function TopBar() {
         <button
           className="topbar-progress"
           onClick={() => setProgressOpen(true)}
-          title={goal ? `${total.toLocaleString()} of ${goal.toLocaleString()} words: word count and goals` : 'Word count and goals'}
-          aria-label="Word count and goals"
+          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript, ${outline.toLocaleString()} in the outline: word counts and goals`}
+          aria-label="Word counts and goals"
         >
           <Target size={16} />
-          <span className="topbar-words">{total.toLocaleString()} words</span>
+          {/* While there's only an outline, its count; then the manuscript's, with the outline's beside it where there's room. */}
+          {!total && outline ? (
+            <span className="topbar-words">{outline.toLocaleString()} outline words</span>
+          ) : (
+            <>
+              <span className="topbar-words">{total.toLocaleString()} words</span>
+              {outline > 0 && <span className="topbar-outline">{outline.toLocaleString()} outline</span>}
+            </>
+          )}
           {goal ? (
             <span className="topbar-goal" aria-hidden>
               <span style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} />
@@ -158,7 +167,7 @@ export function TopBar() {
         <Menu
           label="Story options"
           items={[
-            { label: 'Word count and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
+            { label: 'Word counts and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
             { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },

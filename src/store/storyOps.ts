@@ -26,6 +26,7 @@ import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
+import { outlineWords } from '../lib/progress'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
@@ -222,6 +223,16 @@ export function setChapterText(
   return { ...next, wordLog: { ...data.wordLog, [day]: (data.wordLog[day] ?? 0) + change } }
 }
 
+/**
+ * After a change: how many words it added to the outline (or cut from it),
+ * added to the day's tally in the outline log.
+ */
+export function logOutline(before: StoryData, after: StoryData, day: string = dayKey()): StoryData {
+  const change = outlineWords(after).total - outlineWords(before).total
+  if (!change) return after
+  return { ...after, outlineLog: { ...after.outlineLog, [day]: (after.outlineLog[day] ?? 0) + change } }
+}
+
 export function setGoals(data: StoryData, patch: StoryGoals): StoryData {
   const goals: StoryGoals = { ...data.goals }
   for (const key of ['draft', 'daily'] as const) {
@@ -247,6 +258,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     mindMaps: [defaultMindMap()],
     goals: {},
     wordLog: {},
+    outlineLog: {},
   }
 }
 
@@ -1620,14 +1632,15 @@ export function normalizeStory(input: unknown): StoryData {
   const daily = cleanTarget(rawGoals.daily)
   if (draft) goals.draft = draft
   if (daily) goals.daily = daily
-  // The log keeps the last year or so of days.
-  const wordLog = Object.fromEntries(
-    Object.entries(isRecord(raw.wordLog) ? raw.wordLog : {})
-      .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n))
-      .sort(([a], [b]) => (a < b ? -1 : 1))
-      .slice(-400)
-      .map(([day, n]) => [day, Math.round(n as number)]),
-  )
+  // The logs keep the last year or so of days.
+  const logOf = (value: unknown): Record<string, number> =>
+    Object.fromEntries(
+      Object.entries(isRecord(value) ? value : {})
+        .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n))
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+        .slice(-400)
+        .map(([day, n]) => [day, Math.round(n as number)]),
+    )
 
   return linkMentions({
     title: str(raw.title, 'Untitled story'),
@@ -1640,6 +1653,7 @@ export function normalizeStory(input: unknown): StoryData {
     timeline: [...new Set(ids(raw.timeline))].filter((b) => beats[b]),
     mindMaps,
     goals,
-    wordLog,
+    wordLog: logOf(raw.wordLog),
+    outlineLog: logOf(raw.outlineLog),
   })
 }

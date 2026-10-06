@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStory } from '../store/storyStore'
-import { useUi } from '../store/uiStore'
+import { useUi, type ProgressTab } from '../store/uiStore'
 import { dayKey } from '../store/storyOps'
-import { progressTo, recentDays, totalWords, writingStreak } from '../lib/progress'
+import { outlineWords, progressTo, recentDays, totalWords, writingStreak, type OutlineWords } from '../lib/progress'
 import { Modal } from './Modal'
 import { MentionText } from './MentionText'
 import { StatusPicker } from './StatusPicker'
@@ -63,19 +63,64 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   )
 }
 
-/** Word counts for the manuscript, goals for the draft and each day, and every chapter's target. */
+const TABS: { tab: ProgressTab; label: string }[] = [
+  { tab: 'manuscript', label: 'Manuscript' },
+  { tab: 'outline', label: 'Outline' },
+]
+
+/**
+ * Word counts, kept apart: the manuscript's (with goals for the draft and
+ * each day, and every chapter's target), and the outline's.
+ */
 export function ProgressDialog() {
   const setOpen = useUi((s) => s.setProgressOpen)
+  const picked = useUi((s) => s.progressTab)
+  const setTab = useUi((s) => s.setProgressTab)
+  const texts = useStory((s) => s.texts)
+  const chapters = useStory((s) => s.chapters)
+  const arcs = useStory((s) => s.arcs)
+  const beats = useStory((s) => s.beats)
+  const outline = useMemo(() => outlineWords({ beats, arcs, chapters }), [beats, arcs, chapters])
+  const close = () => setOpen(false)
+  const total = totalWords(texts)
+  // Until one is picked: the outline, while that's all there is.
+  const tab = picked ?? (!total && outline.total ? 'outline' : 'manuscript')
+  const counts: Record<ProgressTab, number> = { manuscript: total, outline: outline.total }
+
+  return (
+    <Modal title="Progress" onClose={close} variant="wide">
+      <div className="progress-top">
+        <h2 className="confirm-title">Progress</h2>
+        <div className="mode-switch" role="tablist" aria-label="Word count">
+          {TABS.map((t) => (
+            <button
+              key={t.tab}
+              role="tab"
+              aria-selected={tab === t.tab}
+              className={`mode-tab${tab === t.tab ? ' active' : ''}`}
+              onClick={() => setTab(t.tab)}
+            >
+              {t.label}
+              <span className="mode-count">{counts[t.tab].toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === 'manuscript' ? <ManuscriptProgress total={total} close={close} /> : <OutlineProgress outline={outline} close={close} />}
+    </Modal>
+  )
+}
+
+/** The manuscript's words: today's and lately, goals, and each chapter's. */
+function ManuscriptProgress({ total, close }: { total: number; close: () => void }) {
   const texts = useStory((s) => s.texts)
   const chapters = useStory((s) => s.chapters)
   const goals = useStory((s) => s.goals)
   const log = useStory((s) => s.wordLog)
   const setGoals = useStory((s) => s.setGoals)
   const updateChapter = useStory((s) => s.updateChapter)
-  const close = () => setOpen(false)
 
   const today = dayKey()
-  const total = totalWords(texts)
   const days = recentDays(log, today, 30)
   const todayWords = log[today] ?? 0
   const week = days.slice(-7).reduce((n, d) => n + d.words, 0)
@@ -84,8 +129,7 @@ export function ProgressDialog() {
   const dayProgress = progressTo(Math.max(0, todayWords), goals.daily)
 
   return (
-    <Modal title="Progress" onClose={close} variant="wide">
-      <h2 className="confirm-title">Progress</h2>
+    <>
       <div className="stat-row">
         <Stat
           label="Manuscript"
@@ -173,6 +217,78 @@ export function ProgressDialog() {
           </tbody>
         </table>
       </div>
-    </Modal>
+    </>
+  )
+}
+
+/** The outline's words, counted apart from the manuscript: in all, today and lately, and arc by arc. */
+function OutlineProgress({ outline, close }: { outline: OutlineWords; close: () => void }) {
+  const arcs = useStory((s) => s.arcs)
+  const chapters = useStory((s) => s.chapters)
+  const log = useStory((s) => s.outlineLog)
+
+  const today = dayKey()
+  const days = recentDays(log, today, 30)
+  const todayWords = log[today] ?? 0
+  const week = days.slice(-7).reduce((n, d) => n + d.words, 0)
+  const streak = writingStreak(log, today)
+
+  return (
+    <>
+      <div className="stat-row">
+        <Stat label="Outline" value={outline.total.toLocaleString()} note="words" />
+        <Stat label="Today" value={signed(todayWords)} note="words" />
+        <Stat label="Last 7 days" value={signed(week)} note="words" />
+        <Stat label="Streak" value={`${streak} day${streak === 1 ? '' : 's'}`} note="adding to it every day" />
+      </div>
+      <p className="progress-note">
+        Everything written in beats (titles and descriptions), arcs (names and descriptions), and chapters’ titles and summaries,
+        counted apart from the manuscript.
+      </p>
+
+      <WordsChart days={days} what="Outline words" />
+
+      <h3 className="progress-heading">By arc</h3>
+      <div className="progress-table-wrap">
+        <table className="progress-table">
+          <thead>
+            <tr>
+              <th scope="col">Arc</th>
+              <th scope="col" className="num">
+                Beats
+              </th>
+              <th scope="col" className="num">
+                Words
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {arcs.map((arc) => (
+              <tr key={arc.id}>
+                <td>
+                  <Link to={`/arcs/${arc.id}`} className="progress-chapter" onClick={close}>
+                    <span className="arc-dot" style={{ '--arc': arc.color } as React.CSSProperties} aria-hidden />
+                    <span className="progress-title">
+                      <MentionText text={arc.name} fallback={<span className="muted">Untitled arc</span>} />
+                    </span>
+                  </Link>
+                </td>
+                <td className="num">{arc.beatIds.length.toLocaleString()}</td>
+                <td className="num">{(outline.byArc[arc.id] ?? 0).toLocaleString()}</td>
+              </tr>
+            ))}
+            <tr>
+              <td>
+                <span className="progress-chapter static">
+                  <span className="progress-title">Chapter titles and summaries</span>
+                </span>
+              </td>
+              <td className="num muted">{chapters.length ? `${chapters.length} chapter${chapters.length === 1 ? '' : 's'}` : ''}</td>
+              <td className="num">{outline.chapters.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }

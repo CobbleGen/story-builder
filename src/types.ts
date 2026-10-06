@@ -240,4 +240,6 @@ export interface StoryData {
   goals: StoryGoals
   /** Local date (YYYY-MM-DD) -> words added that day, less words cut. */
   wordLog: Record<string, number>
+  /** The same for the outline (beats, arcs, chapter titles and summaries), kept apart. */
+  outlineLog: Record<string, number>
 }

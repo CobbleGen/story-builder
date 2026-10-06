@@ -5,6 +5,8 @@ import { DEFAULT_EXPORT, type ExportOptions } from '../lib/manuscript'
 export type SidebarMode = 'arcs' | 'characters' | 'world'
 /** The timeline in the order things happen, or in the order they're read. */
 export type TimelineMode = 'story' | 'reading'
+/** The word counts shown in the progress dialog: the manuscript's, or the outline's. */
+export type ProgressTab = 'manuscript' | 'outline'
 /** Light or dark colours, or whichever the device is set to. */
 export type ThemeSetting = 'system' | 'light' | 'dark'
 
@@ -41,6 +43,8 @@ interface UiState {
   theme: ThemeSetting
   /** The word count and goals dialog is open. */
   progressOpen: boolean
+  /** Its tab last picked (none yet: whichever has words). */
+  progressTab: ProgressTab | null
   /** The search dialog is open. */
   searchOpen: boolean
   /** How the manuscript was last exported. */
@@ -62,6 +66,7 @@ interface UiState {
   toggleMapPalette: () => void
   setTheme: (theme: ThemeSetting) => void
   setProgressOpen: (open: boolean) => void
+  setProgressTab: (tab: ProgressTab) => void
   setSearchOpen: (open: boolean) => void
   setExportOptions: (patch: Partial<ExportOptions>) => void
   setTimelineMode: (mode: TimelineMode) => void
@@ -89,6 +94,7 @@ export const useUi = create<UiState>()(
       mapPaletteOpen: typeof window === 'undefined' || window.innerWidth > 760,
       theme: 'system',
       progressOpen: false,
+      progressTab: null,
       searchOpen: false,
       exportOptions: DEFAULT_EXPORT,
       timelineMode: 'story',
@@ -108,6 +114,7 @@ export const useUi = create<UiState>()(
       toggleMapPalette: () => set((s) => ({ mapPaletteOpen: !s.mapPaletteOpen })),
       setTheme: (theme) => set({ theme }),
       setProgressOpen: (progressOpen) => set({ progressOpen }),
+      setProgressTab: (progressTab) => set({ progressTab }),
       setSearchOpen: (searchOpen) => set({ searchOpen }),
       setExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
       setTimelineMode: (timelineMode) => set({ timelineMode }),
@@ -143,6 +150,7 @@ export const useUi = create<UiState>()(
         exportOptions: s.exportOptions,
         timelineMode: s.timelineMode,
         recentColors: s.recentColors,
+        progressTab: s.progressTab,
       }),
     },
   ),
