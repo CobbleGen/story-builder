@@ -559,7 +559,7 @@ describe('mind map', () => {
     })
     expect(data.mindMaps[0].nodes.map((n) => n.id)).toEqual(['n1', 'n3'])
     expect(data.mindMaps[0].nodes[0]).toMatchObject({ x: 10, y: 0 })
-    expect(data.mindMaps[0].nodes[1]).toMatchObject({ color: 'yellow', width: 220, height: 160 })
+    expect(data.mindMaps[0].nodes[1]).toMatchObject({ color: '#fbe7a1', width: 220, height: 160 })
     expect(data.mindMaps[0].edges).toEqual([{ id: 'e1', source: 'n1', target: 'n3', label: 'why', arrow: false }])
   })
 
@@ -593,12 +593,12 @@ describe('mind map', () => {
     expect(sized).toMatchObject({ expanded: 'beats', sizes: { text: { width: 500, height: 4000 } } })
     expect(sized).not.toHaveProperty('sizes.beats')
     expect(sized).not.toHaveProperty('sizes.details')
-    expect(note).toMatchObject({ color: 'white', list: 'bullet', checked: [0] })
+    expect(note).toMatchObject({ color: '#ffffff', list: 'bullet', checked: [0] })
     expect(character).toMatchObject({ expanded: 'details' })
     expect(chapter).toMatchObject({ expanded: 'text' })
     expect(arc).toMatchObject({ expanded: 'beats' })
     expect(badArc).not.toHaveProperty('expanded')
-    expect(list).toMatchObject({ bg: 'green', list: 'check', checked: [1] })
+    expect(list).toMatchObject({ bg: '#cfe9c8', list: 'check', checked: [1] })
     expect(plain).not.toHaveProperty('bg')
     expect(plain).not.toHaveProperty('list')
     expect(plain).not.toHaveProperty('checked')
@@ -919,7 +919,7 @@ describe('copy and paste on the map', () => {
       { x: 0, y: 0 },
     )
     expect(ids).toHaveLength(1)
-    expect(next.mindMaps[0].nodes[0]).toMatchObject({ kind: 'note', text: 'Keep me', color: 'pink', size: 22, x: 10, y: 10 })
+    expect(next.mindMaps[0].nodes[0]).toMatchObject({ kind: 'note', text: 'Keep me', color: '#f9c9d9', size: 22, x: 10, y: 10 })
     expect(next.mindMaps[0].edges).toHaveLength(0)
     expect(pasteMapItems(data, mapId, { nodes: 'junk' }, { x: 0, y: 0 })).toEqual([data, []])
   })
@@ -934,10 +934,10 @@ describe('containers on the map', () => {
       data = next
       return id!
     }
-    const box = add({ kind: 'container', x: 0, y: 0, title: 'Suspects', width: 300, height: 200, color: 'blue', layout: 'vertical' })
-    const a = add({ kind: 'note', x: 10, y: 10, width: 100, height: 80, text: 'A', color: 'yellow', parentId: box })
-    const b = add({ kind: 'note', x: 10, y: 100, width: 100, height: 80, text: 'B', color: 'yellow', parentId: box })
-    const c = add({ kind: 'note', x: 500, y: 0, width: 100, height: 80, text: 'C', color: 'yellow' })
+    const box = add({ kind: 'container', x: 0, y: 0, title: 'Suspects', width: 300, height: 200, color: '#c7dcf7', layout: 'vertical' })
+    const a = add({ kind: 'note', x: 10, y: 10, width: 100, height: 80, text: 'A', color: '#fbe7a1', parentId: box })
+    const b = add({ kind: 'note', x: 10, y: 100, width: 100, height: 80, text: 'B', color: '#fbe7a1', parentId: box })
+    const c = add({ kind: 'note', x: 500, y: 0, width: 100, height: 80, text: 'C', color: '#fbe7a1' })
     return { get data() { return data }, set data(d) { data = d }, add, mapId, box, a, b, c }
   }
   const order = (data: StoryData, box: string) =>
@@ -969,7 +969,7 @@ describe('containers on the map', () => {
 
   it('puts cards in a grid in reading order: by row, then across', () => {
     const t = setup()
-    const d = t.add({ kind: 'note', x: 0, y: 0, width: 100, height: 80, text: 'D', color: 'yellow', parentId: t.box })
+    const d = t.add({ kind: 'note', x: 0, y: 0, width: 100, height: 80, text: 'D', color: '#fbe7a1', parentId: t.box })
     t.data = setContainerLayout(t.data, t.box, 'free', {
       [t.a]: { x: 200, y: 100 },
       [t.b]: { x: 20, y: 102 },
@@ -1021,8 +1021,8 @@ describe('containers on the map', () => {
       },
     })
     const [box, box2, n1, n2, n3] = loaded.mindMaps[0].nodes
-    expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, title: '', width: 80, height: 260, color: 'blue', layout: 'vertical' })
-    expect(box2).toMatchObject({ color: 'green', layout: 'grid', title: 'The harbour' })
+    expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, title: '', width: 80, height: 260, color: '#c7dcf7', layout: 'vertical' })
+    expect(box2).toMatchObject({ color: '#cfe9c8', layout: 'grid', title: 'The harbour' })
     expect([n1, n2, n3].map(parentOf)).toEqual(['box', undefined, undefined])
   })
 })

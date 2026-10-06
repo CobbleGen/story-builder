@@ -22,7 +22,7 @@ import './map.css'
 import { PanelLeftOpen } from 'lucide-react'
 import type { MapNode, MindMap } from '../types'
 import { useStory } from '../store/storyStore'
-import { parentOf, type NewMapNode } from '../store/storyOps'
+import { CONTAINER_COLOR, NOTE_COLOR, parentOf, type NewMapNode } from '../store/storyOps'
 import { anchorOfHandle } from '../lib/anchors'
 import { useResolvedTheme } from '../lib/theme'
 import { useUi } from '../store/uiStore'
@@ -41,7 +41,7 @@ import {
   DRAG_MIME,
   MapContext,
   NEW_NODE_CENTER,
-  NOTE_COLOR_VALUES,
+  paint,
   newNodeFor,
   type PaletteItem,
   type StoryFlowNode,
@@ -477,9 +477,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
               style={{ width: 168, height: 112 }}
               nodeColor={(n) => {
                 const node = (n as StoryFlowNode).data.node
-                if (node.kind === 'note') return node.color === 'white' ? '#e4e0d7' : NOTE_COLOR_VALUES[node.color]
+                if (node.kind === 'note') return paint(node.color, NOTE_COLOR)
                 if (node.kind === 'image') return dark ? '#5a554d' : '#bdb6a8'
-                if (node.kind === 'container') return `${NOTE_COLOR_VALUES[node.color]}73`
+                if (node.kind === 'container') return `${paint(node.color, CONTAINER_COLOR)}73`
                 return node.kind === 'text' ? 'transparent' : dark ? '#4a463f' : '#d6d1c6'
               }}
               maskColor={dark ? 'rgba(23, 22, 20, 0.7)' : 'rgba(239, 236, 229, 0.7)'}

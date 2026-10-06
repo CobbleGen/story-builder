@@ -11,7 +11,7 @@ import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { ELEMENT_KINDS } from '../store/storyOps'
 import type { BeatDragData, UnassignDropData } from '../lib/dnd'
 import { ChapterTag } from './ChapterTag'
-import { ColorSwatches } from './ColorSwatches'
+import { ColorPicker } from './ColorPicker'
 import { MentionText } from './MentionText'
 import { MentionTextarea } from './MentionTextarea'
 import { CharacterAvatar } from './CharacterAvatar'
@@ -388,7 +388,7 @@ function NewArcForm() {
           }
         }}
       />
-      <ColorSwatches value={chosen} onChange={setColor} />
+      <ColorPicker value={chosen} onChange={setColor} label="Arc colour" />
       <div className="form-actions">
         <button type="submit" className="btn primary" disabled={!name.trim()}>
           Create arc
@@ -475,7 +475,7 @@ function NewCharacterForm() {
         aria-label="Character name"
         onKeyDown={(e) => e.key === 'Escape' && close()}
       />
-      <ColorSwatches value={chosen} onChange={setColor} />
+      <ColorPicker value={chosen} onChange={setColor} label="Character colour" />
       <div className="form-actions">
         <button type="submit" className="btn primary" disabled={!name.trim()}>
           Create character
@@ -563,7 +563,7 @@ function NewElementForm() {
         onKeyDown={(e) => e.key === 'Escape' && close()}
       />
       <KindPicker value={kind} onChange={setKind} />
-      <ColorSwatches value={chosen} onChange={setColor} />
+      <ColorPicker value={chosen} onChange={setColor} label="Colour" />
       <div className="form-actions">
         <button type="submit" className="btn primary" disabled={!name.trim()}>
           Create {ELEMENT_KIND_NAMES[kind].noun}

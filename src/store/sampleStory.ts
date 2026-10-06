@@ -1,5 +1,5 @@
 import type { ElementKind, RichNode, StoryData } from '../types'
-import { ARC_COLORS } from '../lib/colors'
+import { ARC_COLORS, PAPER_NAMES } from '../lib/colors'
 import type { NewMapNode } from './storyOps'
 import {
   addArc,
@@ -220,7 +220,7 @@ export function buildSampleStory(): StoryData {
     y: 240,
     width: 220,
     height: 150,
-    color: 'yellow',
+    color: PAPER_NAMES.yellow,
     text: 'What if @Theo already knows about the smuggling?',
   })
   connect(nElias, nMara, 'father of')

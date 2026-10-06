@@ -92,7 +92,8 @@ export interface ChapterText {
 
 /** Story items that can be placed on the mind map; the card shows the live item. */
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'element' | 'beat'
-export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
+/** A sticky note's, text box's or container's colour, as #rrggbb (older saves name one, like 'yellow'). */
+export type NoteColor = string
 /**
  * How a container lays out the cards on it: in a column, in a row, in a grid
  * as wide as the container, or wherever they're put.

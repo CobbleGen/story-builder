@@ -12,7 +12,7 @@ import { Sidebar } from '../components/Sidebar'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
-import { ColorSwatches } from '../components/ColorSwatches'
+import { ColorPicker } from '../components/ColorPicker'
 import { ChapterTag } from '../components/ChapterTag'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
@@ -119,7 +119,7 @@ function CharacterView({ character }: { character: Character }) {
         </div>
         {showColors && (
           <div className="arc-colors character-colors">
-            <ColorSwatches value={character.color} onChange={(color) => updateCharacter(character.id, { color })} />
+            <ColorPicker value={character.color} onChange={(color) => updateCharacter(character.id, { color })} label="Character colour" />
           </div>
         )}
         <MentionTextarea

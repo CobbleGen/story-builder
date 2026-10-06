@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MapNode } from '../types'
-import { arrange, carryCards, planDrops } from './containers'
+import { TITLE_HEIGHT as T, arrange, carryCards, planDrops } from './containers'
 import type { StoryFlowNode } from './mapShared'
 
 const flow = (node: MapNode, size = { width: 100, height: 50 }, extra: Partial<StoryFlowNode> = {}): StoryFlowNode => ({
@@ -20,7 +20,7 @@ const box = (layout: 'vertical' | 'horizontal' | 'grid' | 'free', x = 0, y = 0, 
   title: '',
   width,
   height: 100,
-  color: 'blue',
+  color: '#c7dcf7',
   layout,
 })
 const note = (id: string, x: number, y: number, parentId?: string): MapNode => ({
@@ -31,7 +31,7 @@ const note = (id: string, x: number, y: number, parentId?: string): MapNode => (
   width: 100,
   height: 50,
   text: id,
-  color: 'yellow',
+  color: '#fbe7a1',
   ...(parentId ? { parentId } : {}),
 })
 const at = (nodes: StoryFlowNode[], id: string) => nodes.find((n) => n.id === id)!.position
@@ -39,10 +39,10 @@ const at = (nodes: StoryFlowNode[], id: string) => nodes.find((n) => n.id === id
 describe('containers on the map', () => {
   it('stacks cards down a container, under its title, and grows it to fit', () => {
     const nodes = arrange([flow(box('vertical', 10, 20)), flow(note('a', 500, 500, 'box')), flow(note('b', 0, 0, 'box'), { width: 260, height: 40 })])
-    expect(at(nodes, 'a')).toEqual({ x: 26, y: 60 })
-    expect(at(nodes, 'b')).toEqual({ x: 26, y: 122 })
+    expect(at(nodes, 'a')).toEqual({ x: 26, y: 20 + T })
+    expect(at(nodes, 'b')).toEqual({ x: 26, y: 20 + T + 62 })
     const c = nodes.find((n) => n.id === 'box')!
-    expect([c.width, c.height]).toEqual([292, 158])
+    expect([c.width, c.height]).toEqual([292, T + 50 + 12 + 40 + 16])
     expect(c.data.count).toBe(2)
   })
 
@@ -51,28 +51,28 @@ describe('containers on the map', () => {
     // 360 wide: (360 - 32 + 12) / (100 + 12) = 3 columns
     const wide = arrange([flow(box('grid', 0, 0, 360)), ...cards])
     expect(['a', 'b', 'c', 'd', 'e'].map((id) => at(wide, id))).toEqual([
-      { x: 16, y: 40 },
-      { x: 128, y: 40 },
-      { x: 240, y: 40 },
-      { x: 16, y: 102 },
-      { x: 128, y: 102 },
+      { x: 16, y: T },
+      { x: 128, y: T },
+      { x: 240, y: T },
+      { x: 16, y: T + 62 },
+      { x: 128, y: T + 62 },
     ])
     const c = wide.find((n) => n.id === 'box')!
-    expect([c.width, c.height]).toEqual([360, 168])
+    expect([c.width, c.height]).toEqual([360, T + 128])
     // It can be made as narrow as one card, but no narrower
-    expect(c.data.min).toEqual({ width: 132, height: 168 })
+    expect(c.data.min).toEqual({ width: 132, height: T + 128 })
     // Resized narrower: two columns, three rows, and it grows taller
     const narrow = arrange(wide.map((n) => (n.id === 'box' ? { ...n, width: 250, resizing: true } : n)))
-    expect(at(narrow, 'c')).toEqual({ x: 16, y: 102 })
-    expect(at(narrow, 'e')).toEqual({ x: 16, y: 164 })
-    expect(narrow.find((n) => n.id === 'box')!.height).toBe(230)
+    expect(at(narrow, 'c')).toEqual({ x: 16, y: T + 62 })
+    expect(at(narrow, 'e')).toEqual({ x: 16, y: T + 124 })
+    expect(narrow.find((n) => n.id === 'box')!.height).toBe(T + 190)
   })
 
   it('stacks them side by side, leaves a dragged one be, and does nothing when all is in place', () => {
     const laid = arrange([flow(box('horizontal')), flow(note('a', 0, 0, 'box')), flow(note('b', 0, 0, 'box'))])
     expect([at(laid, 'a'), at(laid, 'b')]).toEqual([
-      { x: 16, y: 40 },
-      { x: 128, y: 40 },
+      { x: 16, y: T },
+      { x: 128, y: T },
     ])
     expect(arrange(laid)).toBe(laid)
     const dragging = laid.map((n) => (n.id === 'a' ? { ...n, position: { x: 400, y: 400 }, dragging: true } : n))
@@ -97,7 +97,7 @@ describe('containers on the map', () => {
       return { ...n, position: { x, y } }
     }
     // c dropped with the pointer just above b: it goes before b
-    expect(planDrops(nodes, [drag('c', 20, 70)], saved, { id: 'c', point: { x: 40, y: 80 } })).toEqual([
+    expect(planDrops(nodes, [drag('c', 20, 70)], saved, { id: 'c', point: { x: 40, y: T + 50 } })).toEqual([
       { id: 'c', x: 20, y: 70, parentId: 'box', before: 'b' },
     ])
     // a dragged out onto the board
@@ -108,8 +108,8 @@ describe('containers on the map', () => {
     const drops = planDrops(nodes, [drag('box', 100, 100)], saved)
     expect(drops).toEqual([
       { id: 'box', x: 100, y: 100 },
-      { id: 'a', x: 116, y: 140 },
-      { id: 'b', x: 116, y: 202 },
+      { id: 'a', x: 116, y: 100 + T },
+      { id: 'b', x: 116, y: 100 + T + 62 },
     ])
   })
 
@@ -118,9 +118,9 @@ describe('containers on the map', () => {
     const saved = nodes.map((n) => n.data.node)
     const x = { ...nodes.find((n) => n.id === 'x')!, position: { x: 100, y: 60 } }
     const slot = (point: { x: number; y: number }) => planDrops(nodes, [x], saved, { id: 'x', point })[0].before
-    expect(slot({ x: 140, y: 60 })).toBe('b') // left half of b, in the first row
-    expect(slot({ x: 200, y: 60 })).toBe('c') // right half of b
-    expect(slot({ x: 340, y: 60 })).toBe('d') // past the end of the first row
-    expect(slot({ x: 200, y: 120 })).toBeNull() // after d, on the second row
+    expect(slot({ x: 140, y: T + 20 })).toBe('b') // left half of b, in the first row
+    expect(slot({ x: 200, y: T + 20 })).toBe('c') // right half of b
+    expect(slot({ x: 340, y: T + 20 })).toBe('d') // past the end of the first row
+    expect(slot({ x: 200, y: T + 80 })).toBeNull() // after d, on the second row
   })
 })

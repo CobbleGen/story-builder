@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { NodeResizer, NodeToolbar, type NodeProps } from '@xyflow/react'
 import { Minus, PenLine, Plus, Trash2 } from 'lucide-react'
-import type { MapNode, NoteColor } from '../types'
+import type { MapNode } from '../types'
 import { useStory } from '../store/storyStore'
-import { NOTE_COLORS } from '../store/storyOps'
+import { NOTE_COLOR } from '../store/storyOps'
+import { ColorPicker } from '../components/ColorPicker'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
 import { ListButtons, ListEditor, TextList } from './TextList'
-import { NOTE_COLOR_VALUES, focusSoon, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { focusSoon, paint, paperClasses, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, NOTE_TEXT_SIZE, cleanTextSize, stepTextSize, textLook } from '../lib/textSize'
 
 type NoteMapNode = Extract<MapNode, { kind: 'note' }>
@@ -90,11 +91,12 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const { editing, input, start, stop, remove } = useEditing(id)
   const toolbar = useToolbarPlacement(id, selected)
+  const color = paint(node.color, NOTE_COLOR)
 
   return (
     <div
-      className={`map-note note-${node.color}${editing ? ' editing' : ''}`}
-      style={{ background: NOTE_COLOR_VALUES[node.color], fontSize: node.size }}
+      className={`map-note${paperClasses(color)}${editing ? ' editing' : ''}`}
+      style={{ background: color, fontSize: node.size }}
       onDoubleClick={start}
     >
       <NodeResizer
@@ -106,16 +108,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width, height: p.height })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
-        {NOTE_COLORS.map((color: NoteColor) => (
-          <button
-            key={color}
-            className={`map-swatch${color === node.color ? ' active' : ''}`}
-            style={{ background: NOTE_COLOR_VALUES[color] }}
-            onClick={() => updateMapNode(id, { color })}
-            aria-label={`${color} note`}
-            title={color[0].toUpperCase() + color.slice(1)}
-          />
-        ))}
+        <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Note colour" />
         <span className="map-tool-sep" />
         <TextSizeControl size={node.size ?? NOTE_TEXT_SIZE} onChange={(size) => updateMapNode(id, { size })} />
         <span className="map-tool-sep" />
@@ -165,11 +158,12 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const { editing, input, start, stop, remove } = useEditing(id)
   const toolbar = useToolbarPlacement(id, selected)
+  const bg = node.bg ? paint(node.bg, NOTE_COLOR) : undefined
 
   return (
     <div
-      className={`map-text look-${textLook(node.size)}${node.bg ? ` has-bg bg-${node.bg}` : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
-      style={{ fontSize: node.size, background: node.bg ? NOTE_COLOR_VALUES[node.bg] : undefined }}
+      className={`map-text look-${textLook(node.size)}${bg ? ` has-bg${paperClasses(bg)}` : ''}${editing ? ' editing' : ''}${selected ? ' selected' : ''}`}
+      style={{ fontSize: node.size, background: bg }}
       onDoubleClick={start}
     >
       <NodeResizer
@@ -189,16 +183,7 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
           aria-label="No background"
           title="No background"
         />
-        {NOTE_COLORS.map((color) => (
-          <button
-            key={color}
-            className={`map-swatch${color === node.bg ? ' active' : ''}`}
-            style={{ background: NOTE_COLOR_VALUES[color] }}
-            onClick={() => updateMapNode(id, { bg: color })}
-            aria-label={`${color} background`}
-            title={`${color[0].toUpperCase() + color.slice(1)} background`}
-          />
-        ))}
+        <ColorPicker variant="toolbar" count={6} value={bg} onChange={(c) => updateMapNode(id, { bg: c })} label="Background colour" />
         <span className="map-tool-sep" />
         <ListButtons node={node} />
         <span className="map-tool-sep" />

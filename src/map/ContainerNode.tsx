@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { NodeResizer, NodeToolbar, useReactFlow, type NodeProps } from '@xyflow/react'
 import { Columns3, LayoutGrid, PenLine, Rows3, Shapes, Trash2, type LucideIcon } from 'lucide-react'
-import type { ContainerLayout, MapNode, NoteColor } from '../types'
+import type { ContainerLayout, MapNode } from '../types'
 import { useStory } from '../store/storyStore'
-import { NOTE_COLORS, parentOf } from '../store/storyOps'
+import { CONTAINER_COLOR, parentOf } from '../store/storyOps'
+import { ColorPicker } from '../components/ColorPicker'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
 import { TITLE_HEIGHT } from './containers'
-import { NOTE_COLOR_VALUES, focusSoon, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { focusSoon, paint, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 
 type ContainerMapNode = Extract<MapNode, { kind: 'container' }>
 
@@ -38,6 +39,7 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
   const input = useRef<HTMLTextAreaElement>(null)
   const resizedFrom = useRef<{ width: number; height: number } | null>(null)
   const min = data.min
+  const color = paint(node.color, CONTAINER_COLOR)
 
   useEffect(() => (editing ? focusSoon(() => input.current) : undefined), [editing])
 
@@ -51,7 +53,7 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
   return (
     <div
       className={`map-container layout-${node.layout}${dropTarget === id ? ' drop-target' : ''}`}
-      style={{ '--box': NOTE_COLOR_VALUES[node.color], '--title-height': `${TITLE_HEIGHT}px` } as React.CSSProperties}
+      style={{ '--box': color, '--title-height': `${TITLE_HEIGHT}px` } as React.CSSProperties}
     >
       <NodeResizer
         isVisible={selected && !editing}
@@ -88,16 +90,7 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
           </button>
         ))}
         <span className="map-tool-sep" />
-        {NOTE_COLORS.map((color: NoteColor) => (
-          <button
-            key={color}
-            className={`map-swatch${color === node.color ? ' active' : ''}`}
-            style={{ background: NOTE_COLOR_VALUES[color] }}
-            onClick={() => updateMapNode(id, { color })}
-            aria-label={`${color} container`}
-            title={color[0].toUpperCase() + color.slice(1)}
-          />
-        ))}
+        <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Container colour" />
         <span className="map-tool-sep" />
         <button className="map-tool icon-only" onClick={() => setEditingId(id)} aria-label="Edit title" title="Edit title">
           <PenLine size={14} />

@@ -12,7 +12,7 @@ import type { StoryFlowNode } from './mapShared'
 type ContainerMapNode = Extract<MapNode, { kind: 'container' }>
 
 /** The title bar along a container's top (ContainerNode draws it this tall); cards stack below it. */
-export const TITLE_HEIGHT = 40
+export const TITLE_HEIGHT = 56
 /** Room around and between cards stacked on a container. */
 const PAD = 16
 const GAP = 12

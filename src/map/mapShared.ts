@@ -3,7 +3,8 @@ import { Position, useNodeId, useStore, useUpdateNodeInternals, type Node } from
 import { useShallow } from 'zustand/react/shallow'
 import { useStory } from '../store/storyStore'
 import type { MapNode, MapSize, NoteColor } from '../types'
-import type { NewMapNode } from '../store/storyOps'
+import { CONTAINER_COLOR, NOTE_COLOR, type NewMapNode } from '../store/storyOps'
+import { cleanColor, isPale, needsLightInk } from '../lib/colors'
 import { TEXT_BOX_SIZE } from '../lib/textSize'
 
 /** Data type for things dragged from the palette onto the canvas. */
@@ -17,9 +18,9 @@ export type PaletteItem =
 
 /** A palette item as a new card at a position (top-left corner). */
 export function newNodeFor(item: PaletteItem, x: number, y: number): NewMapNode {
-  if (item.kind === 'note') return { kind: 'note', x, y, width: 220, height: 160, text: '', color: 'yellow' }
+  if (item.kind === 'note') return { kind: 'note', x, y, width: 220, height: 160, text: '', color: NOTE_COLOR }
   if (item.kind === 'text') return { kind: 'text', x, y, width: 280, text: '', size: TEXT_BOX_SIZE }
-  if (item.kind === 'container') return { kind: 'container', x, y, title: '', width: 360, height: 260, color: 'blue', layout: 'vertical' }
+  if (item.kind === 'container') return { kind: 'container', x, y, title: '', width: 360, height: 260, color: CONTAINER_COLOR, layout: 'vertical' }
   return { kind: item.kind, refId: item.refId, x, y }
 }
 
@@ -35,15 +36,11 @@ export const NEW_NODE_CENTER: Record<PaletteItem['kind'], { x: number; y: number
   beat: { x: 120, y: 35 },
 }
 
-export const NOTE_COLOR_VALUES: Record<NoteColor, string> = {
-  yellow: '#fbe7a1',
-  pink: '#f9c9d9',
-  blue: '#c7dcf7',
-  green: '#cfe9c8',
-  purple: '#dccff5',
-  orange: '#fbd2ad',
-  white: '#ffffff',
-}
+/** A note's, text box's or container's colour to paint, also for colours saved by name. */
+export const paint = (color: NoteColor | undefined, fallback: string) => cleanColor(color) ?? fallback
+
+/** Classes for writing on a colour: light ink on dark ones, an edge for pale ones. */
+export const paperClasses = (hex: string) => `${needsLightInk(hex) ? ' dark-paper' : ''}${isPale(hex) ? ' pale' : ''}`
 
 export type StoryFlowNode = Node<
   {

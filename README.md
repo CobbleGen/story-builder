@@ -32,6 +32,11 @@ It has four views: the **chapter board**, the **manuscript**, the
   a colour, a page with its own attributes and suggestions for the kind, and
   a list of everywhere it's mentioned. Hovering one dims the beats that don't
   mention it.
+- **Colours**: wherever a colour is picked (arcs, characters, places,
+  sticky notes, text box backgrounds, containers), the row shows the colours
+  used lately, latest first, and the rainbow button opens a colour wheel:
+  hue around it, paler towards the middle, a brightness slider and the
+  colour's code to type. Writing on dark colours turns light.
 - **@mentions**: type `@` in any text to mention a character, place or thing
   (or create a new character or place from what you typed). Mentions show as
   the name in its colour, and renaming updates every mention; deleting turns
@@ -51,7 +56,7 @@ It has four views: the **chapter board**, the **manuscript**, the
   from the toolbar: the − and + buttons, or type a size (bigger text in a text
   box turns bolder, and from 28 up a serif title). Notes
   and text boxes can become a bulleted, numbered or tick-box list, and text
-  boxes can have a background colour (white included). Drag from the dot on a card's edge to another card to draw a
+  boxes can have a background colour. Drag from the dot on a card's edge to another card to draw a
   line, then select the line to label it or give it an arrow. Lines can also
   start from, or end on, a single row inside a card: hover a beat, an
   attribute, a paragraph on a chapter's page or a list item, and drag from the
@@ -62,8 +67,8 @@ It has four views: the **chapter board**, the **manuscript**, the
   join (and over containers). Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
-- **Containers**: add one from the panel (**Container**) and give it a title
-  (double-click the title, or the pen in its toolbar, to change it; `@`
+- **Containers**: add one from the panel (**Container**) and give it a title,
+  shown large across its top (double-click the title, or the pen in its toolbar, to change it; `@`
   mentions work, and search finds it). Drop cards on it (from the map or the
   panel) to put them on it; drag a card off to take it off. Moving a
   container moves everything on it. By default its cards stack downwards;

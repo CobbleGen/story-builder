@@ -22,7 +22,7 @@ import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 import { displayName, plainText } from '../lib/mentions'
-import { ColorSwatches } from '../components/ColorSwatches'
+import { ColorPicker } from '../components/ColorPicker'
 import { askConfirm } from '../lib/confirm'
 
 export function ArcPage() {
@@ -118,7 +118,7 @@ function ArcView({ arc }: { arc: Arc }) {
         </div>
         {showColors && (
           <div className="arc-colors">
-            <ColorSwatches value={arc.color} onChange={(color) => updateArc(arc.id, { color })} />
+            <ColorPicker value={arc.color} onChange={(color) => updateArc(arc.id, { color })} label="Arc colour" />
           </div>
         )}
         <MentionTextarea

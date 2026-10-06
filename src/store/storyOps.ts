@@ -27,6 +27,7 @@ import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
+import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
 // invariants: a beat is listed in exactly its own arc's beatIds, and in the
@@ -1072,7 +1073,9 @@ export function cleanTarget(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? Math.min(10_000_000, Math.round(value)) : undefined
 }
 
-export const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange', 'white']
+/** New sticky notes' colour, and new containers'. */
+export const NOTE_COLOR = PAPER_NAMES.yellow
+export const CONTAINER_COLOR = PAPER_NAMES.blue
 export const MAP_LIST_STYLES: MapListStyle[] = ['bullet', 'number', 'check']
 /** The ways each kind of card can open up on the mind map. */
 export const MAP_CARD_VIEWS: Record<MapEntityKind, MapCardView[]> = {
@@ -1274,7 +1277,6 @@ export function normalizeStory(input: unknown): StoryData {
         if (Object.keys(sizes).length) node.sizes = sizes
         nodes.push(node)
       } else if (kind === 'note') {
-        const color = str(n.color) as NoteColor
         const text = str(n.text)
         nodes.push({
           id,
@@ -1284,7 +1286,7 @@ export function normalizeStory(input: unknown): StoryData {
           width: num(n.width, 220, 80, 2000),
           height: num(n.height, 160, 60, 2000),
           text,
-          color: NOTE_COLORS.includes(color) ? color : 'yellow',
+          color: cleanColor(n.color) ?? NOTE_COLOR,
           ...sizeOf(n.size),
           ...listOf(n, text),
         })
@@ -1293,7 +1295,6 @@ export function normalizeStory(input: unknown): StoryData {
         if (!IMAGE_ID.test(imageId)) continue
         nodes.push({ id, kind, x, y, width: num(n.width, 240, 30, 4000), height: num(n.height, 180, 30, 4000), imageId })
       } else if (kind === 'container') {
-        const color = str(n.color) as NoteColor
         const layout = str(n.layout) as ContainerLayout
         nodes.push({
           id,
@@ -1303,7 +1304,7 @@ export function normalizeStory(input: unknown): StoryData {
           title: str(n.title).slice(0, 500),
           width: num(n.width, 360, 80, 8000),
           height: num(n.height, 260, 60, 8000),
-          color: NOTE_COLORS.includes(color) ? color : 'blue',
+          color: cleanColor(n.color) ?? CONTAINER_COLOR,
           layout: CONTAINER_LAYOUTS.includes(layout) ? layout : 'vertical',
         })
       } else if (kind === 'text') {
@@ -1318,8 +1319,8 @@ export function normalizeStory(input: unknown): StoryData {
           // Saves from before sizes could be set say small, medium or large.
           size: cleanTextSize(n.size) ?? TEXT_BOX_SIZE,
         }
-        const bg = str(n.bg) as NoteColor
-        if (NOTE_COLORS.includes(bg)) node.bg = bg
+        const bg = cleanColor(n.bg)
+        if (bg) node.bg = bg
         nodes.push({ ...node, ...listOf(n, text) })
       }
     }

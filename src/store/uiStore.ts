@@ -46,6 +46,8 @@ interface UiState {
   /** How the manuscript was last exported. */
   exportOptions: ExportOptions
   timelineMode: TimelineMode
+  /** Colours picked lately, the latest first (empty until one is picked). */
+  recentColors: string[]
   toggleSidebar: () => void
   setSidebarMode: (mode: SidebarMode) => void
   toggleArc: (arcId: string) => void
@@ -63,7 +65,11 @@ interface UiState {
   setSearchOpen: (open: boolean) => void
   setExportOptions: (patch: Partial<ExportOptions>) => void
   setTimelineMode: (mode: TimelineMode) => void
+  /** Puts a picked colour first among the recent ones; `shown` are the ones on show until any is picked. */
+  rememberColor: (color: string, shown: string[]) => void
 }
+
+const RECENT_COLORS = 12
 
 export const useUi = create<UiState>()(
   persist(
@@ -86,6 +92,7 @@ export const useUi = create<UiState>()(
       searchOpen: false,
       exportOptions: DEFAULT_EXPORT,
       timelineMode: 'story',
+      recentColors: [],
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarMode: (sidebarMode) => set({ sidebarMode }),
       toggleArc: (arcId) =>
@@ -104,6 +111,11 @@ export const useUi = create<UiState>()(
       setSearchOpen: (searchOpen) => set({ searchOpen }),
       setExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
       setTimelineMode: (timelineMode) => set({ timelineMode }),
+      rememberColor: (color, shown) =>
+        set((s) => {
+          const was = s.recentColors.length ? s.recentColors : shown
+          return { recentColors: [color, ...was.filter((c) => c !== color)].slice(0, RECENT_COLORS) }
+        }),
     }),
     {
       name: 'story-builder:ui',
@@ -130,6 +142,7 @@ export const useUi = create<UiState>()(
         theme: s.theme,
         exportOptions: s.exportOptions,
         timelineMode: s.timelineMode,
+        recentColors: s.recentColors,
       }),
     },
   ),

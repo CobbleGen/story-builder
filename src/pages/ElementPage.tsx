@@ -12,7 +12,7 @@ import { useMentionPlaces } from '../lib/useMentionPlaces'
 import { Sidebar } from '../components/Sidebar'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ElementIcon } from '../components/ElementIcon'
-import { ColorSwatches } from '../components/ColorSwatches'
+import { ColorPicker } from '../components/ColorPicker'
 import { KindPicker } from '../components/KindPicker'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
@@ -132,7 +132,7 @@ function ElementView({ element }: { element: StoryElement }) {
         </div>
         {showColors && (
           <div className="arc-colors character-colors">
-            <ColorSwatches value={element.color} onChange={(color) => updateElement(element.id, { color })} />
+            <ColorPicker value={element.color} onChange={(color) => updateElement(element.id, { color })} label="Colour" />
           </div>
         )}
         <div className="element-kind-row">
