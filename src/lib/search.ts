@@ -214,13 +214,14 @@ export function buildIndex(data: Searchable, lookup: Lookup): SearchIndex {
   for (const map of data.mindMaps) {
     entries.push({ kind: 'map', id: map.id, key: `map:${map.id}`, title: field(map.name), fields: [], mapId: map.id })
     for (const n of map.nodes) {
-      if (n.kind !== 'note' && n.kind !== 'text') continue
+      const text = n.kind === 'note' || n.kind === 'text' ? n.text : n.kind === 'container' ? n.title : null
+      if (!text) continue
       entries.push({
         kind: 'note',
         id: n.id,
         key: `note:${n.id}`,
         title: field(map.name),
-        fields: [field(plain(n.text))],
+        fields: [field(plain(text))],
         titleIsLabel: true,
         mapId: map.id,
       })

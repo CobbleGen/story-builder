@@ -11,6 +11,8 @@ import type { StoryFlowNode } from './mapShared'
 
 type ContainerMapNode = Extract<MapNode, { kind: 'container' }>
 
+/** The title bar along a container's top (ContainerNode draws it this tall); cards stack below it. */
+export const TITLE_HEIGHT = 40
 /** Room around and between cards stacked on a container. */
 const PAD = 16
 const GAP = 12
@@ -26,20 +28,49 @@ export const sizeOf = (n: StoryFlowNode): MapSize =>
 
 const containerOf = (n: StoryFlowNode) => (n.data.node.kind === 'container' ? (n.data.node as ContainerMapNode) : null)
 
-/** Where cards of these sizes go stacked on a container at `at`, and the room they take up. */
-export function stack(layout: Exclude<ContainerLayout, 'free'>, at: { x: number; y: number }, sizes: MapSize[]) {
+interface Laid {
+  positions: { x: number; y: number }[]
+  /** The room the cards take up, title bar included. */
+  content: MapSize
+  /** The smallest the container can be made (a grid can lose columns). */
+  min: MapSize
+}
+
+/**
+ * Where cards of these sizes go stacked on a container at `at` that's
+ * `width` wide (which a grid fills), and the room they take up.
+ */
+export function stack(layout: Exclude<ContainerLayout, 'free'>, at: { x: number; y: number }, sizes: MapSize[], width: number): Laid {
+  if (!sizes.length) return { positions: [], content: { width: 0, height: 0 }, min: { width: 0, height: 0 } }
+  if (layout === 'grid') return grid(at, sizes, width)
   const down = layout === 'vertical'
-  let along = PAD
+  let along = down ? TITLE_HEIGHT : PAD
   let across = 0
   const positions = sizes.map((s) => {
-    const p = down ? { x: at.x + PAD, y: at.y + along } : { x: at.x + along, y: at.y + PAD }
+    const p = down ? { x: at.x + PAD, y: at.y + along } : { x: at.x + along, y: at.y + TITLE_HEIGHT }
     along += (down ? s.height : s.width) + GAP
     across = Math.max(across, down ? s.width : s.height)
     return p
   })
-  const length = sizes.length ? along - GAP + PAD : 0
-  const thickness = sizes.length ? across + 2 * PAD : 0
-  return { positions, content: down ? { width: thickness, height: length } : { width: length, height: thickness } }
+  const length = along - GAP + PAD
+  const content = down ? { width: across + 2 * PAD, height: length } : { width: length, height: across + TITLE_HEIGHT + PAD }
+  return { positions, content, min: content }
+}
+
+/** Cards in rows of equal cells, as many to a row as fit across the container. */
+function grid(at: { x: number; y: number }, sizes: MapSize[], width: number): Laid {
+  const cell = Math.max(...sizes.map((s) => s.width))
+  const columns = Math.max(1, Math.floor((width - 2 * PAD + GAP) / (cell + GAP)))
+  const positions: { x: number; y: number }[] = []
+  let top = TITLE_HEIGHT
+  for (let first = 0; first < sizes.length; first += columns) {
+    const row = sizes.slice(first, first + columns)
+    row.forEach((_, i) => positions.push({ x: at.x + PAD + i * (cell + GAP), y: at.y + top }))
+    top += Math.max(...row.map((s) => s.height)) + GAP
+  }
+  const used = Math.min(columns, sizes.length)
+  const content = { width: 2 * PAD + used * cell + (used - 1) * GAP, height: top - GAP + PAD }
+  return { positions, content, min: { width: cell + 2 * PAD, height: content.height } }
 }
 
 /**
@@ -63,19 +94,20 @@ export function arrange(nodes: StoryFlowNode[]): StoryFlowNode[] {
     // While it's being resized, the size it's being given is the one on screen.
     const given = c.resizing ? { width: c.width ?? box.width, height: c.height ?? box.height } : box
     let content = { width: 0, height: 0 }
+    let min = content
     if (box.layout !== 'free' && cards.length) {
-      const laid = stack(box.layout, c.position, cards.map(sizeOf))
+      const laid = stack(box.layout, c.position, cards.map(sizeOf), given.width)
       laid.positions.forEach((p, i) => {
         const card = cards[i]
         if (!card.dragging && (card.position.x !== p.x || card.position.y !== p.y)) updates.set(card.id, { ...card, position: p })
       })
-      content = laid.content
+      ;({ content, min } = laid)
     }
     const width = Math.max(given.width, content.width)
     const height = Math.max(given.height, content.height)
-    const was = c.data.content
-    if (c.width !== width || c.height !== height || was?.width !== content.width || was?.height !== content.height || c.data.count !== cards.length) {
-      updates.set(c.id, { ...c, width, height, data: { ...c.data, content, count: cards.length } })
+    const was = c.data.min
+    if (c.width !== width || c.height !== height || was?.width !== min.width || was?.height !== min.height || c.data.count !== cards.length) {
+      updates.set(c.id, { ...c, width, height, data: { ...c.data, min, count: cards.length } })
     }
   }
   return updates.size ? nodes.map((n) => updates.get(n.id) ?? n) : nodes
@@ -114,13 +146,21 @@ export function containerAt(nodes: StoryFlowNode[], point: { x: number; y: numbe
   return found
 }
 
-/** Which card on a container's column or row one centred at `point` goes before (null: the end). */
+/** Which card on a container's column, row or grid one dropped at `point` goes before (null: the end). */
 export function stackBefore(nodes: StoryFlowNode[], container: StoryFlowNode, point: { x: number; y: number }, skip: Set<string>) {
-  const down = containerOf(container)?.layout !== 'horizontal'
+  const layout = containerOf(container)?.layout
   for (const n of nodes) {
     if (parentOf(n.data.node) !== container.id || skip.has(n.id)) continue
     const { width, height } = sizeOf(n)
-    if (down ? point.y < n.position.y + height / 2 : point.x < n.position.x + width / 2) return n.id
+    const { x, y } = n.position
+    const before =
+      layout === 'grid'
+        ? // In a grid: above its row, or in its row and left of its middle.
+          point.y < y || (point.y < y + height && point.x < x + width / 2)
+        : layout === 'horizontal'
+          ? point.x < x + width / 2
+          : point.y < y + height / 2
+    if (before) return n.id
   }
   return null
 }
@@ -164,7 +204,7 @@ export function planDrops(
         if (s) drops.push({ id: card.id, x: s.x + at.x - was.x, y: s.y + at.y - was.y })
       }
     } else {
-      stack(box.layout, at, cards.map(sizeOf)).positions.forEach((p, i) => drops.push({ id: cards[i].id, ...round(p) }))
+      stack(box.layout, at, cards.map(sizeOf), sizeOf(c).width).positions.forEach((p, i) => drops.push({ id: cards[i].id, ...round(p) }))
     }
   }
   // Top to bottom, so several cards dropped on one column keep their order.

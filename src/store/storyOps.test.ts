@@ -934,7 +934,7 @@ describe('containers on the map', () => {
       data = next
       return id!
     }
-    const box = add({ kind: 'container', x: 0, y: 0, width: 300, height: 200, color: 'blue', layout: 'vertical' })
+    const box = add({ kind: 'container', x: 0, y: 0, title: 'Suspects', width: 300, height: 200, color: 'blue', layout: 'vertical' })
     const a = add({ kind: 'note', x: 10, y: 10, width: 100, height: 80, text: 'A', color: 'yellow', parentId: box })
     const b = add({ kind: 'note', x: 10, y: 100, width: 100, height: 80, text: 'B', color: 'yellow', parentId: box })
     const c = add({ kind: 'note', x: 500, y: 0, width: 100, height: 80, text: 'C', color: 'yellow' })
@@ -965,6 +965,18 @@ describe('containers on the map', () => {
     // A container never goes on another one
     t.data = dropMapNodes(t.data, [{ id: t.box, x: 5, y: 5, parentId: t.box }])
     expect(parentOf(t.data.mindMaps[0].nodes.find((n) => n.id === t.box)!)).toBeUndefined()
+  })
+
+  it('puts cards in a grid in reading order: by row, then across', () => {
+    const t = setup()
+    const d = t.add({ kind: 'note', x: 0, y: 0, width: 100, height: 80, text: 'D', color: 'yellow', parentId: t.box })
+    t.data = setContainerLayout(t.data, t.box, 'free', {
+      [t.a]: { x: 200, y: 100 },
+      [t.b]: { x: 20, y: 102 },
+      [d]: { x: 120, y: 10 },
+    })
+    t.data = setContainerLayout(t.data, t.box, 'grid')
+    expect(order(t.data, t.box)).toEqual(['D', 'B', 'A'])
   })
 
   it('stacks cards in the order they’re in on screen when it stops being freeform', () => {
@@ -1001,7 +1013,7 @@ describe('containers on the map', () => {
       mindMap: {
         nodes: [
           { id: 'box', kind: 'container', x: 0, y: 0, width: 5, height: 'tall', color: 'neon', layout: 'diagonal', parentId: 'box2' },
-          { id: 'box2', kind: 'container', x: 0, y: 0, width: 400, height: 300, color: 'green', layout: 'free' },
+          { id: 'box2', kind: 'container', x: 0, y: 0, width: 400, height: 300, color: 'green', layout: 'grid', title: 'The harbour' },
           { id: 'n1', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'box' },
           { id: 'n2', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'n1' },
           { id: 'n3', kind: 'note', x: 0, y: 0, width: 100, height: 80, text: '', color: 'yellow', parentId: 'gone' },
@@ -1009,8 +1021,8 @@ describe('containers on the map', () => {
       },
     })
     const [box, box2, n1, n2, n3] = loaded.mindMaps[0].nodes
-    expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, width: 80, height: 260, color: 'blue', layout: 'vertical' })
-    expect(box2).toMatchObject({ color: 'green', layout: 'free' })
+    expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, title: '', width: 80, height: 260, color: 'blue', layout: 'vertical' })
+    expect(box2).toMatchObject({ color: 'green', layout: 'grid', title: 'The harbour' })
     expect([n1, n2, n3].map(parentOf)).toEqual(['box', undefined, undefined])
   })
 })

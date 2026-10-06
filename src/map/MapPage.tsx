@@ -114,6 +114,9 @@ function toFlow(mapNodes: MapNode[], prev: StoryFlowNode[], select?: Set<string>
   })
 }
 
+/** New cards that open ready to write in: a note's or text box's text, a container's title. */
+const WRITTEN_FIRST = new Set<PaletteItem['kind']>(['note', 'text', 'container'])
+
 /** A new picture's size on the map: as it is, unless that's bigger than a large card. */
 function pictureSize(width: number, height: number) {
   const scale = Math.min(1, 320 / width, 320 / height)
@@ -301,7 +304,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
       // Dropped on a container: it goes on it, where it was dropped.
       const { parentId, before } = item.kind === 'container' ? { parentId: null, before: undefined } : placeOnContainer(nodesRef.current, p)
       const id = addMapNode(parentId ? ({ ...node, parentId } as NewMapNode) : node, mindMap.id, before ?? null)
-      if (id && (item.kind === 'note' || item.kind === 'text')) setEditingId(id)
+      if (id && WRITTEN_FIRST.has(item.kind)) setEditingId(id)
     },
     [addMapNode, screenToFlowPosition, mindMap.id],
   )
@@ -314,7 +317,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
     const middle = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
     const spot = freeSpot(nodes, middle.x - c.x, middle.y - c.y, c.x * 2, c.y * 2)
     const id = addMapNode(newNodeFor(item, Math.round(spot.x), Math.round(spot.y)), mindMap.id)
-    if (id && (item.kind === 'note' || item.kind === 'text')) setEditingId(id)
+    if (id && WRITTEN_FIRST.has(item.kind)) setEditingId(id)
     // On a phone the panel covers the map; get it out of the way of the new card.
     if (window.matchMedia('(max-width: 760px)').matches) togglePalette()
   }

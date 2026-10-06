@@ -716,6 +716,7 @@ export type MapNodePatch = Partial<{
   width: number
   height: number
   text: string
+  title: string
   color: NoteColor
   size: number | undefined
   bg: NoteColor | undefined
@@ -728,7 +729,7 @@ export type MapNodePatch = Partial<{
 
 const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refId' in n
 
-export const CONTAINER_LAYOUTS: ContainerLayout[] = ['vertical', 'horizontal', 'free']
+export const CONTAINER_LAYOUTS: ContainerLayout[] = ['vertical', 'horizontal', 'grid', 'free']
 export const isContainer = (n: MapNode | NewMapNode): n is Extract<MapNode, { kind: 'container' }> => n.kind === 'container'
 /** The container a card is on, if any. */
 export const parentOf = (n: MapNode | NewMapNode): string | undefined => ('parentId' in n ? n.parentId : undefined)
@@ -890,10 +891,24 @@ export function dropMapNodes(data: StoryData, drops: MapDrop[]): StoryData {
   })
 }
 
+/** How far down one card can be from another and still count as in its row. */
+const ROW_SLACK = 60
+
+/** Cards in the order they're read: row by row (roughly lined up is enough), left to right. */
+function rowByRow(cards: MapNode[]): MapNode[] {
+  const rows: MapNode[][] = []
+  for (const card of [...cards].sort((a, b) => a.y - b.y)) {
+    const row = rows[rows.length - 1]
+    if (row && card.y - row[0].y < ROW_SLACK) row.push(card)
+    else rows.push([card])
+  }
+  return rows.flatMap((row) => row.sort((a, b) => a.x - b.x))
+}
+
 /**
  * Changes how a container lays out its cards. `positions` are where its cards
  * are on screen now, so they stay put when it becomes freeform; when it stacks
- * them, they go in the order they're in now, down or across.
+ * them, they go in the order they're in now: down, across, or row by row.
  */
 export function setContainerLayout(
   data: StoryData,
@@ -910,8 +925,11 @@ export function setContainerLayout(
       return at && parentOf(n) === id ? { ...n, x: Math.round(at.x), y: Math.round(at.y) } : n
     })
     if (layout !== 'free') {
-      const key = (n: MapNode) => (layout === 'vertical' ? [n.y, n.x] : [n.x, n.y])
-      const sorted = nodes.filter((n) => parentOf(n) === id).sort((a, b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1])
+      const cards = nodes.filter((n) => parentOf(n) === id)
+      const sorted =
+        layout === 'grid'
+          ? rowByRow(cards)
+          : cards.sort(layout === 'horizontal' ? (a, b) => a.x - b.x || a.y - b.y : (a, b) => a.y - b.y || a.x - b.x)
       let k = 0
       nodes = nodes.map((n) => (parentOf(n) === id ? sorted[k++] : n))
     }
@@ -1282,6 +1300,7 @@ export function normalizeStory(input: unknown): StoryData {
           kind,
           x,
           y,
+          title: str(n.title).slice(0, 500),
           width: num(n.width, 360, 80, 8000),
           height: num(n.height, 260, 60, 8000),
           color: NOTE_COLORS.includes(color) ? color : 'blue',

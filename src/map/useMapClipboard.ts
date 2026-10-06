@@ -30,6 +30,8 @@ function textOf(data: StoryData, nodes: MapNode[]): string {
       case 'note':
       case 'text':
         return plainText(n.text, lookup)
+      case 'container':
+        return plainText(n.title, lookup)
       case 'character': {
         const c = data.characters.find((x) => x.id === n.refId)
         return c ? displayName(c) : ''

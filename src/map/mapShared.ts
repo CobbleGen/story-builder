@@ -19,7 +19,7 @@ export type PaletteItem =
 export function newNodeFor(item: PaletteItem, x: number, y: number): NewMapNode {
   if (item.kind === 'note') return { kind: 'note', x, y, width: 220, height: 160, text: '', color: 'yellow' }
   if (item.kind === 'text') return { kind: 'text', x, y, width: 280, text: '', size: TEXT_BOX_SIZE }
-  if (item.kind === 'container') return { kind: 'container', x, y, width: 360, height: 260, color: 'blue', layout: 'vertical' }
+  if (item.kind === 'container') return { kind: 'container', x, y, title: '', width: 360, height: 260, color: 'blue', layout: 'vertical' }
   return { kind: item.kind, refId: item.refId, x, y }
 }
 
@@ -48,8 +48,8 @@ export const NOTE_COLOR_VALUES: Record<NoteColor, string> = {
 export type StoryFlowNode = Node<
   {
     node: MapNode
-    /** On a container: the room the cards stacked on it take up, and how many cards are on it. */
-    content?: MapSize
+    /** On a container: the smallest it can be made around the cards stacked on it, and how many cards are on it. */
+    min?: MapSize
     count?: number
   },
   MapNode['kind']

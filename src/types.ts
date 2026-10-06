@@ -93,8 +93,11 @@ export interface ChapterText {
 /** Story items that can be placed on the mind map; the card shows the live item. */
 export type MapEntityKind = 'arc' | 'chapter' | 'character' | 'element' | 'beat'
 export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple' | 'orange' | 'white'
-/** How a container lays out the cards on it: in a column, in a row, or wherever they're put. */
-export type ContainerLayout = 'vertical' | 'horizontal' | 'free'
+/**
+ * How a container lays out the cards on it: in a column, in a row, in a grid
+ * as wide as the container, or wherever they're put.
+ */
+export type ContainerLayout = 'vertical' | 'horizontal' | 'grid' | 'free'
 /** A text box shown as a list: each line is an item. */
 export type MapListStyle = 'bullet' | 'number' | 'check'
 /** What an opened-up card shows: a chapter's pages, the beats of a chapter or arc, or a character's details. */
@@ -172,6 +175,8 @@ export type MapNode =
       kind: 'container'
       x: number
       y: number
+      /** Shown along its top; may have @mentions. */
+      title: string
       /** The size it was given; it grows to fit cards stacked on it. */
       width: number
       height: number

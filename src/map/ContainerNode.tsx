@@ -1,35 +1,45 @@
+import { useEffect, useRef } from 'react'
 import { NodeResizer, NodeToolbar, useReactFlow, type NodeProps } from '@xyflow/react'
-import { Columns3, LayoutDashboard, Rows3, Trash2, type LucideIcon } from 'lucide-react'
+import { Columns3, LayoutGrid, PenLine, Rows3, Shapes, Trash2, type LucideIcon } from 'lucide-react'
 import type { ContainerLayout, MapNode, NoteColor } from '../types'
 import { useStory } from '../store/storyStore'
 import { NOTE_COLORS, parentOf } from '../store/storyOps'
+import { MentionText } from '../components/MentionText'
+import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
-import { NOTE_COLOR_VALUES, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { TITLE_HEIGHT } from './containers'
+import { NOTE_COLOR_VALUES, focusSoon, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 
 type ContainerMapNode = Extract<MapNode, { kind: 'container' }>
 
 const LAYOUTS: { layout: ContainerLayout; label: string; icon: LucideIcon }[] = [
   { layout: 'vertical', label: 'Stack cards downwards', icon: Rows3 },
   { layout: 'horizontal', label: 'Stack cards side by side', icon: Columns3 },
-  { layout: 'free', label: 'Place cards freely', icon: LayoutDashboard },
+  { layout: 'grid', label: 'Cards in a grid, as many across as fit', icon: LayoutGrid },
+  { layout: 'free', label: 'Place cards freely', icon: Shapes },
 ]
 
-const MIN = { width: 120, height: 80 }
+const MIN = { width: 120, height: TITLE_HEIGHT + 40 }
 
 /**
- * A see-through area on the map to put cards on. Cards dropped on it stack
- * down it, or across it, or stay where they're put (freeform); they move
- * with it. Deleting it leaves its cards on the map.
+ * A see-through area on the map to put cards on, with a title along its top.
+ * Cards dropped on it stack down it, across it or in a grid, or stay where
+ * they're put (freeform); they move with it. Deleting it leaves its cards on
+ * the map. Double-click the title to write it.
  */
 export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const node = data.node as ContainerMapNode
   const updateMapNode = useStory((s) => s.updateMapNode)
   const setContainerLayout = useStory((s) => s.setContainerLayout)
-  const { removeNode, dropTarget } = useMap()
+  const { removeNode, dropTarget, editingId, setEditingId } = useMap()
   const { getNodes } = useReactFlow<StoryFlowNode>()
   const toolbar = useToolbarPlacement(id, selected)
-  const stacked = node.layout !== 'free'
-  const content = data.content
+  const editing = editingId === id
+  const input = useRef<HTMLTextAreaElement>(null)
+  const resizedFrom = useRef<{ width: number; height: number } | null>(null)
+  const min = data.min
+
+  useEffect(() => (editing ? focusSoon(() => input.current) : undefined), [editing])
 
   const setLayout = (layout: ContainerLayout) => {
     if (layout === node.layout) return
@@ -41,19 +51,30 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
   return (
     <div
       className={`map-container layout-${node.layout}${dropTarget === id ? ' drop-target' : ''}`}
-      style={{ '--box': NOTE_COLOR_VALUES[node.color] } as React.CSSProperties}
+      style={{ '--box': NOTE_COLOR_VALUES[node.color], '--title-height': `${TITLE_HEIGHT}px` } as React.CSSProperties}
     >
       <NodeResizer
-        isVisible={selected}
-        minWidth={stacked ? Math.max(MIN.width, content?.width ?? 0) : MIN.width}
-        minHeight={stacked ? Math.max(MIN.height, content?.height ?? 0) : MIN.height}
+        isVisible={selected && !editing}
+        minWidth={Math.max(MIN.width, min?.width ?? 0)}
+        minHeight={Math.max(MIN.height, min?.height ?? 0)}
         lineClassName="map-resize-line"
         handleClassName="map-resize-handle"
-        onResizeEnd={(_, p) =>
-          updateMapNode(id, { x: Math.round(p.x), y: Math.round(p.y), width: Math.round(p.width), height: Math.round(p.height) })
-        }
+        onResizeStart={(_, p) => {
+          resizedFrom.current = { width: p.width, height: p.height }
+        }}
+        onResizeEnd={(_, p) => {
+          // Only the sides dragged change its size: a height it grew to around
+          // its cards isn't kept when just its width was changed, say.
+          const from = resizedFrom.current
+          updateMapNode(id, {
+            x: Math.round(p.x),
+            y: Math.round(p.y),
+            width: from && Math.round(from.width) === Math.round(p.width) ? node.width : Math.round(p.width),
+            height: from && Math.round(from.height) === Math.round(p.height) ? node.height : Math.round(p.height),
+          })
+        }}
       />
-      <NodeToolbar isVisible={selected} position={toolbar.position} align={toolbar.align} className="map-toolbar">
+      <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         {LAYOUTS.map(({ layout, label, icon: Icon }) => (
           <button
             key={layout}
@@ -78,6 +99,9 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
           />
         ))}
         <span className="map-tool-sep" />
+        <button className="map-tool icon-only" onClick={() => setEditingId(id)} aria-label="Edit title" title="Edit title">
+          <PenLine size={14} />
+        </button>
         <button
           className="map-tool icon-only"
           onClick={() => removeNode(id)}
@@ -88,6 +112,26 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
         </button>
       </NodeToolbar>
       <Handles />
+      <div className="map-container-head" onDoubleClick={() => setEditingId(id)}>
+        {editing ? (
+          <MentionTextarea
+            ref={input}
+            className="map-container-title-input nodrag nopan"
+            value={node.title}
+            placeholder="Title… Type @ to mention a character."
+            aria-label="Container title"
+            submitOnEnter
+            onChange={(title) => updateMapNode(id, { title })}
+            onBlur={() => setEditingId(null)}
+          />
+        ) : node.title ? (
+          <span className="map-container-title">
+            <MentionText text={node.title} />
+          </span>
+        ) : (
+          <span className="map-container-title empty">Double-click to add a title</span>
+        )}
+      </div>
       {!data.count && <span className="map-container-hint">Drop cards here</span>}
     </div>
   )

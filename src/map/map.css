@@ -249,9 +249,55 @@
   box-shadow: 0 0 0 2px var(--focus);
 }
 
+/* The title bar along the top. */
+.map-container-head {
+  display: flex;
+  align-items: center;
+  height: var(--title-height);
+  padding: 0 14px;
+}
+
+.map-container-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Until it has a title, the hint shows only on hover or when selected. */
+.map-container-title.empty {
+  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.react-flow__node:hover .map-container-title.empty,
+.react-flow__node.selected .map-container-title.empty {
+  opacity: 1;
+}
+
+.map-container-head .mention-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.map-container-title-input {
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--focus);
+  font-size: 15px;
+  font-weight: 650;
+}
+
 .map-container-hint {
   position: absolute;
-  inset: 0;
+  inset: var(--title-height) 0 0;
   display: grid;
   place-items: center;
   color: color-mix(in srgb, var(--box) 30%, var(--ink-3));

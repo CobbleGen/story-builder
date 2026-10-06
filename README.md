@@ -62,10 +62,13 @@ It has four views: the **chapter board**, the **manuscript**, the
   join (and over containers). Pan by dragging
   the board, zoom with the wheel, a pinch or the buttons. Delete removes a
   card from the map only; the story item stays.
-- **Containers**: add one from the panel (**Container**), then drop cards on
-  it (from the map or the panel) to put them on it; drag a card off to take
-  it off. Moving a container moves everything on it. By default its cards
-  stack downwards; its toolbar switches to side by side, or freeform, where
+- **Containers**: add one from the panel (**Container**) and give it a title
+  (double-click the title, or the pen in its toolbar, to change it; `@`
+  mentions work, and search finds it). Drop cards on it (from the map or the
+  panel) to put them on it; drag a card off to take it off. Moving a
+  container moves everything on it. By default its cards stack downwards;
+  its toolbar switches to side by side, a grid (as many cards across as fit
+  its width, so widening or narrowing it reflows them), or freeform, where
   cards stay wherever they're put. Resize it from its edges (stacked cards
   never spill out; it grows to fit them) and give it a colour. Deleting a
   container leaves its cards on the map.

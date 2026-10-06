@@ -1,7 +1,7 @@
 import { useDeferredValue, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Network, Search, StickyNote, Type, X } from 'lucide-react'
+import { FileText, Network, Search, SquareDashed, StickyNote, Type, X } from 'lucide-react'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { plainText } from '../lib/mentions'
@@ -289,7 +289,7 @@ function HitRow({ hit }: { hit: Hit }) {
   else if (hit.kind === 'arc') icon = <span className="arc-dot" />
   else if (character) icon = <CharacterAvatar character={character} size="sm" />
   else if (element) icon = <ElementIcon element={element} size="sm" />
-  else if (hit.kind === 'note') icon = note?.kind === 'text' ? <Type size={16} /> : <StickyNote size={16} />
+  else if (hit.kind === 'note') icon = note?.kind === 'text' ? <Type size={16} /> : note?.kind === 'container' ? <SquareDashed size={16} /> : <StickyNote size={16} />
   else if (hit.kind === 'map') icon = <Network size={16} />
 
   // Paragraphs and notes lead with the matched text; where they are comes second.
