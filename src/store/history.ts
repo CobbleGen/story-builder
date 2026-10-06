@@ -113,6 +113,10 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
     return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
+  // Several beats moved at once.
+  if ((name === 'moveInStory' || name === 'moveInReading') && Array.isArray(target) && target.length > 1) {
+    return name === 'moveInStory' ? 'move beats in time' : 'move beats'
+  }
   return labelFor(name)
 }
 

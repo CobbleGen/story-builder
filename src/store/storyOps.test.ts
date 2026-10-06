@@ -884,7 +884,7 @@ describe('timeline', () => {
 
   it('adds beats at any point: in story time, or in a chapter in reading order', () => {
     const { data, a, b, c, loose, main, love, ch2, ch3 } = story()
-    const [inTime, n] = addBeatInStory(data, { arcId: main, title: 'n' }, 1)
+    const [inTime, n] = addBeatInStory(data, { arcId: main, title: 'n' }, { gap: 1 })
     expect(storyOrder(inTime)).toEqual([a, n, b, c, loose])
     expect(inTime.beats[n].chapterId).toBeNull()
     expect(inTime.arcs.find((x) => x.id === main)!.beatIds).toEqual([a, n, c])
@@ -895,6 +895,57 @@ describe('timeline', () => {
     const [inEmpty, e] = addBeatInReading(data, { arcId: main, title: 'e' }, { chapterId: ch3, gap: 0 })
     expect(chapterBeats(inEmpty)[2]).toEqual([e])
     expect(inEmpty.arcs.find((x) => x.id === main)!.beatIds).toEqual([a, c, e])
+  })
+
+  it('adds a beat at the same moment as others, in either order', () => {
+    const { data, a, b, c, loose, love, main, ch2 } = story()
+    // In story time: on top of c (in the main arc), a love beat
+    const [inTime, n] = addBeatInStory(data, { arcId: love, title: 'n' }, { column: 2 })
+    expect(storyColumns(inTime)).toEqual([[a], [b], [c, n], [loose]])
+    expect(inTime.beats[n].chapterId).toBeNull()
+    // Not on top of a beat of its own arc: just after it instead
+    const [after, m] = addBeatInStory(data, { arcId: main, title: 'm' }, { column: 2 })
+    expect(storyColumns(after)).toEqual([[a], [b], [c], [m], [loose]])
+    // In reading order: next to c in chapter two, at the same time
+    const [inChapter, r] = addBeatInReading(data, { arcId: love, title: 'r' }, { chapterId: ch2, column: 0 })
+    expect(chapterBeats(inChapter)[1]).toEqual([c, r])
+    expect(readingSections(inChapter)[1].columns).toEqual([[c, r]])
+  })
+
+  it('moves several beats at once, keeping those on top of each other together', () => {
+    let { data, a, b, c, loose, ch1, ch2, ch3 } = story()
+    // b and loose (both love) can't both go on top of a column, nor two of one arc
+    expect(moveInStory(data, [a, c], { column: 1 })).toBe(data)
+    // a and c (main) to the end of story time, in their order
+    let next = moveInStory(data, [c, a], { gap: 4 })
+    expect(storyColumns(next)).toEqual([[b], [loose], [a], [c]])
+    // b on top of c, then both moved before everything: still together
+    next = moveInStory(next, b, { column: 3 })
+    expect(storyColumns(next)).toEqual([[loose], [a], [c, b]])
+    next = moveInStory(next, [b, c], { gap: 0 })
+    expect(storyColumns(next)).toEqual([[c, b], [loose], [a]])
+    // Only one of a stack moved: it leaves the other behind
+    const one = moveInStory(next, c, { gap: 3 })
+    expect(storyColumns(one)).toEqual([[b], [loose], [a], [c]])
+    expect([one.beats[b], one.beats[c]].some((k) => 'moment' in k)).toBe(false)
+    // In reading order: a and loose into the empty third chapter, in reading order
+    const read = moveInReading(data, [loose, a], { chapterId: ch3, gap: 0 })
+    expect(chapterBeats(read)).toEqual([[b], [c], [a, loose]])
+    expect(read.beats[loose].chapterId).toBe(ch3)
+    // b and c onto nothing they can share a moment with: loose (love) is b's arc
+    expect(moveInReading(data, [b, c], { chapterId: null, column: 0 })).toBe(data)
+    // a is c's arc: the two of them can't go on top of c
+    expect(moveInReading(data, [a, b], { chapterId: ch2, column: 0 })).toBe(data)
+    // b and a beat of a third arc on top of c in chapter two: all at once, read one after another
+    let third: string
+    let x: string
+    ;[data, third] = addArc(data, { name: 'Third', color: '#00f' })
+    ;[data, x] = addBeat(data, { arcId: third, title: 'x' })
+    const stacked = moveInReading(data, [x, b], { chapterId: ch2, column: 0 })
+    expect(chapterBeats(stacked)).toEqual([[a], [c, b, x], []])
+    expect(readingSections(stacked)[1].columns).toEqual([[c, b, x]])
+    expect(new Set([c, b, x].map((id) => stacked.beats[id].moment)).size).toBe(1)
+    void ch1
   })
 
   it('keeps moments shared by two or more beats when loading', () => {

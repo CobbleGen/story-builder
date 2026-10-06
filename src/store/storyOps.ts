@@ -758,31 +758,74 @@ export function readingSections(data: Pick<StoryData, 'chapters' | 'arcs' | 'bea
   return sections
 }
 
-/** A beat no longer happens at the same time as others (nor does one left alone in its moment). */
-function leaveMoment(data: StoryData, id: string): StoryData {
-  const moment = data.beats[id]?.moment
-  if (!moment) return data
-  const beats = { ...data.beats }
-  const others = Object.values(beats).filter((b) => b.moment === moment && b.id !== id)
-  for (const b of others.length === 1 ? [id, others[0].id] : [id]) {
-    const copy = { ...beats[b] }
+/** Beats left alone in their moment don't share it any more. */
+function tidyMoments(beats: Record<string, Beat>): Record<string, Beat> {
+  const sharing = new Map<string, number>()
+  for (const b of Object.values(beats)) if (b.moment) sharing.set(b.moment, (sharing.get(b.moment) ?? 0) + 1)
+  let out = beats
+  for (const b of Object.values(beats)) {
+    if (!b.moment || sharing.get(b.moment)! > 1) continue
+    if (out === beats) out = { ...beats }
+    const copy = { ...b }
     delete copy.moment
-    beats[b] = copy
+    out[b.id] = copy
   }
-  return { ...data, beats }
-}
-
-/** A beat happens at the same time as `others` (the beats of one moment, or a single beat). */
-function joinMoment(data: StoryData, id: string, others: string[]): StoryData {
-  const left = leaveMoment(data, id)
-  const moment = others.map((b) => left.beats[b]?.moment).find(Boolean) ?? makeId('moment')
-  const beats = { ...left.beats }
-  for (const b of [...others, id]) if (beats[b] && beats[b].moment !== moment) beats[b] = { ...beats[b], moment }
-  return { ...left, beats }
+  return out
 }
 
 /**
- * Where on the timeline a beat goes: at a moment of its own before column
+ * Moved beats parted from the beats they happened at once with that are
+ * left behind: a moved beat on its own is at a moment of its own, and moved
+ * beats that were on top of each other (a group) still happen together.
+ */
+function detach(data: StoryData, groups: string[][]): StoryData {
+  const moving = new Set(groups.flat())
+  const beats = { ...data.beats }
+  let changed = false
+  for (const group of groups) {
+    const moment = beats[group[0]]?.moment
+    if (!moment || !Object.values(beats).some((b) => b.moment === moment && !moving.has(b.id))) continue
+    changed = true
+    const fresh = group.length > 1 ? makeId('moment') : undefined
+    for (const id of group) {
+      const copy = { ...beats[id] }
+      if (fresh) copy.moment = fresh
+      else delete copy.moment
+      beats[id] = copy
+    }
+  }
+  return changed ? { ...data, beats: tidyMoments(beats) } : data
+}
+
+/** Beats happen at the same time as `others` (the beats of one moment, or a single beat). */
+function joinMoment(data: StoryData, ids: string[], others: string[]): StoryData {
+  const moment = others.map((b) => data.beats[b]?.moment).find(Boolean) ?? makeId('moment')
+  const beats = { ...data.beats }
+  for (const b of [...others, ...ids]) if (beats[b] && beats[b].moment !== moment) beats[b] = { ...beats[b], moment }
+  return { ...data, beats: tidyMoments(beats) }
+}
+
+/** Whether `moving` can all happen at once with `staying`: never two beats of one arc at one moment. */
+function canStack(data: StoryData, moving: string[], staying: string[]): boolean {
+  if (!staying.length) return false
+  const arcs = moving.map((id) => data.beats[id]?.arcId)
+  return new Set(arcs).size === arcs.length && !staying.some((b) => arcs.includes(data.beats[b]?.arcId))
+}
+
+const idsOf = (data: StoryData, ids: string | string[]) => [...new Set(typeof ids === 'string' ? [ids] : ids)].filter((id) => data.beats[id])
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i])
+
+/** Whether a move changed nothing: the same order in time and in chapters, and the same moments. */
+function sameTimeline(a: StoryData, b: StoryData): boolean {
+  return (
+    a.chapters.every((c, i) => sameIds(c.beatIds, b.chapters[i].beatIds)) &&
+    Object.values(a.beats).every((beat) => b.beats[beat.id]?.moment === beat.moment && b.beats[beat.id]?.chapterId === beat.chapterId) &&
+    sameIds(storyOrder(a), storyOrder(b))
+  )
+}
+
+/**
+ * Where on the timeline beats go: at a moment of their own before column
  * `gap` (`gap` = the number of columns: after them all), or on top of the
  * beats in column `column`, at the same time as them.
  */
@@ -792,67 +835,89 @@ export type TimelineSpot = { gap: number } | { column: number }
 export type ReadingSpot = TimelineSpot & { chapterId: string | null }
 
 /**
- * Moves a beat in story time (see storyColumns), arranging the timeline. On
- * top of another column it happens at the same time as those beats, which
- * can't be of its own arc.
+ * Moves beats (one, or several at once) in story time (see storyColumns),
+ * arranging the timeline; those that were on top of each other stay so. On
+ * top of another column they happen at the same time as its beats, which
+ * can't be of their arcs (nor can two of them be of one arc).
  */
-export function moveInStory(data: StoryData, id: string, spot: TimelineSpot): StoryData {
-  const beat = data.beats[id]
+export function moveInStory(data: StoryData, ids: string | string[], spot: TimelineSpot): StoryData {
+  const moving = idsOf(data, ids)
+  if (!moving.length) return data
+  const set = new Set(moving)
   const columns = storyColumns(data)
-  const from = columns.findIndex((c) => c.includes(id))
-  if (!beat || from === -1) return data
-  const rest = columns.map((c) => c.filter((b) => b !== id))
+  const rest = columns.map((c) => c.filter((b) => !set.has(b)))
+  const groups = columns.map((c) => c.filter((b) => set.has(b))).filter((c) => c.length)
+  let next: StoryData
   if ('column' in spot) {
-    const target = columns[spot.column]
-    if (!target || spot.column === from || target.some((b) => data.beats[b]?.arcId === beat.arcId)) return data
-    rest[spot.column].push(id)
-    return joinMoment({ ...data, timeline: rest.flat() }, id, target)
+    const staying = rest[spot.column]
+    if (!staying || !canStack(data, moving, staying)) return data
+    const ordered = groups.flat()
+    rest[spot.column] = [...staying, ...ordered]
+    next = joinMoment({ ...data, timeline: rest.flat() }, ordered, staying)
+  } else {
+    if (spot.gap < 0 || spot.gap > columns.length) return data
+    rest.splice(spot.gap, 0, ...groups)
+    next = detach({ ...data, timeline: rest.flat() }, groups)
   }
-  const alone = columns[from].length === 1
-  if (spot.gap < 0 || spot.gap > columns.length || (alone && (spot.gap === from || spot.gap === from + 1))) return data
-  rest.splice(spot.gap, 0, [id])
-  return leaveMoment({ ...data, timeline: rest.flat() }, id)
+  return sameTimeline(data, next) ? data : next
 }
 
-const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i])
+/** Beats into a chapter (null: out of every chapter), one after another from `index` among its other beats. */
+function placeAll(data: StoryData, ids: string[], chapterId: string | null, index: number): StoryData {
+  const moving = new Set(ids)
+  const chapters = data.chapters.map((c) => {
+    let beatIds = c.beatIds.filter((b) => !moving.has(b))
+    if (c.id === chapterId) beatIds = [...beatIds.slice(0, index), ...ids, ...beatIds.slice(index)]
+    return sameIds(beatIds, c.beatIds) ? c : { ...c, beatIds }
+  })
+  const beats = { ...data.beats }
+  for (const id of ids) if (beats[id].chapterId !== chapterId) beats[id] = { ...beats[id], chapterId }
+  return { ...data, chapters, beats }
+}
 
 /**
- * Moves a beat in reading order (see readingSections): into the chapter of
- * the spot, at that place among its beats, or out of every chapter. On top
- * of another column it happens at the same time as those beats too (and so
- * comes just after them in story time); taken off a stack, it no longer does.
+ * Moves beats (one, or several at once, in the order they're read) in
+ * reading order (see readingSections): into the chapter of the spot, at
+ * that place among its beats, or out of every chapter. On top of another
+ * column they happen at the same time as its beats too (and so come just
+ * after them in story time); taken off a stack, they no longer do.
  */
-export function moveInReading(data: StoryData, id: string, spot: ReadingSpot): StoryData {
-  const beat = data.beats[id]
-  if (!beat || (spot.chapterId && !data.chapters.some((c) => c.id === spot.chapterId))) return data
+export function moveInReading(data: StoryData, ids: string | string[], spot: ReadingSpot): StoryData {
+  const moving = idsOf(data, ids)
+  if (!moving.length || (spot.chapterId && !data.chapters.some((c) => c.id === spot.chapterId))) return data
+  const set = new Set(moving)
   const sections = readingSections(data)
+  const shown = sections.flatMap((s) => s.columns)
+  const groups = shown.map((c) => c.filter((b) => set.has(b))).filter((c) => c.length)
+  const ordered = groups.flat()
   const columns = sections.find((s) => s.chapterId === spot.chapterId)?.columns ?? []
-  const columnOf = (d: StoryData) => readingSections(d).flatMap((s) => s.columns).find((c) => c.includes(id)) ?? [id]
-  // Where in the chapter: after its beats in the columns before `n`, leaving this one out.
-  const indexBefore = (n: number) => (spot.chapterId ? columns.slice(0, n).flat().filter((b) => b !== id).length : undefined)
+  // Where in the chapter: after its other beats in the columns before `n`.
+  const indexBefore = (n: number) => columns.slice(0, n).flat().filter((b) => !set.has(b)).length
   if ('column' in spot) {
-    const target = columns[spot.column]
-    if (!target || target.includes(id) || target.some((b) => data.beats[b]?.arcId === beat.arcId)) return data
-    const placed = leaveMoment(placeBeat(data, id, spot.chapterId, indexBefore(spot.column + 1)), id)
-    return joinMoment(afterInTime(placed, id, target), id, target)
+    const staying = columns[spot.column]?.filter((b) => !set.has(b)) ?? []
+    if (!canStack(data, moving, staying)) return data
+    const placed = placeAll(data, ordered, spot.chapterId, indexBefore(spot.column + 1))
+    return joinMoment(afterInTime(placed, ordered, staying), ordered, staying)
   }
-  let next = placeBeat(data, id, spot.chapterId, indexBefore(spot.gap))
-  // Taken off a stack, or put down by the others of its moment (which would stack it again).
-  if (columnOf(data).length > 1 || columnOf(next).length > 1) next = leaveMoment(next, id)
-  const unchanged =
-    next.beats[id].chapterId === beat.chapterId &&
-    next.beats[id].moment === beat.moment &&
-    data.chapters.every((c, i) => sameIds(c.beatIds, next.chapters[i].beatIds))
-  return unchanged ? data : next
+  let next = placeAll(data, ordered, spot.chapterId, indexBefore(spot.gap))
+  // Taken off a stack, or put down by others of their moment (which would stack them again): apart from those.
+  const after = readingSections(next).flatMap((s) => s.columns)
+  const leftBehind = (column: string[] | undefined) => !!column?.some((b) => !set.has(b))
+  next = detach(
+    next,
+    groups.filter((g) => leftBehind(shown.find((c) => c.includes(g[0]))) || leftBehind(after.find((c) => c.includes(g[0])))),
+  )
+  return sameTimeline(data, next) ? data : next
 }
 
-/** On an arranged timeline, a beat moved to just after `others` in story time. */
-function afterInTime(data: StoryData, id: string, others: string[]): StoryData {
+/** On an arranged timeline, beats moved to just after `others` in story time. */
+function afterInTime(data: StoryData, ids: string[], others: string[]): StoryData {
   if (!data.timeline.length) return data
-  const order = storyOrder(data).filter((b) => b !== id)
+  const moving = new Set(ids)
+  const order = storyOrder(data).filter((b) => !moving.has(b))
   const last = Math.max(...others.map((b) => order.indexOf(b)))
   if (last === -1) return data
-  order.splice(last + 1, 0, id)
+  order.splice(last + 1, 0, ...ids)
   return { ...data, timeline: order }
 }
 
@@ -871,30 +936,51 @@ export interface TimelineBeat {
   title: string
 }
 
-/** A new beat at a moment of its own in story time, before column `gap`; it's in no chapter yet. */
-export function addBeatInStory(data: StoryData, init: TimelineBeat, gap: number): [StoryData, string] {
+/** Whether a new beat of `arcId` can happen at once with the beats of `column`. */
+const stacksOn = (data: StoryData, arcId: string, column: string[] | undefined): column is string[] =>
+  !!column?.length && !column.some((b) => data.beats[b]?.arcId === arcId)
+
+/**
+ * A new beat in story time: at a moment of its own before column `gap`, or
+ * at the same time as the beats of column `column` (if none is of its arc;
+ * else just after them). It's in no chapter yet.
+ */
+export function addBeatInStory(data: StoryData, init: TimelineBeat, spot: TimelineSpot): [StoryData, string] {
   const columns = storyColumns(data)
-  const at = Math.max(0, Math.min(gap, columns.length))
+  const target = 'column' in spot ? columns[spot.column] : undefined
+  const stack = stacksOn(data, init.arcId, target)
+  const at = Math.max(0, Math.min('column' in spot ? spot.column + 1 : spot.gap, columns.length))
   const earlier = columns.slice(0, at).flat()
-  const [next, id] = addBeat(data, { ...init, arcIndex: arcIndexAt(data, init.arcId, columns.flat(), earlier.length) })
-  return [{ ...next, timeline: [...earlier, id, ...columns.slice(at).flat()] }, id]
+  const [added, id] = addBeat(data, { ...init, arcIndex: arcIndexAt(data, init.arcId, columns.flat(), earlier.length) })
+  const next = { ...added, timeline: [...earlier, id, ...columns.slice(at).flat()] }
+  return [stack ? joinMoment(next, [id], target) : next, id]
 }
 
-/** A new beat in reading order: in the spot's chapter (or in none), before its column `gap`. */
-export function addBeatInReading(data: StoryData, init: TimelineBeat, spot: { chapterId: string | null; gap: number }): [StoryData, string] {
+/**
+ * A new beat in reading order, in the spot's chapter (or in none): before
+ * its column `gap`, or at the same time as the beats of column `column` (if
+ * none is of its arc), next to them.
+ */
+export function addBeatInReading(data: StoryData, init: TimelineBeat, spot: ReadingSpot): [StoryData, string] {
   const chapterId = spot.chapterId && data.chapters.some((c) => c.id === spot.chapterId) ? spot.chapterId : null
+  const sections = readingSections(data)
+  const columns = sections.find((s) => s.chapterId === chapterId)?.columns ?? []
+  const target = 'column' in spot ? columns[spot.column] : undefined
+  const stack = stacksOn(data, init.arcId, target)
+  const before = Math.max(0, 'column' in spot ? spot.column + 1 : spot.gap)
   let at = 0
   let inChapter = 0
-  for (const section of readingSections(data)) {
+  for (const section of sections) {
     if (section.chapterId === chapterId) {
-      inChapter = section.columns.slice(0, Math.max(0, spot.gap)).flat().length
+      inChapter = section.columns.slice(0, before).flat().length
       at += inChapter
       break
     }
     at += section.columns.flat().length
   }
-  const order = readingSections(data).flatMap((s) => s.columns.flat())
-  return addBeat(data, { ...init, chapterId, chapterIndex: chapterId ? inChapter : undefined, arcIndex: arcIndexAt(data, init.arcId, order, at) })
+  const order = sections.flatMap((s) => s.columns.flat())
+  const [next, id] = addBeat(data, { ...init, chapterId, chapterIndex: chapterId ? inChapter : undefined, arcIndex: arcIndexAt(data, init.arcId, order, at) })
+  return [stack ? joinMoment(afterInTime(next, [id], target), [id], target) : next, id]
 }
 
 /** Story time goes back to following the reading order. */

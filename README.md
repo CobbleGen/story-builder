@@ -116,9 +116,15 @@ It has four views: the **chapter board**, the **manuscript**, the
   shows it. Drop a beat onto another arc's beat (in either order) and they
   happen at the same moment, one above the other, joined by a dotted line:
   one revelation closing several arcs, say. Drag it off again to part them.
-  Hover a lane and click a + between two beats to add one right there (in
-  story order it's in no chapter yet; in reading order it's in that
-  chapter). With the keyboard, Space picks a beat up, ← and → step it from
+  A + shows by the pointer in an arc's lane: between two beats it adds one
+  right there (in story order it's in no chapter yet; in reading order it's
+  in that chapter), and in the empty place above or below another arc's
+  beat it adds one happening at the same time. Each arc's name has a + for
+  a beat after everything else, and **New arc** under the lanes adds an
+  arc. Drag across empty space to box in several beats (Shift or Ctrl to
+  add to them, or Ctrl-click beats one by one), then drag any of them to
+  move them all at once, in their order; a click on empty space or Esc
+  lets go. With the keyboard, Space picks a beat up, ← and → step it from
   place to place, and Space puts it down. Beats told out of order are marked
   **Flashback** or **Flash-forward**, and **Match reading order** puts story
   time back the way it's read.
