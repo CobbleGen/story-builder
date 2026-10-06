@@ -21,6 +21,8 @@ const LAYOUTS: { layout: ContainerLayout; label: string; icon: LucideIcon }[] = 
 ]
 
 const MIN = { width: 120, height: TITLE_HEIGHT + 40 }
+/** Over every card, as a selected card's own toolbar is. */
+const TOOLBAR_Z = 2500
 
 /**
  * A see-through area on the map to put cards on, with a title along its top.
@@ -32,12 +34,13 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
   const node = data.node as ContainerMapNode
   const updateMapNode = useStory((s) => s.updateMapNode)
   const setContainerLayout = useStory((s) => s.setContainerLayout)
+  const resizeContainer = useStory((s) => s.resizeContainer)
   const { removeNode, dropTarget, editingId, setEditingId } = useMap()
   const { getNodes } = useReactFlow<StoryFlowNode>()
   const toolbar = useToolbarPlacement(id, selected)
   const editing = editingId === id
   const input = useRef<HTMLTextAreaElement>(null)
-  const resizedFrom = useRef<{ width: number; height: number } | null>(null)
+  const resizedFrom = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const min = data.min
   const color = paint(node.color, CONTAINER_COLOR)
 
@@ -45,8 +48,15 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
 
   const setLayout = (layout: ContainerLayout) => {
     if (layout === node.layout) return
-    // Where its cards are on screen now, so they stay put or stack in that order.
-    const positions = Object.fromEntries(getNodes().filter((n) => parentOf(n.data.node) === id).map((n) => [n.id, n.position]))
+    // Where its cards are on screen now (from its corner), so they stay put or stack in that order.
+    const all = getNodes()
+    const self = all.find((n) => n.id === id)
+    if (!self) return
+    const positions = Object.fromEntries(
+      all
+        .filter((n) => parentOf(n.data.node) === id)
+        .map((n) => [n.id, { x: n.position.x - self.position.x, y: n.position.y - self.position.y }]),
+    )
     setContainerLayout(id, layout, positions)
   }
 
@@ -62,21 +72,29 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
         lineClassName="map-resize-line"
         handleClassName="map-resize-handle"
         onResizeStart={(_, p) => {
-          resizedFrom.current = { width: p.width, height: p.height }
+          resizedFrom.current = p
         }}
         onResizeEnd={(_, p) => {
           // Only the sides dragged change its size: a height it grew to around
-          // its cards isn't kept when just its width was changed, say.
-          const from = resizedFrom.current
-          updateMapNode(id, {
-            x: Math.round(p.x),
-            y: Math.round(p.y),
-            width: from && Math.round(from.width) === Math.round(p.width) ? node.width : Math.round(p.width),
-            height: from && Math.round(from.height) === Math.round(p.height) ? node.height : Math.round(p.height),
+          // its cards isn't kept when just its width was changed, say. Its
+          // place is saved from the container it's on, so it moves by as much as its corner did.
+          const from = resizedFrom.current ?? p
+          resizeContainer(id, {
+            x: Math.round(node.x + p.x - from.x),
+            y: Math.round(node.y + p.y - from.y),
+            width: Math.round(from.width) === Math.round(p.width) ? node.width : Math.round(p.width),
+            height: Math.round(from.height) === Math.round(p.height) ? node.height : Math.round(p.height),
           })
         }}
       />
-      <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
+      <NodeToolbar
+        isVisible={selected && !editing}
+        position={toolbar.position}
+        align={toolbar.align}
+        className="map-toolbar"
+        // React Flow puts a toolbar just over its card; a container's sits far down, under the board.
+        style={{ zIndex: TOOLBAR_Z }}
+      >
         {LAYOUTS.map(({ layout, label, icon: Icon }) => (
           <button
             key={layout}

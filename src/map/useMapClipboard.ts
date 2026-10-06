@@ -84,15 +84,29 @@ export function useMapClipboard({ mapId, wrapper, addPictures, select }: Options
       const data = useStory.getState()
       const map = data.mindMaps.find((m) => m.id === mapId)
       if (!map) return null
-      // A container comes with the cards on it.
-      for (const n of map.nodes) if (ids.has(parentOf(n) ?? '')) ids.add(n.id)
+      // A container comes with everything on it.
+      for (let grew = true; grew; ) {
+        grew = false
+        for (const n of map.nodes) {
+          if (!ids.has(n.id) && ids.has(parentOf(n) ?? '')) {
+            ids.add(n.id)
+            grew = true
+          }
+        }
+      }
+      const shownAt = (id: string) => flow.nodeLookup.get(id)?.position
       const nodes = map.nodes
         .filter((n) => ids.has(n.id))
         .map((n) => {
-          // Where it's shown (cards stacked on a container are laid out there).
-          const shown = flow.nodeLookup.get(n.id)?.position
-          const copy = (shown ? { ...n, x: Math.round(shown.x), y: Math.round(shown.y) } : { ...n }) as MapNode & { parentId?: string }
-          if (copy.parentId && !ids.has(copy.parentId)) delete copy.parentId
+          // Where it's shown: from its container's corner if that's copied too, else on the map.
+          const copy = { ...n } as MapNode & { containerId?: string }
+          const at = shownAt(n.id)
+          const parent = copy.containerId && ids.has(copy.containerId) ? shownAt(copy.containerId) : undefined
+          if (!parent) delete copy.containerId
+          if (at) {
+            copy.x = Math.round(at.x - (parent?.x ?? 0))
+            copy.y = Math.round(at.y - (parent?.y ?? 0))
+          }
           return copy as MapNode
         })
       if (!nodes.length) return null
@@ -111,8 +125,9 @@ export function useMapClipboard({ mapId, wrapper, addPictures, select }: Options
      * and right for each copy already there), or else in the middle of the view.
      */
     const paste = (items: { nodes?: unknown; edges?: unknown }) => {
+      // Placed by the cards that aren't on a copied container (those are placed from its corner).
       const copied = (Array.isArray(items.nodes) ? items.nodes : []).filter(
-        (n): n is Record<string, unknown> => typeof n === 'object' && n !== null,
+        (n): n is Record<string, unknown> => typeof n === 'object' && n !== null && !n.containerId && !n.parentId,
       )
       const xs = copied.map((n) => Number(n.x)).filter(Number.isFinite)
       const ys = copied.map((n) => Number(n.y)).filter(Number.isFinite)

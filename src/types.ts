@@ -120,8 +120,8 @@ export type MapNode =
       expanded?: MapCardView
       /** Sizes the writer gave the card while opened up, per view. */
       sizes?: Partial<Record<MapCardView, MapSize>>
-      /** The container it's on, if any. */
-      parentId?: string
+      /** The container it's on, if any; then x and y are from that container's top-left corner. */
+      containerId?: string
     }
   | {
       id: string
@@ -137,7 +137,7 @@ export type MapNode =
       list?: MapListStyle
       /** Ticked items of a checklist, by line. */
       checked?: number[]
-      parentId?: string
+      containerId?: string
     }
   | {
       id: string
@@ -153,7 +153,7 @@ export type MapNode =
       list?: MapListStyle
       /** Ticked items of a checklist, by line. */
       checked?: number[]
-      parentId?: string
+      containerId?: string
     }
   | {
       id: string
@@ -164,13 +164,14 @@ export type MapNode =
       height: number
       /** The picture, in the picture store (store/images). */
       imageId: string
-      parentId?: string
+      containerId?: string
     }
   | {
       /**
-       * A see-through area that cards are put on: they move with it, and
-       * stack in a column or a row unless it's freeform. Cards on it say so
-       * with their parentId; in a column or row, they go in the map's order.
+       * A see-through area that cards (and other containers) are put on:
+       * they move with it, and stack in a column, a row or a grid unless it's
+       * freeform. Cards on it say so with their containerId; stacked, they go
+       * in the map's order.
        */
       id: string
       kind: 'container'
@@ -183,6 +184,8 @@ export type MapNode =
       height: number
       color: NoteColor
       layout: ContainerLayout
+      /** The container it's on, if any (as for cards). */
+      containerId?: string
     }
 
 /** A line between two things on the mind map. */

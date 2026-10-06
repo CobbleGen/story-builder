@@ -75,8 +75,11 @@ It has four views: the **chapter board**, the **manuscript**, the
   its toolbar switches to side by side, a grid (as many cards across as fit
   its width, so widening or narrowing it reflows them), or freeform, where
   cards stay wherever they're put. Resize it from its edges (stacked cards
-  never spill out; it grows to fit them) and give it a colour. Deleting a
-  container leaves its cards on the map.
+  never spill out; it grows to fit them) and give it a colour. Containers
+  go inside containers too: drop one on another and it stacks or sits there
+  like any card, taking everything on it along (it's drawn over the one it's
+  on, so its cards can still be picked). Deleting a container leaves its
+  cards where they are, on the container it was on, or else on the map.
 - **Copy and paste on the map**: select cards (click; Ctrl-click or
   Shift-drag for several) and press Ctrl+C, Ctrl+X or Ctrl+V (⌘ on a Mac) to
   copy, cut and paste them, with the lines between them, on the same map or

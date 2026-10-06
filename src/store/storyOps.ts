@@ -732,16 +732,27 @@ const isEntity = (n: MapNode): n is Extract<MapNode, { refId: string }> => 'refI
 
 export const CONTAINER_LAYOUTS: ContainerLayout[] = ['vertical', 'horizontal', 'grid', 'free']
 export const isContainer = (n: MapNode | NewMapNode): n is Extract<MapNode, { kind: 'container' }> => n.kind === 'container'
-/** The container a card is on, if any. */
-export const parentOf = (n: MapNode | NewMapNode): string | undefined => ('parentId' in n ? n.parentId : undefined)
+/** The container a card (or container) is on, if any. */
+export const parentOf = (n: MapNode | NewMapNode): string | undefined => ('containerId' in n ? n.containerId : undefined)
 
-/** A card put on a container (or taken off, with undefined); containers don't go on containers. */
-function withParent<T extends MapNode>(node: T, parentId: string | undefined): T {
-  if (isContainer(node)) return node
-  if (parentId) return { ...node, parentId }
-  const rest = { ...node } as T & { parentId?: string }
-  delete rest.parentId
+/** A card put on a container, or taken off one with undefined. Its x and y are the caller's to make fit. */
+function withParent<T extends MapNode>(node: T, containerId: string | undefined): T {
+  if (containerId) return { ...node, containerId }
+  const rest = { ...node } as T & { containerId?: string }
+  delete rest.containerId
   return rest
+}
+
+/** Whether container `inside` is `id` itself or somewhere on it, so `id` can't go onto it. */
+function isWithin(nodes: MapNode[], inside: string, id: string): boolean {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  let at: string | undefined = inside
+  for (let steps = 0; at && steps <= nodes.length; steps++) {
+    if (at === id) return true
+    const node = byId.get(at)
+    at = node ? parentOf(node) : undefined
+  }
+  return false
 }
 
 /**
@@ -866,8 +877,8 @@ export interface MapDrop {
   id: string
   x: number
   y: number
-  /** The container it's now on (null for none); unchanged when absent. */
-  parentId?: string | null
+  /** The container it's now on (null for none); unchanged when absent. x and y are from its corner. */
+  containerId?: string | null
   /** On a column or row: the card it goes before (null for the end); its place is kept when absent. */
   before?: string | null
 }
@@ -878,12 +889,14 @@ export function dropMapNodes(data: StoryData, drops: MapDrop[]): StoryData {
   return mapMaps(data, (m) => {
     if (!m.nodes.some((n) => byId.has(n.id))) return m
     const containers = new Set(m.nodes.filter(isContainer).map((n) => n.id))
-    let nodes = m.nodes.map((n) => {
+    let nodes = [...m.nodes]
+    // One at a time, so no two dropped containers end up on each other.
+    nodes.forEach((n, i) => {
       const drop = byId.get(n.id)
-      if (!drop) return n
+      if (!drop) return
       const moved = { ...n, x: drop.x, y: drop.y } as MapNode
-      if (drop.parentId === undefined) return moved
-      return withParent(moved, drop.parentId && drop.parentId !== n.id && containers.has(drop.parentId) ? drop.parentId : undefined)
+      const onto = drop.containerId && containers.has(drop.containerId) && !isWithin(nodes, drop.containerId, n.id)
+      nodes[i] = drop.containerId === undefined ? moved : withParent(moved, onto ? drop.containerId! : undefined)
     })
     for (const drop of drops) {
       if (drop.before !== undefined && drop.before !== drop.id) nodes = placeAmong(nodes, drop.id, drop.before)
@@ -908,8 +921,9 @@ function rowByRow(cards: MapNode[]): MapNode[] {
 
 /**
  * Changes how a container lays out its cards. `positions` are where its cards
- * are on screen now, so they stay put when it becomes freeform; when it stacks
- * them, they go in the order they're in now: down, across, or row by row.
+ * are on screen now (from its corner), so they stay put when it becomes
+ * freeform; when it stacks them, they go in the order they're in now: down,
+ * across, or row by row.
  */
 export function setContainerLayout(
   data: StoryData,
@@ -940,26 +954,50 @@ export function setContainerLayout(
 
 /**
  * Takes cards off their maps (never deletes the story items), with their
- * lines. Cards on a container that goes stay on the map, at `place` if given.
+ * lines. Cards on a container that goes stay on the map, on the container
+ * that one was on, if any: at `place` (from that one's corner) if given.
  */
 export function removeMapNodes(data: StoryData, ids: string[], place: Record<string, { x: number; y: number }> = {}): StoryData {
   const gone = new Set(ids)
-  return mapMaps(data, (m) =>
-    m.nodes.some((n) => gone.has(n.id))
-      ? {
-          ...m,
-          nodes: m.nodes
-            .filter((n) => !gone.has(n.id))
-            .map((n) => {
-              const parent = parentOf(n)
-              if (!parent || !gone.has(parent)) return n
-              const at = place[n.id]
-              return withParent(at ? ({ ...n, x: Math.round(at.x), y: Math.round(at.y) } as MapNode) : n, undefined)
-            }),
-          edges: m.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
+  return mapMaps(data, (m) => {
+    if (!m.nodes.some((n) => gone.has(n.id))) return m
+    const byId = new Map(m.nodes.map((n) => [n.id, n]))
+    const nodes = m.nodes
+      .filter((n) => !gone.has(n.id))
+      .map((n) => {
+        let parent = parentOf(n)
+        if (!parent || !gone.has(parent)) return n
+        // Out to the nearest container that stays, adding up the corners of those that go.
+        let { x, y } = n
+        while (parent && gone.has(parent)) {
+          const p = byId.get(parent)
+          x += p?.x ?? 0
+          y += p?.y ?? 0
+          parent = p ? parentOf(p) : undefined
         }
-      : m,
-  )
+        const at = place[n.id] ?? { x, y }
+        return withParent({ ...n, x: Math.round(at.x), y: Math.round(at.y) } as MapNode, parent)
+      })
+    return { ...m, nodes, edges: m.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)) }
+  })
+}
+
+/**
+ * A container resized: its new size and place. Cards on a freeform one stay
+ * where they are on the map, though its corner moved (they're placed from it).
+ */
+export function resizeContainer(data: StoryData, id: string, rect: { x: number; y: number; width: number; height: number }): StoryData {
+  return mapMaps(data, (m) => {
+    const box = m.nodes.find((n) => n.id === id)
+    if (!box || !isContainer(box)) return m
+    const dx = rect.x - box.x
+    const dy = rect.y - box.y
+    const nodes = m.nodes.map((n) => {
+      if (n.id === id) return { ...n, ...rect } as MapNode
+      return box.layout === 'free' && parentOf(n) === id && (dx || dy) ? { ...n, x: n.x - dx, y: n.y - dy } : n
+    })
+    return { ...m, nodes }
+  })
 }
 
 /** Cards and the lines between them, as copied from a map. */
@@ -988,8 +1026,9 @@ export function pasteMapItems(
   const ids = new Map(checked.nodes.map((n) => [n.id, idOf(n.id)]))
   const nodes = checked.nodes.map((n) => {
     const parent = parentOf(n)
-    const moved = { ...n, id: ids.get(n.id)!, x: Math.round(n.x + offset.x), y: Math.round(n.y + offset.y) } as MapNode
-    return parent ? withParent(moved, ids.get(parent)) : moved
+    // Cards on a pasted container keep their place on it; the rest move over.
+    if (parent) return withParent({ ...n, id: ids.get(n.id)! } as MapNode, ids.get(parent))
+    return { ...n, id: ids.get(n.id)!, x: Math.round(n.x + offset.x), y: Math.round(n.y + offset.y) } as MapNode
   })
   if (!nodes.length) return [data, []]
   const edges = checked.edges.map((e) => ({ ...e, id: makeId('edge'), source: ids.get(e.source)!, target: ids.get(e.target)! }))
@@ -1254,9 +1293,13 @@ export function normalizeStory(input: unknown): StoryData {
     seenMaps.add(mapId)
     const nodes: MapNode[] = []
     const parents = new Map<string, string>()
+    // Saves from before containers held containers put cards on them by
+    // parentId, with x and y on the map rather than from the container.
+    const onMap = new Map<string, string>()
     for (const n of list(rawMap.nodes)) {
       const id = str(n.id) || makeId('node')
-      if (typeof n.parentId === 'string') parents.set(id, n.parentId)
+      if (typeof n.containerId === 'string') parents.set(id, n.containerId)
+      else if (typeof n.parentId === 'string') onMap.set(id, n.parentId)
       const x = num(n.x, 0)
       const y = num(n.y, 0)
       const kind = str(n.kind)
@@ -1324,11 +1367,20 @@ export function normalizeStory(input: unknown): StoryData {
         nodes.push({ ...node, ...listOf(n, text) })
       }
     }
-    // Cards on a container that's on this map (not another container).
-    const containerIds = new Set(nodes.filter(isContainer).map((n) => n.id))
+    // Cards (and containers) on a container that's on this map, never round in a circle.
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    const isBox = (id: string | undefined) => !!id && byId.get(id)?.kind === 'container'
     for (const node of nodes) {
       const parent = parents.get(node.id)
-      if (parent && containerIds.has(parent) && !isContainer(node)) (node as { parentId?: string }).parentId = parent
+      const old = onMap.get(node.id)
+      if (parent && parent !== node.id && isBox(parent)) (node as { containerId?: string }).containerId = parent
+      else if (old && isBox(old) && !isContainer(node)) {
+        const box = byId.get(old)!
+        Object.assign(node, { containerId: old, x: node.x - box.x, y: node.y - box.y })
+      }
+    }
+    for (const node of nodes) {
+      if (parentOf(node) && isWithin(nodes, parentOf(node)!, node.id)) delete (node as { containerId?: string }).containerId
     }
     const nodeIds = new Set(nodes.map((n) => n.id))
     const edges: MapEdge[] = list(rawMap.edges)
@@ -1365,7 +1417,7 @@ export function normalizeStory(input: unknown): StoryData {
     }
     for (const n of nodes) {
       const parent = parentOf(n)
-      if (parent && renamed.has(parent)) (n as { parentId?: string }).parentId = renamed.get(parent)
+      if (parent && renamed.has(parent)) (n as { containerId?: string }).containerId = renamed.get(parent)
     }
     const mapEdges = edges.map((e) =>
       renamed.size ? { ...e, source: renamed.get(e.source) ?? e.source, target: renamed.get(e.target) ?? e.target } : e,
