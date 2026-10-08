@@ -19,6 +19,18 @@ export interface CloudStoryRow {
 
 export type AuthEvent = 'signed-in' | 'signed-out' | 'password-recovery'
 
+/** A link an AI assistant reads the account's stories through (see server/mcp.ts). */
+export interface AssistantLink {
+  id: string
+  /** What the writer called it ("Claude"). */
+  label: string
+  /** The key's last few characters, to tell links apart (the key itself isn't kept). */
+  hint: string
+  /** ISO dates. */
+  createdAt: string
+  lastUsedAt: string | null
+}
+
 export interface CloudBackend {
   /** Calls back with the signed-in user straight away (null if none), then on every change. */
   onAuthChange(callback: (event: AuthEvent, user: CloudUser | null) => void): () => void
@@ -38,6 +50,12 @@ export interface CloudBackend {
   /** Saves over version `version`; null if it's been saved elsewhere since (or is gone). */
   saveStory(id: string, title: string, data: unknown, version: number): Promise<CloudStoryRow | null>
   deleteStory(id: string): Promise<void>
+
+  /** The account's links for AI assistants, newest first. */
+  listAssistantLinks(): Promise<AssistantLink[]>
+  /** Keeps a new link: only its key's fingerprint (SHA-256, hex) and last characters. */
+  addAssistantLink(label: string, keyHash: string, hint: string): Promise<AssistantLink>
+  revokeAssistantLink(id: string): Promise<void>
 
   /** The ids of the pictures stored for a user. */
   listPictures(userId: string): Promise<string[]>

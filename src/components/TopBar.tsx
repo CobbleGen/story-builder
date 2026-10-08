@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import {
   BookDown,
+  Bot,
   ChartGantt,
   Download,
   FilePlus2,
@@ -28,7 +29,7 @@ import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
 import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
-import { AccountButton } from './Account'
+import { AccountButton, AssistantDialog } from './Account'
 import { cloud, useCloud } from '../cloud'
 import { useUi } from '../store/uiStore'
 import { outlineWords, totalWords } from '../lib/progress'
@@ -40,6 +41,7 @@ export function TopBar() {
   const replaceStory = useStory((s) => s.replaceStory)
   const fileRef = useRef<HTMLInputElement>(null)
   const [showBackups, setShowBackups] = useState(false)
+  const [showAssistants, setShowAssistants] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
@@ -192,6 +194,7 @@ export function TopBar() {
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
+            ...(cloud ? [{ label: 'AI assistants…', icon: <Bot size={16} />, onSelect: () => setShowAssistants(true) }] : []),
             { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
             { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
             { label: 'Match system', icon: <SunMoon size={16} />, onSelect: () => setTheme('system'), checked: theme === 'system', separated: true },
@@ -212,6 +215,7 @@ export function TopBar() {
         />
       </div>
       {showBackups && <BackupsDialog onClose={() => setShowBackups(false)} />}
+      {showAssistants && <AssistantDialog onClose={() => setShowAssistants(false)} />}
       {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
     </header>
   )

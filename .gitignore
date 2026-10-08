@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel (written by the build: scripts/vercel-output.mjs)
+.vercel

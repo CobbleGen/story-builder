@@ -1,5 +1,5 @@
 import { createClient, type User } from '@supabase/supabase-js'
-import { CloudError, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
+import { CloudError, type AssistantLink, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
 
 // The backend on Supabase: its accounts (email and password), a `stories`
 // table that each account sees only its own rows of, and a private
@@ -9,6 +9,9 @@ const ROW = 'id, title, version, updated_at'
 type Row = { id: string; title: string; version: number; updated_at: string }
 const toRow = (r: Row): CloudStoryRow => ({ id: r.id, title: r.title, version: r.version, updatedAt: r.updated_at })
 const toUser = (u: User): CloudUser => ({ id: u.id, email: u.email ?? '' })
+const LINK = 'id, label, hint, created_at, last_used_at'
+type LinkRow = { id: string; label: string; hint: string; created_at: string; last_used_at: string | null }
+const toLink = (r: LinkRow): AssistantLink => ({ id: r.id, label: r.label, hint: r.hint, createdAt: r.created_at, lastUsedAt: r.last_used_at })
 
 /** Where links in account emails (confirming it, resetting the password) bring people back to: this app. */
 const here = () => `${location.origin}${location.pathname}`
@@ -116,6 +119,23 @@ export function supabaseBackend(url: string, key: string): CloudBackend {
     async deleteStory(id) {
       const { error } = await client.from('stories').delete().eq('id', id)
       if (error) fail(error, 'Couldn’t delete the story.')
+    },
+
+    async listAssistantLinks() {
+      const { data, error } = await client.from('assistant_keys').select(LINK).order('created_at', { ascending: false })
+      if (error) fail(error, 'Couldn’t list your links for AI assistants.')
+      return (data as LinkRow[]).map(toLink)
+    },
+
+    async addAssistantLink(label, keyHash, hint) {
+      const { data, error } = await client.from('assistant_keys').insert({ label, key_hash: keyHash, hint }).select(LINK).single()
+      if (error || !data) fail(error, 'Couldn’t make the link.')
+      return toLink(data as LinkRow)
+    },
+
+    async revokeAssistantLink(id) {
+      const { error } = await client.from('assistant_keys').delete().eq('id', id)
+      if (error) fail(error, 'Couldn’t revoke the link.')
     },
 
     async listPictures(userId) {

@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import type { StoryData } from '../types'
 import { CloudError, isOffline, type AuthEvent, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
+import { keyHash, newKey } from './assistantKeys'
 
 // Keeping the story in this browser in step with one in the writer's account.
 // The browser's copy is the one worked on (it works offline, as before); a
@@ -457,6 +458,18 @@ export function createCloud(deps: CloudDeps) {
 
     /** Saves now (rather than after the pause). */
     saveNow: () => serial(save),
+
+    /** The account's links for AI assistants (see server/mcp.ts). */
+    listAssistantLinks: () => need().listAssistantLinks(),
+
+    /** A new link for an AI assistant: its key comes back this once; the account keeps only a fingerprint of it. */
+    async createAssistantLink(label: string) {
+      const key = newKey()
+      const link = await need().addAssistantLink(label.trim().slice(0, 80), await keyHash(key), key.slice(-4))
+      return { link, key }
+    },
+
+    revokeAssistantLink: (id: string) => need().revokeAssistantLink(id),
 
     /** A picture from the account, for one this browser doesn't have. */
     async fetchPicture(id: string): Promise<Blob | null> {

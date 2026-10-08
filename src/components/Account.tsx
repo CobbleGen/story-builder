@@ -3,23 +3,12 @@ import { BookPlus, CircleAlert, CloudOff, LogOut, RefreshCw, Trash2, UserRound }
 import { cloud, useCloud, type CloudState } from '../cloud'
 import { askConfirm } from '../lib/confirm'
 import { buildBlankStory } from '../store/sampleStory'
+import { when } from '../lib/when'
 import { Modal } from './Modal'
+import { AssistantLinks } from './AssistantLinks'
 
 // The writer's account: signing in (or up), and once signed in, the stories
 // in it and how this browser's story stands with it.
-
-const dateTime = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-
-/** "just now", "5 minutes ago", or a date. */
-function when(at: string | number): string {
-  const ms = typeof at === 'number' ? at : Date.parse(at)
-  const minutes = Math.round((Date.now() - ms) / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return relative.format(-minutes, 'minute')
-  if (minutes < 24 * 60) return relative.format(-Math.round(minutes / 60), 'hour')
-  return dateTime.format(ms)
-}
 
 type Tone = 'good' | 'busy' | 'quiet' | 'bad'
 
@@ -89,6 +78,30 @@ function AccountDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Your account" onClose={onClose}>
       {recovering ? <NewPassword onDone={onClose} /> : user ? <AccountView onClose={onClose} /> : <SignIn />}
+    </Modal>
+  )
+}
+
+/** From the ⋯ menu: links for AI assistants to read the stories, once signed in (the stories are read from the account). */
+export function AssistantDialog({ onClose }: { onClose: () => void }) {
+  const user = useCloud((s) => s.user)
+  const off = useCloud((s) => s.status === 'off')
+  return (
+    <Modal title="AI assistants" onClose={onClose}>
+      {user ? (
+        <div className="account-view">
+          <AssistantLinks />
+        </div>
+      ) : (
+        <>
+          <h2 className="confirm-title">Let an AI assistant read your stories</h2>
+          <p className="confirm-message">
+            An assistant such as Claude can read everything in your stories (the manuscript, outline, timeline, characters, places and mind maps) to
+            give you feedback, but never change them. It reads them from your account, so {off ? 'this needs a version of Story Builder with accounts.' : 'sign in first.'}
+          </p>
+          {!off && <SignIn />}
+        </>
+      )}
     </Modal>
   )
 }
@@ -385,6 +398,7 @@ function AccountView({ onClose }: { onClose: () => void }) {
         </ul>
       )}
       {error && <p className="account-error" role="alert">{error}</p>}
+      <AssistantLinks />
       <div className="form-actions account-actions">
         <button className="btn ghost" disabled={busy === 'sign-out'} onClick={() => void signOut()}>
           <LogOut size={15} /> Sign out

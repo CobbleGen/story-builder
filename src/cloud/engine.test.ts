@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { StoryData } from '../types'
 import { emptyStory, normalizeStory } from '../store/storyOps'
-import { CloudError, type AuthEvent, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
+import { CloudError, type AssistantLink, type AuthEvent, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
 import { createCloud, type Link } from './engine'
 
 /** An account service in memory: its accounts, stories and pictures, shared by every "device". */
@@ -9,6 +10,7 @@ function memoryService() {
   const users = new Map<string, { user: CloudUser; password: string; confirmed: boolean }>()
   const stories = new Map<string, { owner: string; row: CloudStoryRow; data: unknown }>()
   const pictures = new Map<string, Blob>()
+  const links = new Map<string, { owner: string; link: AssistantLink; keyHash: string }>()
   let online = true
   let next = 1
   const stamp = () => new Date(Date.now() + next++).toISOString()
@@ -88,6 +90,18 @@ function memoryService() {
       async deleteStory(id) {
         if (mine(id)) stories.delete(id)
       },
+      async listAssistantLinks() {
+        const id = me().id
+        return [...links.values()].filter((l) => l.owner === id).map((l) => ({ ...l.link })).reverse()
+      },
+      async addAssistantLink(label, keyHash, hint) {
+        const link = { id: `link-${next++}`, label, hint, createdAt: stamp(), lastUsedAt: null }
+        links.set(link.id, { owner: me().id, link, keyHash })
+        return { ...link }
+      },
+      async revokeAssistantLink(id) {
+        if (links.get(id)?.owner === me().id) links.delete(id)
+      },
       async listPictures(userId) {
         me()
         return [...pictures.keys()].filter((k) => k.startsWith(`${userId}/`)).map((k) => k.split('/')[1])
@@ -107,6 +121,7 @@ function memoryService() {
     device,
     stories,
     pictures,
+    links,
     confirm: (email: string) => (users.get(email)!.confirmed = true),
     setOnline: (value: boolean) => (online = value),
   }
@@ -344,5 +359,26 @@ describe('keeping the story in step with the account', () => {
     a.edit({ title: 'Offline only' })
     await settle()
     expect([...service.stories.values()][0].row.title).toBe('Mine, last change')
+  })
+
+  it('makes links for AI assistants, keeping only a fingerprint of each key', async () => {
+    const service = memoryService()
+    const a = browser(service, 'Mine')
+    await a.cloud.signUp('w@example.com', 'longpassword')
+    service.confirm('w@example.com')
+    await a.cloud.signIn('w@example.com', 'longpassword')
+    await settle()
+    const { link, key } = await a.cloud.createAssistantLink('  Claude  ')
+    expect(key).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(link).toMatchObject({ label: 'Claude', hint: key.slice(-4), lastUsedAt: null })
+    const kept = service.links.get(link.id)!
+    expect(kept.keyHash).toBe(createHash('sha256').update(key).digest('hex'))
+    expect(JSON.stringify([...service.links.values()])).not.toContain(key)
+    // Every key is new
+    const second = await a.cloud.createAssistantLink('Another')
+    expect(second.key).not.toBe(key)
+    expect((await a.cloud.listAssistantLinks()).map((l) => l.label)).toEqual(['Another', 'Claude'])
+    await a.cloud.revokeAssistantLink(link.id)
+    expect((await a.cloud.listAssistantLinks()).map((l) => l.label)).toEqual(['Another'])
   })
 })

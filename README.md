@@ -4,7 +4,9 @@ A planning board for writers. Lay your book out chapter by chapter and drag
 colour-coded story beats into place, Trello-style.
 
 It has four views: the **chapter board**, the **manuscript**, the
-**mind map** and the **timeline**.
+**mind map** and the **timeline**. Signed in, you can also let an AI
+assistant such as Claude read all of it and give you feedback (see
+[AI assistants](#ai-assistants)).
 
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
@@ -220,17 +222,67 @@ account as well:
 - Signing out leaves the story in the browser; it just stops being saved to
   your account.
 
+### AI assistants
+
+An AI assistant such as Claude can read your stories (everything in them)
+to give you feedback: a critique of a chapter, a check for continuity slips,
+ideas for what to write next. It can only read; it never changes anything.
+It reads them from your account, so sign in first, then:
+
+1. **⋯ → AI assistants** (or the same section under your account): **New
+   link**, give it a name, and copy the link. It's shown once (the account
+   keeps only a fingerprint of it), so copy it then.
+2. Give the link to the assistant:
+   - **Claude** (on the web, desktop or phone): Settings → Connectors → Add
+     custom connector; name it Story Builder and paste the link as its URL.
+   - **Claude Code**: `claude mcp add --transport http story-builder <link>`
+   - Any other assistant that takes a remote MCP server (Streamable HTTP).
+3. Ask away: "Read my story and tell me what you think of chapter 3."
+
+The list shows when each link was last used; **Revoke** one and it stops
+working at once. Anyone who has a link can read your stories, so keep them
+private. To see what an assistant gets before connecting your own stories,
+use `https://story-builder-flame.vercel.app/mcp/example`, which reads the
+example story (open it in a browser for the same instructions).
+
+What the assistant can read, each as a tool:
+
+| Tool | What it gives |
+| --- | --- |
+| `get_story_overview` | The whole story at a glance, where it starts: chapters (status, length, point of view, summary, beats), arcs, characters, places and things, story time in brief, mind maps, goals |
+| `read_chapter` | One chapter with its plan: its beats and the passages linked to them, who's named in it, and its text (long chapters in parts) |
+| `read_manuscript` | The text straight through, as much as fits in one reply, and where to carry on |
+| `get_outline` | Every chapter's beats in order, beats not in a chapter yet, and each arc's beats in its own order |
+| `get_timeline` | Story time: backstory before the book begins, the book, aftermath; beats happening at once; flashbacks and flash-forwards |
+| `get_characters`, `get_places_and_things` | Full profiles with every detail, and everywhere each is named (the manuscript, beats, other profiles, mind maps); name one for every passage that mentions them |
+| `get_mind_maps` | Every card (notes and text in full, groups and what's in them) and every line, with its label |
+| `search_story` | Words anywhere in the story |
+| `get_writing_progress` | Words, goals, chapter by chapter, and the last two weeks |
+| `list_stories` | The stories in the account; the others read the one edited last, unless told another |
+
+It also explains Story Builder's ideas to the assistant (beats, arcs, story
+time, where the book begins and ends, mentions), and offers ready-made
+requests: feedback on a chapter, feedback on the whole story, a continuity
+check, and what to write next. Pictures aren't included.
+
 ## Hosting
 
-Live at **https://story-builder-flame.vercel.app**. It's a static site
-deployed on Vercel from this repository: every push to the production branch
-redeploys it. Stories live in each visitor's browser (and, signed in, in
-their account), so updates never touch them.
+Live at **https://story-builder-flame.vercel.app**. It's deployed on Vercel
+from this repository: every push to the production branch redeploys it.
+Stories live in each visitor's browser (and, signed in, in their account), so
+updates never touch them. Besides the app's static files there's one
+function, the story server for AI assistants at `/mcp/<key>`
+(`server/mcp.ts`). The build writes both in Vercel's Build Output API format
+(`scripts/vercel-output.mjs`), bundling the server into one file, since it
+shares the app's own code.
 
 The backend is a Supabase project (`story-builder`, in the CobbleWebb
 organization): its sign-in (email and password), a `stories` table that
 every account sees only its own rows of, and a private `pictures` bucket
-with a folder per account. `supabase/migrations/` holds its schema. The app
+with a folder per account, plus `assistant_keys` (the fingerprints of the
+links for AI assistants) and two functions that read a key's account's
+stories, which is all the story server can reach. `supabase/migrations/`
+holds its schema. The app
 finds it through `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` in `.env`
 (public values: the key only lets people sign in; the row rules do the
 rest). Without them the app runs as before, in the browser only.
@@ -249,7 +301,7 @@ npm install
 npm run dev      # start the dev server
 npm test         # unit tests (vitest)
 npm run lint     # oxlint
-npm run build    # type-check and build to dist/
+npm run build    # type-check, build to dist/, and write .vercel/output
 ```
 
 Built with React, TypeScript and Vite. Drag and drop uses
@@ -293,6 +345,14 @@ any static host or sub-folder.
   `engine.test.ts`), `supabaseBackend.ts` talks to Supabase (loaded only
   when someone signs in), and `index.ts` wires them to the app;
   `src/components/Account.tsx` is the account button and dialog
+- `server/` and `src/reader/`: the story server for AI assistants.
+  `src/reader/` tells a story in words (the overview, chapters with their
+  plans, outline, story time, profiles, mind maps, search, progress), from
+  the app's own code; `server/mcp.ts` offers that as MCP tools, prompts and
+  instructions over HTTP, a fresh server per request; `server/sources.ts`
+  reads an account's stories by key, or the example story; and
+  `server/vercel.ts` is the function Vercel runs. `server/mcp.test.ts`
+  connects to it with an MCP client
 - `src/store/images.ts` and `src/lib/pictures.ts`: the picture store (its own
   IndexedDB database) and adding pictures; `src/editor/picture.ts` and
   `src/map/PictureNode.tsx` show them

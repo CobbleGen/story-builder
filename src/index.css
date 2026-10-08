@@ -5600,6 +5600,75 @@ button.tl-new-arc:hover {
   font-weight: 600;
 }
 
+/* Links for AI assistants (in the account, and from ⋯ → AI assistants). */
+.assistant-new {
+  margin-top: 12px;
+}
+
+.assistant-new .field {
+  margin: 0;
+}
+
+.assistant-made p {
+  font-size: 14px;
+}
+
+.assistant-url {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.assistant-url input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.assistant-how {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.assistant-how li + li {
+  margin-top: 4px;
+}
+
+.assistant-how code,
+.assistants .account-small code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.assistant-made .account-small {
+  margin-top: 10px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.assistant-made .link-btn {
+  margin-top: 10px;
+}
+
+.assistant-hint {
+  color: var(--ink-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 400;
+}
+
 @media (max-width: 760px) {
   .account-label {
     display: none;
