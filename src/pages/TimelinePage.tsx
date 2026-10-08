@@ -15,14 +15,25 @@ import {
 } from '@dnd-kit/core'
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, FastForward, History, Plus, Rewind, X } from 'lucide-react'
+import { Book, BookOpen, Check, FastForward, GripVertical, History, ListRestart, Plus, Rewind, X } from 'lucide-react'
 import type { Arc, Beat } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type TimelineMode } from '../store/uiStore'
-import { readingOrder, readingSections, storyColumns, storyOrder, type TimelineSpot } from '../store/storyOps'
+import {
+  beatsInBook,
+  isMoment,
+  matchStoryOrder,
+  readingSections,
+  resetTimeline,
+  storyOrder,
+  storyStops,
+  type BookMarker,
+  type TimelineSpot,
+} from '../store/storyOps'
 import { labelSpans, timeJumps, type Jump } from '../lib/timeline'
 import { plainText } from '../lib/mentions'
 import { nextArcColor } from '../lib/colors'
+import { askConfirm } from '../lib/confirm'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ChapterTag } from '../components/ChapterTag'
@@ -39,13 +50,15 @@ type ColumnWhere = { column: number; chapterId?: string | null }
 
 /**
  * The timeline, left to right: gaps (to add a beat in, or drop one in at a
- * moment of its own) between columns of beats happening at once. A wide gap
- * stands for an empty chapter, or an empty timeline; a draft is where a new
- * beat is being written.
+ * moment of its own) between columns of beats happening at once, and in
+ * story order the lines where the book begins and ends. A wide gap stands
+ * for an empty chapter, or a book with nothing in it yet; a draft is where a
+ * new beat is being written.
  */
 type Slot =
   | { kind: 'gap'; key: string; where: GapWhere; wide?: boolean; title: string }
   | { kind: 'column'; key: string; where: ColumnWhere; beats: string[] }
+  | { kind: 'marker'; key: string; marker: BookMarker; drag: MarkerDrag }
   | { kind: 'draft'; key: string }
 
 /** A span of slots along the top: a chapter, or beats with the same "when". */
@@ -53,6 +66,9 @@ interface Heading {
   from: number
   to: number
   label: string
+  /** In reading order: its chapter (null for the beats in none), and how many columns it has. */
+  chapterId?: string | null
+  columns?: number
 }
 
 /** A new beat being written: in a gap, or in a column's empty place (at the same time as its beats). */
@@ -68,12 +84,17 @@ interface AddAt {
   slot: number
 }
 
-/** What's dragged: the beat picked up and, if it's selected, the others selected with it. */
-interface DragData {
-  arcId: string
-  moving: string[]
-  arcs: string[]
-}
+/**
+ * What's dragged: a beat (and, if it's picked out, the others picked out with
+ * it), the line where the book begins or ends, or the edge between two
+ * chapters.
+ */
+type DragData = BeatsDrag | MarkerDrag | EdgeDrag
+type BeatsDrag = { kind: 'beats'; arcId: string; moving: string[]; arcs: string[] }
+/** The book's beginning or end: it can go into gaps `min` to `max` (never past the other one). */
+type MarkerDrag = { kind: 'marker'; marker: BookMarker; min: number; max: number }
+/** The edge between a chapter (of `columns` columns) and the next: into a gap of either. */
+type EdgeDrag = { kind: 'edge'; chapterId: string; nextId: string; columns: number }
 
 interface DropData {
   kind: 'gap' | 'column'
@@ -86,8 +107,17 @@ interface DropData {
 const sameGap = (a: Where, b: Where) => 'gap' in a && 'gap' in b && a.gap === b.gap && a.chapterId === b.chapterId
 const NO_SELECTION = new Set<string>()
 
-/** Whether what's dragged can go on top of a column: no two beats of one arc at one moment. */
+/** Whether what's dragged can go there at all: a book line or chapter edge only into the gaps it can move to. */
+function fits(drop: DropData, drag: DragData | undefined): boolean {
+  if (!drag || drag.kind === 'beats') return true
+  if (!('gap' in drop.where)) return false
+  if (drag.kind === 'marker') return drop.where.gap >= drag.min && drop.where.gap <= drag.max
+  return drop.where.chapterId === drag.chapterId || drop.where.chapterId === drag.nextId
+}
+
+/** Whether what's dragged can go on top of a column: beats, no two of one arc at one moment. */
 function stackable(drop: DropData, drag: DragData | undefined, activeId: string): boolean {
+  if (drag && drag.kind !== 'beats') return false
   const moving = drag?.moving ?? [activeId]
   const movingArcs = drag?.arcs ?? []
   if (new Set(movingArcs).size !== movingArcs.length) return false
@@ -98,7 +128,8 @@ function stackable(drop: DropData, drag: DragData | undefined, activeId: string)
 /**
  * Where dragged beats would go, by the pointer's place across the timeline:
  * onto the column under it (to happen at once with those beats, if none is of
- * their arcs), or else into the nearest gap.
+ * their arcs), or else into the nearest gap. A book line or a chapter edge
+ * goes into the nearest gap it can move to.
  */
 const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, droppableContainers, pointerCoordinates }) => {
   const x = pointerCoordinates?.x ?? collisionRect.left + collisionRect.width / 2
@@ -108,7 +139,7 @@ const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, 
   for (const container of droppableContainers) {
     const rect = droppableRects.get(container.id)
     const drop = container.data.current as DropData | undefined
-    if (!rect || !drop) continue
+    if (!rect || !drop || !fits(drop, drag)) continue
     if (drop.kind === 'column') {
       const edge = rect.width * 0.2
       if (x >= rect.left + edge && x <= rect.right - edge && stackable(drop, drag, String(active.id))) {
@@ -125,7 +156,11 @@ const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, 
   return best ? [{ id: best.id, data: { droppableContainer: best, value: bestDistance } }] : []
 }
 
-/** With the keyboard, ← and → step picked-up beats to the next gap, or column they can go on top of. */
+/**
+ * With the keyboard, ← and → step picked-up beats to the next gap, or column
+ * they can go on top of (and a book line or chapter edge to the next gap it
+ * can go to).
+ */
 const stepThroughSlots: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
   const step = event.code === 'ArrowLeft' ? -1 : event.code === 'ArrowRight' ? 1 : 0
   const { active, collisionRect, droppableRects, droppableContainers } = context
@@ -138,7 +173,7 @@ const stepThroughSlots: KeyboardCoordinateGetter = (event, { currentCoordinates,
     .flatMap((container) => {
       const rect = droppableRects.get(container.id)
       const drop = container.data.current as DropData | undefined
-      if (!rect || !drop) return []
+      if (!rect || !drop || !fits(drop, drag)) return []
       if (drop.kind === 'column' && !drop.beats.includes(String(active.id)) && !stackable(drop, drag, String(active.id))) return []
       return [rect.left + rect.width / 2]
     })
@@ -168,7 +203,10 @@ const isTyping = (target: EventTarget | null) => target instanceof HTMLElement &
  * or place in it), or onto other beats to happen at the same moment, one at
  * a time or several picked out with a box. A + by the pointer adds a beat
  * there, or at the same time as the beats above or below it. Beats told out
- * of order are marked.
+ * of order are marked. In story order, two lines mark where the book begins
+ * and ends (what happens before is backstory, after is aftermath), dragged
+ * to their place in time; in reading order, the edge between two chapters
+ * is dragged to move beats from one into the other.
  */
 export function TimelinePage() {
   const chapters = useStory((s) => s.chapters)
@@ -179,7 +217,10 @@ export function TimelinePage() {
   const moveInReading = useStory((s) => s.moveInReading)
   const addBeatInStory = useStory((s) => s.addBeatInStory)
   const addBeatInReading = useStory((s) => s.addBeatInReading)
-  const resetTimeline = useStory((s) => s.resetTimeline)
+  const putTimeInReadingOrder = useStory((s) => s.resetTimeline)
+  const moveBookMarker = useStory((s) => s.moveBookMarker)
+  const moveChapterEdge = useStory((s) => s.moveChapterEdge)
+  const putChaptersInStoryOrder = useStory((s) => s.matchStoryOrder)
   const mode = useUi((s) => s.timelineMode)
   const setMode = useUi((s) => s.setTimelineMode)
   const lookup = useMentionLookup()
@@ -191,10 +232,13 @@ export function TimelinePage() {
   const [picked, setPicked] = useState<Set<string>>(NO_SELECTION)
   const [band, setBand] = useState<{ l: number; t: number; r: number; b: number } | null>(null)
 
-  const reading = useMemo(() => readingOrder({ chapters, arcs, beats }), [chapters, arcs, beats])
   const story = useMemo(() => storyOrder({ chapters, arcs, beats, timeline }), [chapters, arcs, beats, timeline])
   const jumps = useMemo(() => timeJumps(story, chapters.flatMap((c) => c.beatIds)), [story, chapters])
-  const arranged = story.some((id, i) => id !== reading[i])
+  // Whether matching this order to the other would change anything.
+  const unmatched = useMemo(() => {
+    const data = { chapters, arcs, beats, timeline }
+    return (mode === 'story' ? resetTimeline(data) : matchStoryOrder(data)) !== data
+  }, [mode, chapters, arcs, beats, timeline])
   const numbers = useMemo(() => chapterNumbers(chapters), [chapters])
   const lanes = new Map(arcs.map((a, i) => [a.id, i]))
   const openDraft = draft?.mode === mode ? draft : null
@@ -202,25 +246,40 @@ export function TimelinePage() {
   const selected = useMemo(() => [...picked].filter((id) => beats[id]), [picked, beats])
   const selection = useMemo(() => new Set(selected), [selected])
 
-  const { slots, headings } = useMemo(() => {
+  const { slots, headings, last } = useMemo(() => {
     const slots: Slot[] = []
     const headings: Heading[] = []
     const gap = (key: string, where: GapWhere, title: string, wide = false) => {
       slots.push({ kind: 'gap', key, where, title, wide })
       if (!wide && openDraft && sameGap(openDraft.where, where)) slots.push({ kind: 'draft', key: `${key}-draft` })
     }
+    // Where an arc's own + adds a beat: at the end of the book, or after everything else.
+    let last: GapWhere
     if (mode === 'story') {
-      const columns = storyColumns({ chapters, arcs, beats, timeline })
+      const stops = storyStops({ chapters, arcs, beats, timeline })
+      const start = stops.findIndex((s) => !isMoment(s) && s.marker === 'start')
+      const end = stops.findIndex((s) => !isMoment(s) && s.marker === 'end')
       const at: number[] = []
-      if (!columns.length) gap('g0', { gap: 0 }, 'Add a beat', true)
-      columns.forEach((ids, i) => {
-        gap(`g${i}`, { gap: i }, 'Add a beat at this point in time')
+      stops.forEach((stop, i) => {
+        // Nothing in the book yet: room to add its first beat.
+        const empty = i === end && end === start + 1
+        const title = i <= start ? 'Add a beat before the book begins' : i > end ? 'Add a beat after the book ends' : empty ? 'Add a beat in the book' : 'Add a beat at this point in time'
+        gap(`g${i}`, { gap: i }, title, empty)
         at.push(slots.length)
-        slots.push({ kind: 'column', key: `c-${ids[0]}`, where: { column: i }, beats: ids })
+        if (isMoment(stop)) slots.push({ kind: 'column', key: `c-${stop.beats[0]}`, where: { column: i }, beats: stop.beats })
+        else {
+          const [min, max] = stop.marker === 'start' ? [0, end] : [start + 1, stops.length]
+          slots.push({ kind: 'marker', key: `m-${stop.marker}`, marker: stop.marker, drag: { kind: 'marker', marker: stop.marker, min, max } })
+        }
       })
-      if (columns.length) gap(`g${columns.length}`, { gap: columns.length }, 'Add a beat after everything else')
-      const whenOf = (i: string) => columns[Number(i)].map((id) => beats[id]?.when).find((w) => w?.trim())
-      for (const span of labelSpans(columns.map((_, i) => String(i)), whenOf)) {
+      gap(`g${stops.length}`, { gap: stops.length }, 'Add a beat after the book ends')
+      last = { gap: end }
+      // Moments with the same "when" under one label, but never across the book's lines.
+      const whenOf = (i: string) => {
+        const stop = stops[Number(i)]
+        return isMoment(stop) ? stop.beats.map((id) => beats[id]?.when).find((w) => w?.trim()) : undefined
+      }
+      for (const span of labelSpans(stops.map((_, i) => String(i)), whenOf)) {
         headings.push({ from: at[span.start], to: at[span.end - 1] + 1, label: span.label })
       }
     } else {
@@ -239,10 +298,11 @@ export function TimelinePage() {
           slots.push({ kind: 'column', key: `c-${ids[0]}`, where: { chapterId, column: i }, beats: ids })
         })
         if (columns.length) gap(`${key}-g${columns.length}`, { chapterId, gap: columns.length }, `Add a beat ${into}`)
-        headings.push({ from, to: slots.length, label })
+        headings.push({ from, to: slots.length, label, chapterId, columns: columns.length })
       }
+      last = { chapterId: null, gap: sections[sections.length - 1].columns.length }
     }
-    return { slots, headings }
+    return { slots, headings, last }
   }, [mode, chapters, arcs, beats, timeline, lookup, numbers, openDraft])
 
   // Esc lets go of the beats picked out.
@@ -278,9 +338,41 @@ export function TimelinePage() {
     endDrag()
     const drop = over?.data.current as DropData | undefined
     const drag = active.data.current as DragData | undefined
-    if (!drop || !drag) return
-    if (mode === 'story') moveInStory(drag.moving, drop.where)
-    else moveInReading(drag.moving, { ...drop.where, chapterId: drop.where.chapterId ?? null })
+    if (!drop || !drag || !fits(drop, drag)) return
+    const { where } = drop
+    if (drag.kind === 'marker') {
+      if ('gap' in where) moveBookMarker(drag.marker, where.gap)
+    } else if (drag.kind === 'edge') {
+      // The first chapter keeps its columns before the gap (or all of them, and the next one's before it).
+      if ('gap' in where) moveChapterEdge(drag.chapterId, where.chapterId === drag.chapterId ? where.gap : drag.columns + where.gap)
+    } else if (mode === 'story') moveInStory(drag.moving, where)
+    else moveInReading(drag.moving, { ...where, chapterId: where.chapterId ?? null })
+  }
+
+  /** The chapters follow story time, once the writer has seen what that does. */
+  const matchChapters = async () => {
+    const inBook = beatsInBook({ chapters, arcs, beats, timeline })
+    const all = Object.values(beats)
+    const leaving = all.filter((b) => b.chapterId && !inBook.has(b.id)).length
+    const joining = all.filter((b) => !b.chapterId && inBook.has(b.id)).length
+    const beatsWord = (n: number) => `${n} beat${n === 1 ? '' : 's'}`
+    const ok = await askConfirm({
+      title: 'Put the chapters in story order?',
+      message: [
+        `The beats between where the book begins and ends go into the chapters in the order they happen, ${
+          chapters.some((c) => c.beatIds.length) ? 'each chapter taking about the same share of them as it has now' : 'shared out evenly'
+        }.`,
+        joining ? `That puts ${beatsWord(joining)} not in a chapter yet into one.` : '',
+        leaving
+          ? `${beatsWord(leaving)} happening before the book begins or after it ends will come out of ${leaving === 1 ? 'its chapter' : 'their chapters'}.`
+          : '',
+        'You can undo this.',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      confirmLabel: 'Match story order',
+    })
+    if (ok) putChaptersInStoryOrder()
   }
 
   const add = (title: string) => {
@@ -314,7 +406,7 @@ export function TimelinePage() {
   const startBox = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return placePlus(e)
     const el = grid.current
-    if (e.button !== 0 || !el || (e.target as Element).closest('.tl-card, .tl-lane-head, .tl-new-arc, button, textarea, input, a')) return
+    if (e.button !== 0 || !el || (e.target as Element).closest('.tl-card, .tl-lane-head, .tl-new-arc, .tl-marker, .tl-mark-head, .tl-edge, button, textarea, input, a')) return
     // Not on the timeline's scroll bars.
     const frame = e.currentTarget.getBoundingClientRect()
     if (e.clientX >= frame.left + e.currentTarget.clientWidth || e.clientY >= frame.top + e.currentTarget.clientHeight) return
@@ -361,10 +453,23 @@ export function TimelinePage() {
     })
 
   const overSlot = overId ? slots.find((s) => `slot-${s.key}` === overId) : undefined
-  const stackingOn = overSlot?.kind === 'column' && dragging && overSlot.beats.some((b) => !dragging.moving.includes(b)) ? overSlot : null
+  const stackingOn = overSlot?.kind === 'column' && dragging?.kind === 'beats' && overSlot.beats.some((b) => !dragging.moving.includes(b)) ? overSlot : null
   const rows = arcs.length
   const plus = addAt && !dragging && !band ? slots[addAt.slot] : undefined
   const plusArc = addAt ? arcs.find((a) => a.id === addAt.arcId) : undefined
+  const lineAt = (marker: BookMarker) => slots.findIndex((s) => s.kind === 'marker' && s.marker === marker)
+  const startAt = lineAt('start')
+  const endAt = lineAt('end')
+  // While a book line or chapter edge is dragged over a gap: the slots whose beats it would carry across, [from, to).
+  const sweep = (() => {
+    if (!dragging || dragging.kind === 'beats' || overSlot?.kind !== 'gap') return null
+    const to = slots.indexOf(overSlot)
+    const from = dragging.kind === 'marker' ? lineAt(dragging.marker) : (headings.find((h) => h.chapterId === dragging.nextId)?.from ?? -1)
+    if (from === -1) return null
+    // A chapter edge stands at the start of the next chapter's first gap; a book line in a slot of its own.
+    const [a, b] = to < from ? [to + 1, from] : [from + 1, to]
+    return b > a ? { from: a, to: b } : null
+  })()
 
   return (
     <main className="timeline-page">
@@ -385,8 +490,8 @@ export function TimelinePage() {
         </div>
         <p className="tl-hint">
           {mode === 'story'
-            ? 'When things happen in the story’s world. Drag beats to move them in time, or onto another arc’s beat so they happen at once. Drag across empty space to pick out several.'
-            : 'The order readers meet things. Drag beats to another place or chapter, or onto another arc’s beat to tell them together. Drag across empty space to pick out several.'}
+            ? 'When things happen in the story’s world. Drag beats to move them in time, or onto another arc’s beat so they happen at once. Drag the two lines to where the book begins and ends. Drag across empty space to pick out several.'
+            : 'The order readers meet things. Drag beats to another place or chapter, or onto another arc’s beat to tell them together. Drag the line between two chapters to move beats from one to the other. Drag across empty space to pick out several.'}
         </p>
         {selected.length > 0 && (
           <span className="tl-picked" role="status">
@@ -396,9 +501,24 @@ export function TimelinePage() {
             </button>
           </span>
         )}
-        {mode === 'story' && arranged && timeline.length > 0 && (
-          <button className="btn ghost small" onClick={resetTimeline} title="Put every beat back in the order it's read">
+        {mode === 'story' && (
+          <button
+            className="btn ghost small"
+            onClick={putTimeInReadingOrder}
+            disabled={!unmatched}
+            title={unmatched ? 'Put the beats that are read back in the order they’re read' : 'Story time already follows the reading order'}
+          >
             <History size={15} /> Match reading order
+          </button>
+        )}
+        {mode === 'reading' && chapters.length > 0 && (
+          <button
+            className="btn ghost small"
+            onClick={matchChapters}
+            disabled={!unmatched}
+            title={unmatched ? 'Put the beats into the chapters in the order they happen' : 'The chapters already follow story order'}
+          >
+            <ListRestart size={15} /> Match story order
           </button>
         )}
       </header>
@@ -419,7 +539,7 @@ export function TimelinePage() {
               setDraft(null)
               setAddAt(null)
               // Picking up a beat that isn't picked out moves it alone.
-              if (!selection.has(String(active.id))) setPicked(NO_SELECTION)
+              if (drag.kind === 'beats' && !selection.has(String(active.id))) setPicked(NO_SELECTION)
               setDragging(drag)
             }}
             onDragMove={({ delta }) => grid.current?.style.setProperty('--tl-dx', `${delta.x}px`)}
@@ -431,7 +551,9 @@ export function TimelinePage() {
               ref={grid}
               className={`tl-grid${dragging ? ' is-dragging' : ''}${band ? ' is-boxing' : ''}`}
               style={{
-                gridTemplateColumns: `var(--tl-head) ${slots.map((s) => (s.kind === 'gap' && !s.wide ? 'var(--tl-gap)' : 'var(--tl-col)')).join(' ')}`,
+                gridTemplateColumns: `var(--tl-head) ${slots
+                  .map((s) => (s.kind === 'marker' ? 'var(--tl-mark)' : s.kind === 'gap' && !s.wide ? 'var(--tl-gap)' : 'var(--tl-col)'))
+                  .join(' ')}`,
                 gridTemplateRows: `auto repeat(${rows}, minmax(var(--tl-row), auto)) auto`,
               }}
               onPointerMove={placePlus}
@@ -446,28 +568,35 @@ export function TimelinePage() {
                   <span>{h.label}</span>
                 </div>
               ))}
-              {mode === 'reading' &&
-                headings.slice(1).map((h) => (
-                  <div key={`divider-${h.from}`} className="tl-divider" style={{ gridRow: `2 / span ${rows}`, gridColumn: h.from + 2 }} aria-hidden />
-                ))}
               {arcs.map((arc, i) => (
                 <Lane
                   key={arc.id}
                   arc={arc}
                   row={i + 2}
                   columns={slots.length}
-                  onAdd={() => {
-                    const last = [...slots].reverse().find((s) => s.kind === 'gap')
-                    if (last?.kind === 'gap') setDraft({ mode, arcId: arc.id, where: last.where })
-                  }}
+                  addTitle={mode === 'story' ? 'Add a beat at the end of the book' : 'Add a beat after everything else'}
+                  onAdd={() => setDraft({ mode, arcId: arc.id, where: last })}
                 />
               ))}
               <NewArc row={rows + 2} />
-              {slots.map((slot, i) =>
-                slot.kind === 'draft' ? null : (
-                  <SlotTarget key={`slot-${slot.key}`} slot={slot} column={i + 2} rows={rows} arcOf={(id) => beats[id]?.arcId ?? ''} over={overSlot === slot} />
-                ),
+              {/* Before the book begins and after it ends. */}
+              {startAt > 0 && <div className="tl-outside" style={{ gridRow: `2 / span ${rows}`, gridColumn: `2 / ${startAt + 2}` }} aria-hidden />}
+              {endAt !== -1 && endAt < slots.length - 1 && (
+                <div className="tl-outside" style={{ gridRow: `2 / span ${rows}`, gridColumn: `${endAt + 3} / ${slots.length + 2}` }} aria-hidden />
               )}
+              {sweep && <div className="tl-sweep" style={{ gridRow: `2 / span ${rows}`, gridColumn: `${sweep.from + 2} / ${sweep.to + 2}` }} aria-hidden />}
+              {slots.map((slot, i) =>
+                slot.kind === 'gap' || slot.kind === 'column' ? (
+                  <SlotTarget key={`slot-${slot.key}`} slot={slot} column={i + 2} rows={rows} arcOf={(id) => beats[id]?.arcId ?? ''} over={overSlot === slot} />
+                ) : null,
+              )}
+              {/* Before the beats in no chapter, a line; between two chapters, an edge that moves (with the beats, below). */}
+              {mode === 'reading' &&
+                headings.slice(1).map((h, i) =>
+                  headings[i].chapterId && h.chapterId ? null : (
+                    <div key={`divider-${h.from}`} className="tl-divider" style={{ gridRow: `2 / span ${rows}`, gridColumn: h.from + 2 }} aria-hidden />
+                  ),
+                )}
               {slots.map((slot, i) => {
                 if (slot.kind !== 'column' || slot.beats.length < 2) return null
                 const at = slot.beats.map((id) => lanes.get(beats[id]?.arcId) ?? 0)
@@ -479,6 +608,49 @@ export function TimelinePage() {
                     aria-hidden
                   />
                 )
+              })}
+              {/* Beats, the book's lines and the chapters' edges, left to right (as the keyboard goes through them). */}
+              {slots.map((slot, i) => {
+                if (slot.kind === 'marker') return <BookLine key={slot.key} slot={slot} column={i + 2} rows={rows} />
+                if (slot.kind === 'gap') {
+                  const at = mode === 'reading' ? headings.findIndex((h) => h.from === i) : -1
+                  const [before, next] = at > 0 ? [headings[at - 1], headings[at]] : []
+                  if (!before?.chapterId || !next?.chapterId) return null
+                  return (
+                    <ChapterEdge
+                      key={`edge-${before.chapterId}`}
+                      column={i + 2}
+                      rows={rows}
+                      drag={{ kind: 'edge', chapterId: before.chapterId, nextId: next.chapterId, columns: before.columns ?? 0 }}
+                      label={`Edge between chapters ${numbers[before.chapterId]} and ${numbers[next.chapterId]}`}
+                    />
+                  )
+                }
+                if (slot.kind !== 'column') return null
+                return slot.beats.map((id) => {
+                  const beat = beats[id]
+                  const row = lanes.get(beat?.arcId)
+                  if (!beat || row === undefined) return null
+                  const moving = selection.has(id) ? selected : [id]
+                  return (
+                    <BeatTile
+                      key={id}
+                      beat={beat}
+                      arc={arcs[row]}
+                      row={row + 2}
+                      column={i + 2}
+                      number={beat.chapterId ? numbers[beat.chapterId] : null}
+                      jump={jumps.get(id)}
+                      showWhen={mode === 'reading'}
+                      together={slot.beats.length > 1}
+                      picked={selection.has(id)}
+                      carried={dragging?.kind === 'beats' && dragging.moving.length > 1 && dragging.moving.includes(id)}
+                      drag={{ kind: 'beats', arcId: beat.arcId, moving, arcs: moving.map((b) => beats[b]?.arcId ?? '') }}
+                      onPick={() => pick(id)}
+                      onOpen={() => setPicked(NO_SELECTION)}
+                    />
+                  )
+                })
               })}
               {plus && plusArc && addAt && (plus.kind === 'gap' || plus.kind === 'column') && (
                 <button
@@ -497,36 +669,9 @@ export function TimelinePage() {
                   {plus.kind === 'column' && <span>Same time</span>}
                 </button>
               )}
-              {slots.map((slot, i) =>
-                slot.kind === 'column'
-                  ? slot.beats.map((id) => {
-                      const beat = beats[id]
-                      const row = lanes.get(beat?.arcId)
-                      if (!beat || row === undefined) return null
-                      const moving = selection.has(id) ? selected : [id]
-                      return (
-                        <BeatTile
-                          key={id}
-                          beat={beat}
-                          arc={arcs[row]}
-                          row={row + 2}
-                          column={i + 2}
-                          number={beat.chapterId ? numbers[beat.chapterId] : null}
-                          jump={jumps.get(id)}
-                          showWhen={mode === 'reading'}
-                          together={slot.beats.length > 1}
-                          picked={selection.has(id)}
-                          carried={!!dragging && dragging.moving.length > 1 && dragging.moving.includes(id)}
-                          drag={{ arcId: beat.arcId, moving, arcs: moving.map((b) => beats[b]?.arcId ?? '') }}
-                          onPick={() => pick(id)}
-                          onOpen={() => setPicked(NO_SELECTION)}
-                        />
-                      )
-                    })
-                  : null,
-              )}
               {stackingOn &&
-                dragging?.moving.map((id) => {
+                dragging?.kind === 'beats' &&
+                dragging.moving.map((id) => {
                   const row = lanes.get(beats[id]?.arcId)
                   if (row === undefined) return null
                   return (
@@ -571,7 +716,7 @@ export function TimelinePage() {
   )
 }
 
-function Lane({ arc, row, columns, onAdd }: { arc: Arc; row: number; columns: number; onAdd: () => void }) {
+function Lane({ arc, row, columns, addTitle, onAdd }: { arc: Arc; row: number; columns: number; addTitle: string; onAdd: () => void }) {
   const navigate = useNavigate()
   const lookup = useMentionLookup()
   return (
@@ -592,8 +737,8 @@ function Lane({ arc, row, columns, onAdd }: { arc: Arc; row: number; columns: nu
         <button
           className="tl-lane-add"
           onClick={onAdd}
-          aria-label={`Add a beat to ${plainText(arc.name, lookup) || 'this arc'}, after everything else`}
-          title="Add a beat after everything else"
+          aria-label={`${addTitle}: ${plainText(arc.name, lookup) || 'Untitled arc'}`}
+          title={addTitle}
         >
           <Plus size={14} />
         </button>
@@ -657,6 +802,61 @@ function NewArc({ row }: { row?: number }) {
   )
 }
 
+/**
+ * Where the book begins or ends in story time: a line through every lane,
+ * dragged (by itself or its top) to its place in time.
+ */
+function BookLine({ slot, column, rows }: { slot: Extract<Slot, { kind: 'marker' }>; column: number; rows: number }) {
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `marker-${slot.marker}`, data: slot.drag })
+  const begins = slot.marker === 'start'
+  const name = begins ? 'Book begins' : 'Book ends'
+  const tip = begins
+    ? 'Where the book begins: drag it to its place in time. What happens before it is backstory.'
+    : 'Where the book ends: drag it to its place in time. What happens after it is aftermath.'
+  const move = CSS.Translate.toString(transform)
+  const state = `${slot.marker}${isDragging ? ' dragging' : ''}`
+  return (
+    <>
+      <div className={`tl-mark-head ${state}`} style={{ gridRow: 1, gridColumn: column, transform: move }} title={tip} {...listeners} aria-hidden>
+        {begins ? <BookOpen size={13} /> : <Book size={13} />}
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`tl-marker ${state}`}
+        style={{ gridRow: `2 / span ${rows}`, gridColumn: column, transform: move }}
+        title={tip}
+        {...attributes}
+        {...listeners}
+        aria-roledescription="movable line"
+        aria-label={`${name}, in story time`}
+      >
+        <span className="tl-marker-label">{name}</span>
+      </div>
+    </>
+  )
+}
+
+/** The edge between two chapters in reading order: dragged into either, the beats it passes go into the other. */
+function ChapterEdge({ column, rows, drag, label }: { column: number; rows: number; drag: EdgeDrag; label: string }) {
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `edge-${drag.chapterId}`, data: drag })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`tl-edge${isDragging ? ' dragging' : ''}`}
+      style={{ gridRow: `2 / span ${rows}`, gridColumn: column, transform: CSS.Translate.toString(transform) }}
+      title="Drag to move beats from one chapter into the other"
+      {...attributes}
+      {...listeners}
+      aria-roledescription="movable chapter edge"
+      aria-label={label}
+    >
+      <span className="tl-edge-grip">
+        <GripVertical size={12} />
+      </span>
+    </div>
+  )
+}
+
 /** A slot as a place to drop beats: the whole height of the timeline. */
 function SlotTarget({
   slot,
@@ -665,7 +865,7 @@ function SlotTarget({
   arcOf,
   over,
 }: {
-  slot: Exclude<Slot, { kind: 'draft' }>
+  slot: Extract<Slot, { kind: 'gap' | 'column' }>
   column: number
   rows: number
   arcOf: (beatId: string) => string

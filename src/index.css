@@ -294,7 +294,7 @@ a {
   color: var(--ink-2);
 }
 
-.btn.ghost:hover {
+.btn.ghost:hover:not(:disabled) {
   background: var(--hover);
   color: var(--ink);
 }
@@ -3655,6 +3655,7 @@ a {
   --tl-head: 168px;
   --tl-col: 172px;
   --tl-gap: 26px;
+  --tl-mark: 40px;
   --tl-row: 96px;
   display: flex;
   flex: 1;
@@ -3892,6 +3893,180 @@ a {
   justify-self: start;
   width: 0;
   border-left: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+
+/* The edge between two chapters: dragged into either to move beats across. */
+.tl-edge {
+  position: relative;
+  z-index: 2;
+  justify-self: start;
+  width: 18px;
+  margin-left: -9px;
+  border-radius: 6px;
+  cursor: ew-resize;
+  touch-action: manipulation;
+}
+
+.tl-edge::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: var(--line-strong);
+  content: '';
+}
+
+.tl-edge:hover::before,
+.tl-edge:focus-visible::before,
+.tl-edge.dragging::before {
+  left: calc(50% - 1.5px);
+  width: 3px;
+  border-radius: 2px;
+  background: var(--focus);
+}
+
+.tl-edge:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+}
+
+.tl-edge-grip {
+  position: sticky;
+  top: 46px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 28px;
+  margin: 10px auto 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tl-edge:hover .tl-edge-grip,
+.tl-edge:focus-visible .tl-edge-grip,
+.tl-edge.dragging .tl-edge-grip {
+  border-color: var(--focus);
+  color: var(--focus);
+  opacity: 1;
+}
+
+.tl-edge.dragging {
+  z-index: 6;
+  cursor: grabbing;
+}
+
+@media (hover: none) {
+  .tl-edge-grip {
+    opacity: 0.85;
+  }
+}
+
+/* Where the book begins and ends, in story order: lines through every lane, with their name on them. */
+.tl-marker {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  cursor: ew-resize;
+  touch-action: manipulation;
+}
+
+.tl-marker::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--ink-2);
+  content: '';
+}
+
+.tl-marker-label {
+  position: sticky;
+  top: 46px;
+  margin-top: 12px;
+  padding: 9px 3px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  box-shadow: 0 0 0 3px var(--board);
+}
+
+.tl-mark-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  background: var(--board);
+  cursor: ew-resize;
+}
+
+.tl-mark-head svg {
+  box-sizing: content-box;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.tl-marker:hover::before,
+.tl-marker:focus-visible::before,
+.tl-marker.dragging::before {
+  background: var(--focus);
+}
+
+.tl-marker:hover .tl-marker-label,
+.tl-marker:focus-visible .tl-marker-label,
+.tl-marker.dragging .tl-marker-label,
+.tl-mark-head:hover svg,
+.tl-mark-head.dragging svg {
+  background: var(--focus);
+  color: var(--surface);
+}
+
+.tl-marker:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.tl-marker.dragging,
+.tl-mark-head.dragging {
+  z-index: 6;
+  cursor: grabbing;
+}
+
+/* Before the book begins and after it ends: backstory and aftermath. */
+.tl-outside {
+  z-index: 0;
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--ink) 6%, transparent) 0 2px, transparent 2px 9px);
+  pointer-events: none;
+}
+
+/* While a book line or chapter edge is dragged: the beats it would carry across. */
+.tl-sweep {
+  z-index: 0;
+  margin: 4px 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--focus) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--focus) 30%, transparent);
   pointer-events: none;
 }
 
@@ -4175,6 +4350,7 @@ button.tl-new-arc:hover {
     --tl-head: 100px;
     --tl-col: 146px;
     --tl-gap: 22px;
+    --tl-mark: 34px;
     --tl-row: 90px;
   }
 

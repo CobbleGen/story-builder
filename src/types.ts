@@ -232,7 +232,9 @@ export interface StoryData {
   /**
    * Beats in the order they happen in the story's world, once the writer has
    * arranged them on the timeline; empty until then (story order follows
-   * reading order). Beats missing from it slot in by reading order.
+   * reading order). Beats missing from it slot in by reading order. Among
+   * them, 'book:start' and 'book:end' mark where the book begins and ends
+   * (at the very beginning and end when missing).
    */
   timeline: string[]
   /** A story can have several mind maps (card and line ids are unique across them). */

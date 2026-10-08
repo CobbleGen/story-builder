@@ -120,14 +120,33 @@ It has four views: the **chapter board**, the **manuscript**, the
   right there (in story order it's in no chapter yet; in reading order it's
   in that chapter), and in the empty place above or below another arc's
   beat it adds one happening at the same time. Each arc's name has a + for
-  a beat after everything else, and **New arc** under the lanes adds an
-  arc. Drag across empty space to box in several beats (Shift or Ctrl to
-  add to them, or Ctrl-click beats one by one), then drag any of them to
-  move them all at once, in their order; a click on empty space or Esc
-  lets go. With the keyboard, Space picks a beat up, ← and → step it from
-  place to place, and Space puts it down. Beats told out of order are marked
-  **Flashback** or **Flash-forward**, and **Match reading order** puts story
-  time back the way it's read.
+  a beat at the end of the book (in reading order, after everything else),
+  and **New arc** under the lanes adds an arc. Drag across empty space to
+  box in several beats (Shift or Ctrl to add to them, or Ctrl-click beats
+  one by one), then drag any of them to move them all at once, in their
+  order; a click on empty space or Esc lets go. With the keyboard, Space
+  picks a beat up, ← and → step it from place to place, and Space puts it
+  down. Beats told out of order are marked **Flashback** or
+  **Flash-forward**.
+- **Where the book begins and ends**: in story order, two lines run through
+  every lane, **Book begins** and **Book ends**, at the very beginning and
+  end to start with. Drag a line (or the book at its top) to its place in
+  time: what happens before it is backstory and after it aftermath, shaded
+  on the timeline. While a line is dragged, the beats it would carry across
+  are lit up; the beginning never passes the end. Beats moved, or added,
+  outside the lines stay outside them as the story changes.
+- **Chapter edges and matching the two orders**: in reading order, drag the
+  line between two chapters (its grip shows on hover) to move the beats it
+  passes from one chapter into the other; beats read at the same moment go
+  together. **Match story order** puts the beats between the book's lines
+  into the chapters in the order they happen, each chapter taking about the
+  share of them it has now (all alike if they're empty), and takes beats
+  outside the lines out of their chapters; it says what it will do first.
+  The other way, **Match reading order** (in story order) puts the beats
+  that are read back in time the way they're read, keeping backstory and
+  aftermath in no chapter where they are. Either is greyed out when the two
+  orders already match, and each can be undone. With the keyboard, Tab to a
+  line or edge, Space to pick it up, ← and → to move it, and Space again.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button
   shows the chapter's text a page at a time (arrows or the page picker to move
   through it), and **Beats** lists its beats. An arc card lists its beats in

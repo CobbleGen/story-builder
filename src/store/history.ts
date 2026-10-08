@@ -67,6 +67,10 @@ const LABELS: Record<string, string> = {
   moveInStory: 'move beat in time',
   moveInReading: 'move beat',
   resetTimeline: 'reset the timeline',
+  // "move where the book begins" (or ends); see labelOf.
+  moveBookMarker: 'move where the book',
+  matchStoryOrder: 'put the chapters in story order',
+  moveChapterEdge: 'move a chapter’s edge',
   deleteBeat: 'delete beat',
   setArcCharacter: 'change arc’s cast',
   addCharacter: 'add character',
@@ -113,6 +117,7 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
     return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
+  if (name === 'moveBookMarker') return `${LABELS[name]} ${target === 'end' ? 'ends' : 'begins'}`
   // Several beats moved at once.
   if ((name === 'moveInStory' || name === 'moveInReading') && Array.isArray(target) && target.length > 1) {
     return name === 'moveInStory' ? 'move beats in time' : 'move beats'
