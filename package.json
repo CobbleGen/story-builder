@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/dom": "^1.8.0",
+    "@supabase/supabase-js": "^2.117.3",
     "@tiptap/extension-mention": "^3.31.3",
     "@tiptap/extension-typography": "^3.31.3",
     "@tiptap/extensions": "^3.31.3",

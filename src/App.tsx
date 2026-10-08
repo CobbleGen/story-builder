@@ -18,6 +18,7 @@ import { useStoryLoaded } from './store/storyStore'
 import { useSaveStatus } from './store/persistence'
 import { useApplyTheme } from './lib/theme'
 import { tidyPicturesSoon } from './store/tidyPictures'
+import { startCloud } from './cloud'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
@@ -32,7 +33,9 @@ export default function App() {
   const progressOpen = useUi((s) => s.progressOpen)
   const searchOpen = useUi((s) => s.searchOpen)
   useEffect(() => {
-    if (loaded) tidyPicturesSoon()
+    if (!loaded) return
+    tidyPicturesSoon()
+    startCloud()
   }, [loaded])
 
   if (!loaded) return <div className="boot">Opening your story…</div>

@@ -6,7 +6,7 @@ import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
-import { remember, travel } from './history'
+import { forget, remember, travel } from './history'
 
 type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
 
@@ -63,13 +63,15 @@ interface StoryActions {
   deleteMindMap: (...args: Tail<Parameters<typeof ops.deleteMindMap>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
+  /** Swaps in a story from the writer's account: not a change made here, and not one to undo. */
+  loadStory: (data: StoryData) => void
   undo: () => void
   redo: () => void
 }
 
 export type StoryStore = StoryData & StoryActions
 
-const STORY_KEYS = [
+export const STORY_KEYS = [
   'title',
   'chapters',
   'arcs',
@@ -99,6 +101,13 @@ export const pickData = (s: StoryData): StoryData => ({
   wordLog: s.wordLog,
   outlineLog: s.outlineLog,
 })
+
+/**
+ * Goes up whenever a whole other story (or another copy of it) is swapped
+ * in, so views holding their own copy of its text (the manuscript editor)
+ * start again from the new one.
+ */
+export const useStoryEpoch = create(() => ({ epoch: 0 }))
 
 export const useStory = create<StoryStore>()(
   persist(
@@ -181,7 +190,15 @@ export const useStory = create<StoryStore>()(
         addMindMap: (...a) => withId(ops.addMindMap(data(), ...a), 'addMindMap'),
         renameMindMap: (...a) => apply(ops.renameMindMap(data(), ...a), 'renameMindMap', a[0]),
         deleteMindMap: (...a) => apply(ops.deleteMindMap(data(), ...a), 'deleteMindMap', a[0]),
-        replaceStory: (input) => apply(ops.normalizeStory(input), 'replaceStory'),
+        replaceStory: (input) => {
+          apply(ops.normalizeStory(input), 'replaceStory')
+          useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
+        },
+        loadStory: (input) => {
+          set(pickData(ops.normalizeStory(input)))
+          forget()
+          useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
+        },
         undo: () => step('undo'),
         redo: () => step('redo'),
       }

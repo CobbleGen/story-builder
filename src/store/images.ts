@@ -58,13 +58,52 @@ function setUrl(id: string, url: string | null) {
   listeners.forEach((l) => l())
 }
 
+// Pictures this browser doesn't have can come from the writer's account.
+let remote: ((id: string) => Promise<Blob | null>) | null = null
+
+/** Where to fetch pictures this browser doesn't have (the writer's account), or null. */
+export function setRemotePictures(fetch: ((id: string) => Promise<Blob | null>) | null) {
+  remote = fetch
+}
+
+/** Looks again for pictures that were missing (after signing in, say). */
+export function retryMissingPictures() {
+  let any = false
+  for (const [id, url] of urls) {
+    if (url !== null) continue
+    urls.delete(id)
+    any = true
+  }
+  if (any) listeners.forEach((l) => l())
+}
+
+/** A picture from the account, kept in this browser from then on. */
+async function fromRemote(id: string): Promise<StoredImage | undefined> {
+  const blob = await remote?.(id).catch(() => null)
+  if (!blob) return undefined
+  let width = 800
+  let height = 600
+  try {
+    const bitmap = await createImageBitmap(blob)
+    ;({ width, height } = bitmap)
+    bitmap.close()
+  } catch {
+    // Its size is a guess, then; the picture still shows.
+  }
+  const image: StoredImage = { id, blob, type: blob.type, width, height, name: '', addedAt: Date.now() }
+  await putImage(image).catch(() => {})
+  return image
+}
+
 function load(id: string) {
   if (urls.has(id) || loading.has(id)) return
   loading.add(id)
-  void getImage(id).then((image) => {
-    loading.delete(id)
-    if (!urls.has(id)) setUrl(id, image ? URL.createObjectURL(image.blob) : null)
-  })
+  void getImage(id)
+    .then((image) => image ?? fromRemote(id))
+    .then((image) => {
+      loading.delete(id)
+      if (!urls.has(id)) setUrl(id, image ? URL.createObjectURL(image.blob) : null)
+    })
 }
 
 const subscribe = (listener: () => void) => {

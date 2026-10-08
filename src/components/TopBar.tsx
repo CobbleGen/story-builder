@@ -28,6 +28,8 @@ import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
 import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
+import { AccountButton } from './Account'
+import { cloud, useCloud } from '../cloud'
 import { useUi } from '../store/uiStore'
 import { outlineWords, totalWords } from '../lib/progress'
 import { SEARCH_KEYS } from '../lib/searchShortcut'
@@ -68,29 +70,46 @@ export function TopBar() {
       return
     }
     const ok = await askConfirm({
-      title: 'Replace your story with the imported one?',
-      message: 'Everything on the board now will be replaced. A backup of your current story is kept (⋯ → Backups).',
-      confirmLabel: 'Replace story',
-      danger: true,
+      title: signedIn ? 'Add the imported story to your account?' : 'Replace your story with the imported one?',
+      message: signedIn
+        ? 'It opens here as a new story in your account; the one open now stays in your account.'
+        : 'Everything on the board now will be replaced. A backup of your current story is kept (⋯ → Backups).',
+      confirmLabel: signedIn ? 'Import story' : 'Replace story',
+      danger: !signedIn,
     })
     if (ok) {
-      await backupNow()
       // Pictures first, so the story finds them; a story without them still imports.
       await importImages((data as { images?: unknown } | null)?.images).catch(() => {})
-      replaceStory(data)
+      await swapIn(data)
     }
+  }
+
+  /** Signed in, a story swapped in (blank, the example, an import) is a new story in the account; the one open stays there. */
+  const signedIn = useCloud((s) => !!s.user)
+  const swapIn = async (data: unknown) => {
+    if (cloud && cloud.store.getState().user) {
+      try {
+        await cloud.newStory(data)
+      } catch (error) {
+        await askConfirm({ title: 'Couldn’t start the new story', message: error instanceof Error ? error.message : String(error), notice: true })
+      }
+      return
+    }
+    await backupNow()
+    replaceStory(data)
   }
 
   const replaceWith = async (build: () => unknown, title: string, confirmLabel: string) => {
     const ok = await askConfirm({
       title,
-      message: 'This replaces everything on the board. A backup of your current story is kept (⋯ → Backups).',
+      message: signedIn
+        ? 'It’s added to your account as a new story; the one open now stays in your account (Your account → Your stories).'
+        : 'This replaces everything on the board. A backup of your current story is kept (⋯ → Backups).',
       confirmLabel,
-      danger: true,
+      danger: !signedIn,
     })
     if (!ok) return
-    await backupNow()
-    replaceStory(build())
+    await swapIn(build())
   }
 
   return (
@@ -164,6 +183,7 @@ export function TopBar() {
             </span>
           ) : null}
         </button>
+        <AccountButton />
         <Menu
           label="Story options"
           items={[

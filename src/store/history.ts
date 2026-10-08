@@ -120,6 +120,11 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
   return labelFor(name)
 }
 
+/** Clears the undo history (a different story, or another copy of it, was loaded). */
+export function forget() {
+  useHistory.setState({ past: [], future: [] })
+}
+
 /** Notes the story as it was before a change. */
 export function remember(before: StoryData, name: string, target?: unknown) {
   const key = `${name}:${typeof target === 'string' ? target : ''}`

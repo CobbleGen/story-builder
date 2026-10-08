@@ -4,7 +4,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useMentionables, useMentionLookup, useStory } from '../store/storyStore'
+import { useMentionables, useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { flushStory, useSaveStatus } from '../store/persistence'
 import { displayName, mentionToken, plainText } from '../lib/mentions'
@@ -46,6 +46,7 @@ export default function WritePage() {
   const { chapterId } = useParams()
   const chapters = useStory((s) => s.chapters)
   const lastChapterId = useUi((s) => s.lastChapterId)
+  const epoch = useStoryEpoch((s) => s.epoch)
   const index = chapters.findIndex((c) => c.id === chapterId)
 
   if (chapters.length === 0) return <NoChapters />
@@ -54,7 +55,7 @@ export default function WritePage() {
     return <Navigate to={`/write/${fallback.id}`} replace />
   }
   // A fresh editor per chapter: its own undo history, saved when you leave.
-  return <ChapterWriter key={chapters[index].id} chapter={chapters[index]} index={index} />
+  return <ChapterWriter key={`${chapters[index].id}:${epoch}`} chapter={chapters[index]} index={index} />
 }
 
 function NoChapters() {

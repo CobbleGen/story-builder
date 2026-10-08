@@ -174,12 +174,54 @@ one from **⋯ → Backups**. The same menu exports the story as JSON (the way t
 move it to another browser or device), imports it again, or starts a blank
 story.
 
+### Accounts
+
+Without an account everything works as above, in one browser. **Sign in**
+(top right) with an email address and password to keep your stories in your
+account as well:
+
+- Creating an account sends an email to confirm the address; then sign in.
+  Forgotten passwords are reset by email too.
+- The first time you sign in, the story in the browser becomes your
+  account's first story. Signing in somewhere else (another browser, another
+  device) asks whether to open a story from your account there or add that
+  browser's story too; the one that was there is kept in its backups.
+- From then on it's saved to your account a few seconds after each change
+  (pictures too), and changes made elsewhere are picked up when the app
+  comes back into view, or every minute. The dot on your initial shows how
+  it stands: green saved, amber saving, grey offline (changes wait in the
+  browser and go up when you're back online), red needs you.
+- If the same story was changed in two places before either saw the other's
+  change, nothing is overwritten: you're asked which version to keep, and
+  the other goes into that browser's backups.
+- **Your account** lists your stories: open one, start a new one, or delete
+  one you don't need. Signed in, ⋯ → New blank story, Load example story and
+  Import story each add a new story to your account rather than replacing
+  the one open.
+- Signing out leaves the story in the browser; it just stops being saved to
+  your account.
+
 ## Hosting
 
 Live at **https://story-builder-flame.vercel.app**. It's a static site
 deployed on Vercel from this repository: every push to the production branch
-redeploys it. Stories live in each visitor's
-browser, so updates never touch them.
+redeploys it. Stories live in each visitor's browser (and, signed in, in
+their account), so updates never touch them.
+
+The backend is a Supabase project (`story-builder`, in the CobbleWebb
+organization): its sign-in (email and password), a `stories` table that
+every account sees only its own rows of, and a private `pictures` bucket
+with a folder per account. `supabase/migrations/` holds its schema. The app
+finds it through `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` in `.env`
+(public values: the key only lets people sign in; the row rules do the
+rest). Without them the app runs as before, in the browser only.
+
+In the Supabase dashboard (Authentication), for links in emails to come back
+to the app: **URL Configuration** → Site URL
+`https://story-builder-flame.vercel.app`, and Redirect URLs
+`https://story-builder-flame.vercel.app/**` and `http://localhost:5173/**`.
+Supabase's own mail sender is for trying things out (it sends only a few
+emails an hour); for real use, set up **SMTP** with a mail service.
 
 ## Development
 
@@ -227,6 +269,11 @@ any static host or sub-folder.
 - `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
   (the Word library loads only when exporting)
 - `src/store/history.ts`: undo and redo
+- `src/cloud/`: accounts and sync. `engine.ts` keeps the browser's story in
+  step with the account (tested against an in-memory backend in
+  `engine.test.ts`), `supabaseBackend.ts` talks to Supabase (loaded only
+  when someone signs in), and `index.ts` wires them to the app;
+  `src/components/Account.tsx` is the account button and dialog
 - `src/store/images.ts` and `src/lib/pictures.ts`: the picture store (its own
   IndexedDB database) and adding pictures; `src/editor/picture.ts` and
   `src/map/PictureNode.tsx` show them

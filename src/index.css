@@ -5172,3 +5172,270 @@ button.tl-new-arc:hover {
     transition: none !important;
   }
 }
+
+/* ---------- Account ---------- */
+
+.account-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-right: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.account-btn:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.account-btn.signed-in {
+  width: 32px;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--focus) 16%, var(--tint));
+  color: color-mix(in srgb, var(--focus) 80%, var(--ink));
+  font-weight: 700;
+}
+
+.account-btn.signed-in:hover {
+  background: color-mix(in srgb, var(--focus) 24%, var(--tint));
+}
+
+.account-btn.signed-in .sync-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.sync-dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.sync-dot.good {
+  background: var(--success);
+}
+
+.sync-dot.busy {
+  background: #d4a017;
+}
+
+.sync-dot.bad {
+  background: var(--danger);
+}
+
+.account-form .field:first-of-type {
+  margin-top: 20px;
+}
+
+.field-hint {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.account-error,
+.account-notice {
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.account-error {
+  background: color-mix(in srgb, var(--danger) 10%, var(--tint));
+  color: color-mix(in srgb, var(--danger) 85%, var(--ink));
+}
+
+.account-notice {
+  background: color-mix(in srgb, var(--success) 12%, var(--tint));
+  color: color-mix(in srgb, var(--success) 70%, var(--ink));
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 20px;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--focus) 85%, var(--ink));
+  font: inherit;
+  font-size: 13.5px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--focus) 35%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration-color: currentColor;
+}
+
+.account-switch {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 13.5px;
+}
+
+.account-email {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.account-standing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--tint);
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.account-standing.bad {
+  background: color-mix(in srgb, var(--danger) 9%, var(--tint));
+}
+
+.account-standing .link-btn {
+  margin-left: auto;
+}
+
+.account-ask {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--focus) 30%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--focus) 5%, var(--surface));
+}
+
+.account-ask p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.account-ask p svg {
+  margin-right: 4px;
+  vertical-align: -3px;
+  color: var(--danger);
+}
+
+.account-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.account-small {
+  margin: 10px 0 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.account-stories-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.account-stories-head .progress-heading {
+  margin: 0;
+}
+
+.account-stories {
+  margin: 10px 0 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.account-stories li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 8px 6px 14px;
+}
+
+.account-stories li + li {
+  border-top: 1px solid var(--line);
+}
+
+.account-stories li.here {
+  background: var(--tint);
+}
+
+.account-story-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-story-when {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.account-stories li.here .account-story-when {
+  color: color-mix(in srgb, var(--success) 75%, var(--ink));
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .account-label {
+    display: none;
+  }
+
+  .account-btn {
+    width: 32px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .account-stories li:not(.here) .account-story-when {
+    display: none;
+  }
+}
