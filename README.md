@@ -149,6 +149,14 @@ assistant such as Claude read all of it and give you feedback (see
   aftermath in no chapter where they are. Either is greyed out when the two
   orders already match, and each can be undone. With the keyboard, Tab to a
   line or edge, Space to pick it up, ← and → to move it, and Space again.
+- **The chapter strip**: along the top in reading order, each chapter shows
+  its number, title and point of view. Drag a chapter's number to move where
+  it begins, as with the line below it. Click the number or the title to
+  give the chapter a title, point of view and status right there (Enter or
+  Esc closes it). Hover the strip for a +: between two of a chapter's beats
+  it splits the chapter there, the new chapter taking the beats after it;
+  between chapters, or at either end, it adds an empty one. The chapters
+  after it are renumbered, and the new one opens to be named.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button
   shows the chapter's text a page at a time (arrows or the page picker to move
   through it), and **Beats** lists its beats. An arc card lists its beats in

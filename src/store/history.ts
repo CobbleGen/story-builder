@@ -71,6 +71,8 @@ const LABELS: Record<string, string> = {
   moveBookMarker: 'move where the book',
   matchStoryOrder: 'put the chapters in story order',
   moveChapterEdge: 'move a chapter’s edge',
+  // "add chapter", or "split chapter" when it takes beats from the one before; see labelOf.
+  insertChapter: 'add chapter',
   deleteBeat: 'delete beat',
   setArcCharacter: 'change arc’s cast',
   addCharacter: 'add character',
@@ -117,6 +119,7 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
     return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
+  if (name === 'insertChapter' && target === 'split') return 'split chapter'
   if (name === 'moveBookMarker') return `${LABELS[name]} ${target === 'end' ? 'ends' : 'begins'}`
   // Several beats moved at once.
   if ((name === 'moveInStory' || name === 'moveInReading') && Array.isArray(target) && target.length > 1) {

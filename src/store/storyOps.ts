@@ -1166,6 +1166,19 @@ export function moveChapterEdge(data: StoryData, chapterId: string, keep: number
   return { ...data, chapters, beats }
 }
 
+/**
+ * A new chapter at `index` in reading order (0: before the first). With
+ * `split`, it's cut from the chapter before it: that one keeps its first
+ * `split` columns of beats (beats read together stay together) and the new
+ * chapter takes the rest, in order.
+ */
+export function insertChapter(data: StoryData, index: number, split?: number): [StoryData, string] {
+  const at = Math.max(0, Math.min(Math.round(index), data.chapters.length))
+  const [added, id] = addChapter(data, { index: at })
+  const before = added.chapters[at - 1]
+  return [split !== undefined && before ? moveChapterEdge(added, before.id, split) : added, id]
+}
+
 // ---------- Mind map ----------
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never

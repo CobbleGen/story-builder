@@ -45,6 +45,7 @@ import {
   moveInStory,
   moveBookMarker,
   moveChapterEdge,
+  insertChapter,
   matchStoryOrder,
   beatsInBook,
   BOOK_START,
@@ -1029,6 +1030,28 @@ describe('timeline', () => {
     expect(readingSections(stacked)[1].columns).toEqual([[c, loose]])
     expect(chapterBeats(moveChapterEdge(stacked, ch1, 3))).toEqual([[a, b, c, loose], [], []])
     expect(moveChapterEdge(stacked, ch1, 2)).toBe(stacked)
+  })
+
+  it('adds a chapter at any point: empty between chapters, or split off the one before', () => {
+    const { data, a, b, c, ch1, ch2, ch3 } = story()
+    // Chapter 1 reads [a], [b]: a new chapter 2 starting at b takes b; the rest move up a number
+    let [next, id] = insertChapter(data, 1, 1)
+    expect(next.chapters.map((ch) => ch.id)).toEqual([ch1, id, ch2, ch3])
+    expect(chapterBeats(next)).toEqual([[a], [b], [c], []])
+    expect(next.beats[b].chapterId).toBe(id)
+    expect(readingOrder(next)).toEqual(readingOrder(data))
+    // An empty one first, and one past the end goes last
+    ;[next, id] = insertChapter(data, 0)
+    expect(next.chapters.map((ch) => ch.id)).toEqual([id, ch1, ch2, ch3])
+    expect(chapterBeats(next)[0]).toEqual([])
+    ;[next, id] = insertChapter(data, 99)
+    expect(next.chapters[3].id).toBe(id)
+    // Split at the very start: the new chapter takes them all; beats read together go together
+    const stacked = moveInReading(data, b, { chapterId: ch1, column: 0 })
+    ;[next] = insertChapter(stacked, 1, 0)
+    expect(chapterBeats(next)).toEqual([[], [a, b], [c], []])
+    ;[next] = insertChapter(stacked, 1, 1)
+    expect(chapterBeats(next)).toEqual([[a, b], [], [c], []])
   })
 
   it('puts the chapters in story order, each keeping its share of the book', () => {

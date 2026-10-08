@@ -34,6 +34,7 @@ interface StoryActions {
   moveBookMarker: (...args: Tail<Parameters<typeof ops.moveBookMarker>>) => void
   matchStoryOrder: () => void
   moveChapterEdge: (...args: Tail<Parameters<typeof ops.moveChapterEdge>>) => void
+  insertChapter: (...args: Tail<Parameters<typeof ops.insertChapter>>) => string
   deleteBeat: (...args: Tail<Parameters<typeof ops.deleteBeat>>) => void
   setArcCharacter: (...args: Tail<Parameters<typeof ops.setArcCharacter>>) => void
   addCharacter: (...args: Tail<Parameters<typeof ops.addCharacter>>) => string
@@ -161,6 +162,7 @@ export const useStory = create<StoryStore>()(
         moveBookMarker: (...a) => apply(ops.moveBookMarker(data(), ...a), 'moveBookMarker', a[0]),
         matchStoryOrder: () => apply(ops.matchStoryOrder(data()), 'matchStoryOrder'),
         moveChapterEdge: (...a) => apply(ops.moveChapterEdge(data(), ...a), 'moveChapterEdge', a[0]),
+        insertChapter: (...a) => withId(ops.insertChapter(data(), ...a), 'insertChapter', a[1] === undefined ? 'empty' : 'split'),
         deleteBeat: (...a) => apply(ops.deleteBeat(data(), ...a), 'deleteBeat', a[0]),
         setArcCharacter: (...a) => apply(ops.setArcCharacter(data(), ...a), 'setArcCharacter', a[0]),
         addCharacter: (...a) => withId(ops.addCharacter(data(), ...a), 'addCharacter', a[0]),
