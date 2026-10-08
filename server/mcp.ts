@@ -343,11 +343,19 @@ async function toolTitles(source: StorySource): Promise<string[]> {
   }
 }
 
+/** The site's address as visitors see it: behind Vercel's proxy, requests reach the function over plain http. */
+export function publicOrigin(request: Request): string {
+  const url = new URL(request.url)
+  const forwarded = (name: string) => request.headers.get(name)?.split(',')[0].trim()
+  const proto = forwarded('x-forwarded-proto')
+  return `${proto === 'https' || proto === 'http' ? proto : url.protocol.slice(0, -1)}://${forwarded('x-forwarded-host') || url.host}`
+}
+
 const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 async function infoPage(request: Request, key: string | null, source: StorySource | null): Promise<Response> {
-  const url = new URL(request.url)
-  const link = key ? `${url.origin}/mcp/${encodeURIComponent(key)}` : `${url.origin}/mcp`
+  const origin = publicOrigin(request)
+  const link = key ? `${origin}/mcp/${encodeURIComponent(key)}` : `${origin}/mcp`
   let status: string
   let ok = false
   if (!source) status = BAD_LINK

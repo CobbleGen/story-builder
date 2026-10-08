@@ -151,6 +151,12 @@ describe('the story server', () => {
     expect(html).toMatch(/Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress/)
     expect(html).toMatch(/claude mcp add --transport http story-builder https:\/\/story-builder\.example\/mcp\/example/)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/nope`, { headers: { accept: 'text/html' } }), STORE)).status).toBe(403)
+    // Behind Vercel's proxy the function is reached over http; the page gives the https address visitors use.
+    const proxied = await handleRequest(
+      new Request('http://internal.example/mcp?key=example', { headers: { accept: 'text/html', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'story-builder-flame.vercel.app' } }),
+      STORE,
+    )
+    expect(await proxied.text()).toMatch(/story-builder https:\/\/story-builder-flame\.vercel\.app\/mcp\/example</)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/example`, { headers: { accept: 'text/event-stream' } }), STORE)).status).toBe(405)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/example`, { method: 'DELETE' }), STORE)).status).toBe(405)
     const preflight = await handleRequest(new Request(`${ORIGIN}/mcp/example`, { method: 'OPTIONS' }), STORE)
