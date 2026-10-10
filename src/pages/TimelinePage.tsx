@@ -9,11 +9,16 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type ClientRect,
+  type Collision,
   type CollisionDetection,
   type DragEndEvent,
+  type DroppableContainer,
   type KeyboardCoordinateGetter,
+  type Modifier,
+  type UniqueIdentifier,
 } from '@dnd-kit/core'
-import { restrictToHorizontalAxis } from '@dnd-kit/modifiers'
+import { restrictToHorizontalAxis, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
 import { Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
 import type { Arc, Beat, Chapter } from '../types'
@@ -89,11 +94,12 @@ interface AddAt {
 
 /**
  * What's dragged: a beat (and, if it's picked out, the others picked out with
- * it), the line where the book begins or ends, or the edge between two
- * chapters.
+ * it), the line where the book begins or ends, the edge between two
+ * chapters, or an arc's name (to another place among the arcs).
  */
-type DragData = BeatsDrag | MarkerDrag | EdgeDrag
+type DragData = BeatsDrag | MarkerDrag | EdgeDrag | ArcDrag
 type BeatsDrag = { kind: 'beats'; arcId: string; moving: string[]; arcs: string[] }
+type ArcDrag = { kind: 'arc'; arcId: string; index: number }
 /** The book's beginning or end: it can go into gaps `min` to `max` (never past the other one). */
 type MarkerDrag = { kind: 'marker'; marker: BookMarker; min: number; max: number }
 /** The edge between a chapter (of `columns` columns) and the next: into a gap of either. */
@@ -107,47 +113,109 @@ interface DropData {
   arcs: string[]
 }
 
+/** An arc's lane: beats dragged into it go to that arc; an arc's name dragged onto it takes its place. */
+interface LaneData {
+  kind: 'lane'
+  arcId: string
+  index: number
+}
+
+const laneId = (arcId: string) => `lane-${arcId}`
+const laneOf = (collisions: Collision[] | null | undefined) => {
+  const lane = collisions?.find((c) => String(c.id).startsWith('lane-'))
+  return lane ? String(lane.id).slice('lane-'.length) : null
+}
+
+/**
+ * The arc dragged beats go to, when it isn't theirs: that of the lane
+ * they're over, unless they're over one of its beats (they happen at once
+ * with it instead, keeping their arcs).
+ */
+function newArc(drop: DropData, drag: BeatsDrag, laneArc: string | null | undefined): string | undefined {
+  if (!laneArc || laneArc === drag.arcId) return undefined
+  if (drop.kind === 'column' && drop.arcs.some((arc, i) => arc === laneArc && !drag.moving.includes(drop.beats[i]))) return undefined
+  return laneArc
+}
+
 const sameGap = (a: Where, b: Where) => 'gap' in a && 'gap' in b && a.gap === b.gap && a.chapterId === b.chapterId
 const NO_SELECTION = new Set<string>()
 
 /** Whether what's dragged can go there at all: a book line or chapter edge only into the gaps it can move to. */
 function fits(drop: DropData, drag: DragData | undefined): boolean {
   if (!drag || drag.kind === 'beats') return true
-  if (!('gap' in drop.where)) return false
+  if (drag.kind === 'arc' || !('gap' in drop.where)) return false
   if (drag.kind === 'marker') return drop.where.gap >= drag.min && drop.where.gap <= drag.max
   return drop.where.chapterId === drag.chapterId || drop.where.chapterId === drag.nextId
 }
 
-/** Whether what's dragged can go on top of a column: beats, no two of one arc at one moment. */
-function stackable(drop: DropData, drag: DragData | undefined, activeId: string): boolean {
+/** Whether what's dragged (into `laneArc`'s lane) can go on top of a column: beats, no two of one arc at one moment. */
+function stackable(drop: DropData, drag: DragData | undefined, activeId: string, laneArc?: string | null): boolean {
   if (drag && drag.kind !== 'beats') return false
   const moving = drag?.moving ?? [activeId]
-  const movingArcs = drag?.arcs ?? []
+  const to = drag ? newArc(drop, drag, laneArc) : undefined
+  const movingArcs = to ? moving.map(() => to) : (drag?.arcs ?? [])
   if (new Set(movingArcs).size !== movingArcs.length) return false
   const staying = drop.arcs.filter((_, i) => !moving.includes(drop.beats[i]))
   return staying.length > 0 && !staying.some((arc) => movingArcs.includes(arc))
 }
 
+/** What a gap or column is to what's dropped there. */
+function dropOf(slot: Extract<Slot, { kind: 'gap' | 'column' }>, arcOf: (beatId: string) => string): DropData {
+  const beats = slot.kind === 'column' ? slot.beats : []
+  return { kind: slot.kind, where: slot.where, beats, arcs: beats.map(arcOf) }
+}
+
+const isLane = (container: DroppableContainer) => (container.data.current as LaneData | undefined)?.kind === 'lane'
+
+/** The lane across a height on the page (or, `nearest`, the one closest to it). */
+function laneAt(
+  containers: DroppableContainer[],
+  rects: Map<UniqueIdentifier, ClientRect>,
+  y: number,
+  nearest: boolean,
+): DroppableContainer | undefined {
+  let best: DroppableContainer | undefined
+  let bestDistance = Infinity
+  for (const container of containers) {
+    const rect = rects.get(container.id)
+    if (!rect || !isLane(container)) continue
+    const distance = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+    if (distance === 0) return container
+    if (nearest && distance < bestDistance) {
+      best = container
+      bestDistance = distance
+    }
+  }
+  return best
+}
+
+const hit = (container: DroppableContainer, value = 0): Collision => ({ id: container.id, data: { droppableContainer: container, value } })
+
 /**
  * Where dragged beats would go, by the pointer's place across the timeline:
  * onto the column under it (to happen at once with those beats, if none is of
- * their arcs), or else into the nearest gap. A book line or a chapter edge
- * goes into the nearest gap it can move to.
+ * their arcs), or else into the nearest gap; and, up or down, the lane
+ * they're over (another arc's lane: to that arc). A book line or a chapter
+ * edge goes into the nearest gap it can move to; an arc's name onto the
+ * lane it's nearest.
  */
 const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, droppableContainers, pointerCoordinates }) => {
   const x = pointerCoordinates?.x ?? collisionRect.left + collisionRect.width / 2
+  const y = pointerCoordinates?.y ?? collisionRect.top + collisionRect.height / 2
   const drag = active.data.current as DragData | undefined
-  let best: (typeof droppableContainers)[number] | undefined
+  const lane = drag?.kind === 'beats' || drag?.kind === 'arc' ? laneAt(droppableContainers, droppableRects, y, drag.kind === 'arc') : undefined
+  if (drag?.kind === 'arc') return lane ? [hit(lane)] : []
+  const laneArc = lane ? (lane.data.current as LaneData).arcId : null
+  const withLane = (collision: Collision) => (lane ? [collision, hit(lane)] : [collision])
+  let best: DroppableContainer | undefined
   let bestDistance = Infinity
   for (const container of droppableContainers) {
     const rect = droppableRects.get(container.id)
     const drop = container.data.current as DropData | undefined
-    if (!rect || !drop || !fits(drop, drag)) continue
+    if (!rect || !drop || isLane(container) || !fits(drop, drag)) continue
     if (drop.kind === 'column') {
       const edge = rect.width * 0.2
-      if (x >= rect.left + edge && x <= rect.right - edge && stackable(drop, drag, String(active.id))) {
-        return [{ id: container.id, data: { droppableContainer: container, value: 0 } }]
-      }
+      if (x >= rect.left + edge && x <= rect.right - edge && stackable(drop, drag, String(active.id), laneArc)) return withLane(hit(container))
       continue
     }
     const distance = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0
@@ -156,28 +224,54 @@ const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, 
       bestDistance = distance
     }
   }
-  return best ? [{ id: best.id, data: { droppableContainer: best, value: bestDistance } }] : []
+  return best ? withLane(hit(best, bestDistance)) : []
+}
+
+/** Beats go anywhere (up or down into another arc's lane too); arcs' names only up and down; the book's lines and chapter edges only along. */
+const alongOrAcross: Modifier = (args) => {
+  const kind = (args.active?.data.current as DragData | undefined)?.kind
+  if (kind === 'beats') return args.transform
+  return kind === 'arc' ? restrictToVerticalAxis(args) : restrictToHorizontalAxis(args)
 }
 
 /**
  * With the keyboard, ← and → step picked-up beats to the next gap, or column
  * they can go on top of (and a book line or chapter edge to the next gap it
- * can go to).
+ * can go to); ↑ and ↓ step beats, or an arc's name, to the lane above or
+ * below.
  */
 const stepThroughSlots: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
-  const step = event.code === 'ArrowLeft' ? -1 : event.code === 'ArrowRight' ? 1 : 0
   const { active, collisionRect, droppableRects, droppableContainers } = context
-  if (!step || !active || !collisionRect) return undefined
+  if (!active || !collisionRect) return undefined
+  const drag = active.data.current as DragData | undefined
+  const across = event.code === 'ArrowUp' ? -1 : event.code === 'ArrowDown' ? 1 : 0
+  if (across && (drag?.kind === 'beats' || drag?.kind === 'arc')) {
+    event.preventDefault()
+    const y = collisionRect.top + collisionRect.height / 2
+    const middles = droppableContainers
+      .getEnabled()
+      .flatMap((container) => {
+        const rect = droppableRects.get(container.id)
+        return rect && isLane(container) ? [rect.top + rect.height / 2] : []
+      })
+      .sort((a, b) => a - b)
+    const next = across < 0 ? middles.filter((m) => m < y - 1).pop() : middles.find((m) => m > y + 1)
+    return next === undefined ? undefined : { x: currentCoordinates.x, y: currentCoordinates.y + next - y }
+  }
+  const step = event.code === 'ArrowLeft' ? -1 : event.code === 'ArrowRight' ? 1 : 0
+  if (!step || drag?.kind === 'arc') return undefined
   event.preventDefault()
   const x = collisionRect.left + collisionRect.width / 2
-  const drag = active.data.current as DragData | undefined
+  const y = collisionRect.top + collisionRect.height / 2
+  const lane = drag?.kind === 'beats' ? laneAt(droppableContainers.getEnabled(), droppableRects, y, false) : undefined
+  const laneArc = lane ? (lane.data.current as LaneData).arcId : null
   const centers = droppableContainers
     .getEnabled()
     .flatMap((container) => {
       const rect = droppableRects.get(container.id)
       const drop = container.data.current as DropData | undefined
-      if (!rect || !drop || !fits(drop, drag)) return []
-      if (drop.kind === 'column' && !drop.beats.includes(String(active.id)) && !stackable(drop, drag, String(active.id))) return []
+      if (!rect || !drop || isLane(container) || !fits(drop, drag)) return []
+      if (drop.kind === 'column' && !drop.beats.includes(String(active.id)) && !stackable(drop, drag, String(active.id), laneArc)) return []
       return [rect.left + rect.width / 2]
     })
     .sort((a, b) => a - b)
@@ -225,6 +319,7 @@ export function TimelinePage() {
   const moveChapterEdge = useStory((s) => s.moveChapterEdge)
   const putChaptersInStoryOrder = useStory((s) => s.matchStoryOrder)
   const insertChapter = useStory((s) => s.insertChapter)
+  const moveArc = useStory((s) => s.moveArc)
   const mode = useUi((s) => s.timelineMode)
   const setMode = useUi((s) => s.setTimelineMode)
   const lookup = useMentionLookup()
@@ -233,6 +328,8 @@ export function TimelinePage() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [dragging, setDragging] = useState<DragData | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  // The lane a beat or an arc's name is dragged over (by its arc).
+  const [overLane, setOverLane] = useState<string | null>(null)
   const [addAt, setAddAt] = useState<AddAt | null>(null)
   const [picked, setPicked] = useState<Set<string>>(NO_SELECTION)
   const [band, setBand] = useState<{ l: number; t: number; r: number; b: number } | null>(null)
@@ -344,22 +441,32 @@ export function TimelinePage() {
     setTimeout(() => (justDropped.current = false), 300)
     setDragging(null)
     setOverId(null)
-    grid.current?.style.removeProperty('--tl-dx')
+    setOverLane(null)
+    for (const name of ['--tl-dx', '--tl-dy']) grid.current?.style.removeProperty(name)
   }
 
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
+  const onDragEnd = ({ active, over, collisions }: DragEndEvent) => {
     endDrag()
-    const drop = over?.data.current as DropData | undefined
     const drag = active.data.current as DragData | undefined
-    if (!drop || !drag || !fits(drop, drag)) return
+    const lane = laneOf(collisions)
+    if (drag?.kind === 'arc') {
+      const to = arcs.findIndex((a) => a.id === lane)
+      if (to !== -1 && to !== drag.index) moveArc(drag.index, to)
+      return
+    }
+    const drop = over?.data.current as DropData | LaneData | undefined
+    if (!drop || drop.kind === 'lane' || !drag || !fits(drop, drag)) return
     const { where } = drop
     if (drag.kind === 'marker') {
       if ('gap' in where) moveBookMarker(drag.marker, where.gap)
     } else if (drag.kind === 'edge') {
       // The first chapter keeps its columns before the gap (or all of them, and the next one's before it).
       if ('gap' in where) moveChapterEdge(drag.chapterId, where.chapterId === drag.chapterId ? where.gap : drag.columns + where.gap)
-    } else if (mode === 'story') moveInStory(drag.moving, where)
-    else moveInReading(drag.moving, { ...where, chapterId: where.chapterId ?? null })
+    } else {
+      const to = newArc(drop, drag, lane)
+      if (mode === 'story') moveInStory(drag.moving, where, to)
+      else moveInReading(drag.moving, { ...where, chapterId: where.chapterId ?? null }, to)
+    }
   }
 
   /** The chapters follow story time, once the writer has seen what that does. */
@@ -531,6 +638,15 @@ export function TimelinePage() {
 
   const overSlot = overId ? slots.find((s) => `slot-${s.key}` === overId) : undefined
   const stackingOn = overSlot?.kind === 'column' && dragging?.kind === 'beats' && overSlot.beats.some((b) => !dragging.moving.includes(b)) ? overSlot : null
+  // Dragged into another arc's lane: the arc the beats go to.
+  const toArc =
+    dragging?.kind === 'beats' && (overSlot?.kind === 'gap' || overSlot?.kind === 'column')
+      ? newArc(dropOf(overSlot, (id) => beats[id]?.arcId ?? ''), dragging, overLane)
+      : undefined
+  const toArcColor = toArc ? arcs.find((a) => a.id === toArc)?.color : undefined
+  // An arc's name dragged up or down: its lane, and the one it would take the place of.
+  const lifted = dragging?.kind === 'arc' ? dragging : null
+  const liftTo = lifted ? arcs.findIndex((a) => a.id === overLane) : -1
   const rows = arcs.length
   const plus = addAt && !dragging && !band ? slots[addAt.slot] : undefined
   const plusArc = addAt ? arcs.find((a) => a.id === addAt.arcId) : undefined
@@ -539,7 +655,7 @@ export function TimelinePage() {
   const endAt = lineAt('end')
   // While a book line or chapter edge is dragged over a gap: the slots whose beats it would carry across, [from, to).
   const sweep = (() => {
-    if (!dragging || dragging.kind === 'beats' || overSlot?.kind !== 'gap') return null
+    if (!dragging || dragging.kind === 'beats' || dragging.kind === 'arc' || overSlot?.kind !== 'gap') return null
     const to = slots.indexOf(overSlot)
     const from = dragging.kind === 'marker' ? lineAt(dragging.marker) : (headings.find((h) => h.chapterId === dragging.nextId)?.from ?? -1)
     if (from === -1) return null
@@ -567,8 +683,8 @@ export function TimelinePage() {
         </div>
         <p className="tl-hint">
           {mode === 'story'
-            ? 'When things happen in the story’s world. Drag beats to move them in time, or onto another arc’s beat so they happen at once. Drag the two lines to where the book begins and ends. Drag across empty space to pick out several.'
-            : 'The order readers meet things. Drag beats to another place or chapter, or onto another arc’s beat to tell them together. Drag the line between two chapters to move beats from one to the other. Drag across empty space to pick out several.'}
+            ? 'When things happen in the story’s world. Drag beats to move them in time, up or down into another arc, or onto another arc’s beat so they happen at once. Drag the two lines to where the book begins and ends, and an arc’s name to reorder the arcs. Drag across empty space to pick out several.'
+            : 'The order readers meet things. Drag beats to another place or chapter, up or down into another arc, or onto another arc’s beat to tell them together. Drag the line between two chapters to move beats from one to the other, and an arc’s name to reorder the arcs. Drag across empty space to pick out several.'}
         </p>
         {selected.length > 0 && (
           <span className="tl-picked" role="status">
@@ -610,7 +726,7 @@ export function TimelinePage() {
           <DndContext
             sensors={sensors}
             collisionDetection={byPointer}
-            modifiers={[restrictToHorizontalAxis]}
+            modifiers={[alongOrAcross]}
             onDragStart={({ active }) => {
               const drag = active.data.current as DragData
               setDraft(null)
@@ -621,8 +737,17 @@ export function TimelinePage() {
               if (drag.kind === 'beats' && !selection.has(String(active.id))) setPicked(NO_SELECTION)
               setDragging(drag)
             }}
-            onDragMove={({ delta }) => grid.current?.style.setProperty('--tl-dx', `${delta.x}px`)}
-            onDragOver={({ over }) => setOverId(over ? String(over.id) : null)}
+            onDragMove={({ active, delta, collisions }) => {
+              // Picked-out beats move along with the one dragged; an arc's beats with its name.
+              const kind = (active.data.current as DragData | undefined)?.kind
+              grid.current?.style.setProperty('--tl-dx', `${kind === 'arc' ? 0 : delta.x}px`)
+              grid.current?.style.setProperty('--tl-dy', `${kind === 'beats' || kind === 'arc' ? delta.y : 0}px`)
+              setOverLane(laneOf(collisions))
+            }}
+            onDragOver={({ over, collisions }) => {
+              setOverId(over ? String(over.id) : null)
+              setOverLane(laneOf(collisions))
+            }}
             onDragEnd={onDragEnd}
             onDragCancel={endDrag}
           >
@@ -694,13 +819,37 @@ export function TimelinePage() {
                 <Lane
                   key={arc.id}
                   arc={arc}
+                  index={i}
                   row={i + 2}
                   columns={slots.length}
+                  target={toArc === arc.id}
+                  lifted={lifted?.arcId === arc.id}
                   addTitle={mode === 'story' ? 'Add a beat at the end of the book' : 'Add a beat after everything else'}
                   onAdd={() => setDraft({ mode, arcId: arc.id, where: last })}
                 />
               ))}
               <NewArc row={rows + 2} />
+              {lifted && (
+                <div
+                  className="tl-lane-ghost"
+                  style={{ gridRow: lifted.index + 2, gridColumn: `2 / span ${slots.length}`, '--arc': arcs[lifted.index]?.color } as React.CSSProperties}
+                  aria-hidden
+                />
+              )}
+              {lifted && liftTo !== -1 && liftTo !== lifted.index && (
+                <div
+                  className={`tl-arc-drop ${liftTo > lifted.index ? 'after' : 'before'}`}
+                  style={{ gridRow: liftTo + 2, gridColumn: `1 / span ${slots.length + 1}` }}
+                  aria-hidden
+                />
+              )}
+              {toArc && overSlot?.kind === 'gap' && (
+                <div
+                  className={`tl-gap-mark${overSlot.wide ? ' wide' : ''}`}
+                  style={{ gridRow: (lanes.get(toArc) ?? 0) + 2, gridColumn: slots.indexOf(overSlot) + 2, '--arc': toArcColor } as React.CSSProperties}
+                  aria-hidden
+                />
+              )}
               {/* Before the book begins and after it ends. */}
               {startAt > 0 && <div className="tl-outside" style={{ gridRow: `2 / span ${rows}`, gridColumn: `2 / ${startAt + 2}` }} aria-hidden />}
               {endAt !== -1 && endAt < slots.length - 1 && (
@@ -769,6 +918,8 @@ export function TimelinePage() {
                       together={slot.beats.length > 1}
                       picked={selection.has(id)}
                       carried={dragging?.kind === 'beats' && dragging.moving.length > 1 && dragging.moving.includes(id)}
+                      lifted={lifted?.arcId === beat.arcId}
+                      color={toArcColor && dragging?.kind === 'beats' && dragging.moving.includes(id) ? toArcColor : undefined}
                       drag={{ kind: 'beats', arcId: beat.arcId, moving, arcs: moving.map((b) => beats[b]?.arcId ?? '') }}
                       onPick={() => pick(id)}
                       onOpen={() => setPicked(NO_SELECTION)}
@@ -796,7 +947,7 @@ export function TimelinePage() {
               {stackingOn &&
                 dragging?.kind === 'beats' &&
                 dragging.moving.map((id) => {
-                  const row = lanes.get(beats[id]?.arcId)
+                  const row = lanes.get(toArc ?? beats[id]?.arcId)
                   if (row === undefined) return null
                   return (
                     <div
@@ -840,22 +991,68 @@ export function TimelinePage() {
   )
 }
 
-function Lane({ arc, row, columns, addTitle, onAdd }: { arc: Arc; row: number; columns: number; addTitle: string; onAdd: () => void }) {
+interface LaneProps {
+  arc: Arc
+  index: number
+  row: number
+  columns: number
+  addTitle: string
+  onAdd: () => void
+  /** Beats dragged here go to this arc. */
+  target: boolean
+  /** Its name is being dragged to another place among the arcs. */
+  lifted: boolean
+}
+
+/**
+ * An arc's lane, its name at the start: dragged up or down, the name moves
+ * the arc to another place among them; beats dragged into the lane go to
+ * this arc.
+ */
+function Lane({ arc, index, row, columns, addTitle, onAdd, target, lifted }: LaneProps) {
   const navigate = useNavigate()
   const lookup = useMentionLookup()
+  const drag: ArcDrag = { kind: 'arc', arcId: arc.id, index }
+  const { setNodeRef: setHeadRef, setActivatorNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `arc-${arc.id}`, data: drag })
+  const lane: LaneData = { kind: 'lane', arcId: arc.id, index }
+  const { setNodeRef: setLaneRef } = useDroppable({ id: laneId(arc.id), data: lane })
+  const name = plainText(arc.name, lookup) || 'Untitled arc'
+  const open = () => navigate(`/arcs/${arc.id}`)
+  // Dragged by the mouse or a finger anywhere on it but its + (and by the keyboard from its name).
+  const { onKeyDown, ...pointer } = listeners ?? {}
+  const handlers = Object.fromEntries(
+    Object.entries(pointer).map(([event, handler]) => [
+      event,
+      (e: React.SyntheticEvent) => {
+        if (!(e.target as Element).closest('.tl-lane-add')) handler(e)
+      },
+    ]),
+  )
   return (
     <>
       <div
-        className="tl-lane-head"
+        ref={setHeadRef}
+        className={`tl-lane-head${isDragging ? ' dragging' : ''}`}
         data-lane={arc.id}
-        style={{ gridRow: row, gridColumn: 1, '--arc': arc.color } as React.CSSProperties}
+        style={{ gridRow: row, gridColumn: 1, '--arc': arc.color, transform: CSS.Translate.toString(transform) } as React.CSSProperties}
+        {...handlers}
         onDoubleClick={(e) => {
-          if (!(e.target as Element).closest('button')) navigate(`/arcs/${arc.id}`)
+          if (!(e.target as Element).closest('button')) open()
         }}
-        title="Double-click to open the arc"
+        title="Drag up or down to move the arc. Double-click to open it"
       >
         <span className="arc-dot" />
-        <span className="tl-lane-name">
+        <span
+          ref={setActivatorNodeRef}
+          className="tl-lane-name"
+          {...attributes}
+          aria-roledescription="movable arc"
+          aria-label={`${name}. Space to move it among the arcs, Enter to open it`}
+          onKeyDown={(e) => {
+            onKeyDown?.(e)
+            if (e.key === 'Enter' && !e.defaultPrevented) open()
+          }}
+        >
           <MentionText text={arc.name} fallback="Untitled arc" />
         </span>
         <button
@@ -868,7 +1065,8 @@ function Lane({ arc, row, columns, addTitle, onAdd }: { arc: Arc; row: number; c
         </button>
       </div>
       <div
-        className="tl-lane"
+        ref={setLaneRef}
+        className={`tl-lane${target ? ' drop-target' : ''}${lifted ? ' lifted-from' : ''}`}
         data-lane={arc.id}
         style={{ gridRow: row, gridColumn: `2 / span ${columns}`, '--arc': arc.color } as React.CSSProperties}
         aria-hidden
@@ -1153,8 +1351,7 @@ function SlotTarget({
   arcOf: (beatId: string) => string
   over: boolean
 }) {
-  const beatIds = slot.kind === 'column' ? slot.beats : []
-  const data: DropData = { kind: slot.kind, where: slot.where, beats: beatIds, arcs: beatIds.map(arcOf) }
+  const data = dropOf(slot, arcOf)
   const { setNodeRef } = useDroppable({ id: `slot-${slot.key}`, data })
   return (
     <div
@@ -1222,25 +1419,29 @@ interface TileProps {
   picked: boolean
   /** Moving along with another picked-out beat being dragged. */
   carried: boolean
+  /** Its arc's name is being dragged up or down: it goes along. */
+  lifted: boolean
+  /** The colour of the arc it's being dragged to, if another. */
+  color?: string
   drag: DragData
   onPick: () => void
   onOpen: () => void
 }
 
-function BeatTile({ beat, arc, row, column, number, jump, showWhen, together, picked, carried, drag, onPick, onOpen }: TileProps) {
+function BeatTile({ beat, arc, row, column, number, jump, showWhen, together, picked, carried, lifted, color, drag, onPick, onOpen }: TileProps) {
   const openBeat = useUi((s) => s.openBeat)
   const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: beat.id, data: drag })
   return (
     <div
       ref={setNodeRef}
-      className={`tl-card draggable${isDragging ? ' dragging' : ''}${together ? ' together' : ''}${picked ? ' picked' : ''}${carried && !isDragging ? ' carried' : ''}`}
+      className={`tl-card draggable${isDragging ? ' dragging' : ''}${together ? ' together' : ''}${picked ? ' picked' : ''}${carried && !isDragging ? ' carried' : ''}${lifted ? ' lifted' : ''}`}
       data-lane={arc.id}
       data-beat={beat.id}
       style={
         {
           gridRow: row,
           gridColumn: column,
-          '--arc': arc.color,
+          '--arc': color ?? arc.color,
           transform: CSS.Translate.toString(transform),
         } as React.CSSProperties
       }

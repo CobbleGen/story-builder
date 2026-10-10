@@ -14,6 +14,12 @@ export interface UnassignDropData {
   type: 'unassign'
 }
 
-export type DragData = BeatDragData | ChapterDragData | UnassignDropData
+/** An arc in the sidebar: a beat dropped on it goes to that arc. */
+export interface ArcDropData {
+  type: 'arc'
+  arcId: string
+}
+
+export type DragData = BeatDragData | ChapterDragData | UnassignDropData | ArcDropData
 
 export const chapterSortId = (id: string) => `chapter:${id}`

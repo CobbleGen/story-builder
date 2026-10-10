@@ -10,7 +10,7 @@ import { displayName, mentions, plainText } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { ELEMENT_KINDS } from '../store/storyOps'
 import { useScrollMemory } from '../lib/trail'
-import type { BeatDragData, UnassignDropData } from '../lib/dnd'
+import type { ArcDropData, BeatDragData, UnassignDropData } from '../lib/dnd'
 import { ChapterTag } from './ChapterTag'
 import { ColorPicker } from './ColorPicker'
 import { MentionText } from './MentionText'
@@ -24,6 +24,8 @@ interface Props {
   dragEnabled?: boolean
   /** A board beat is being dragged; show the drop zone for taking it out of its chapter. */
   unassignActive?: boolean
+  /** The arc of the beat being dragged, if one is: dropped on another arc, it goes to that one. */
+  movingArcId?: string | null
 }
 
 const MODES: { mode: SidebarMode; label: string; title: string }[] = [
@@ -32,7 +34,7 @@ const MODES: { mode: SidebarMode; label: string; title: string }[] = [
   { mode: 'world', label: 'World', title: 'Places, objects, groups and more' },
 ]
 
-export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) {
+export function Sidebar({ dragEnabled = false, unassignActive = false, movingArcId = null }: Props) {
   const arcs = useStory((s) => s.arcs)
   const characters = useStory((s) => s.characters)
   const elements = useStory((s) => s.elements)
@@ -134,7 +136,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
           <>
             {arcs.length === 0 && <p className="sidebar-empty">No arcs yet. Create one to start adding beats.</p>}
             {arcs.map((arc) => (
-              <ArcSection key={arc.id} arc={arc} dragEnabled={dragEnabled} />
+              <ArcSection key={arc.id} arc={arc} dragEnabled={dragEnabled} movingArcId={movingArcId} />
             ))}
             <NewArcForm />
           </>
@@ -175,7 +177,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
       {unassignActive && (
         <div className="unassign-zone">
           <strong>Drop here</strong>
-          <span>to take the beat out of its chapter</span>
+          <span>to take the beat out of its chapter, or on an arc to move it to that arc</span>
         </div>
       )}
     </aside>
@@ -200,8 +202,12 @@ function useHighlightCleanup(id: string) {
   return setHighlight
 }
 
-function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
+function ArcSection({ arc, dragEnabled, movingArcId }: { arc: Arc; dragEnabled: boolean; movingArcId: string | null }) {
   const beats = useStory((s) => s.beats)
+  // A beat of another arc dragged onto this one's name goes to this arc.
+  const dropData: ArcDropData = { type: 'arc', arcId: arc.id }
+  const takes = dragEnabled && !!movingArcId && movingArcId !== arc.id
+  const { setNodeRef, isOver } = useDroppable({ id: `sidebar-arc:${arc.id}`, data: dropData, disabled: !takes })
   const numbers = useChapterNumbers()
   const expanded = useUi((s) => !!s.expandedArcs[arc.id])
   const toggleArc = useUi((s) => s.toggleArc)
@@ -216,7 +222,7 @@ function ArcSection({ arc, dragEnabled }: { arc: Arc; dragEnabled: boolean }) {
       onMouseEnter={() => setHighlight({ kind: 'arc', id: arc.id })}
       onMouseLeave={() => setHighlight(null)}
     >
-      <div className="arc-row">
+      <div ref={setNodeRef} className={`arc-row${takes ? ' takes' : ''}${takes && isOver ? ' drop-over' : ''}`}>
         <button
           className="arc-toggle"
           // A click opens or closes its beats; a double-click opens the arc (leaving them as they were).

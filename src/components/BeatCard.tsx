@@ -1,11 +1,12 @@
 import { forwardRef, type HTMLAttributes } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import type { Arc, Beat } from '../types'
-import { useStory } from '../store/storyStore'
+import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { involves } from '../lib/highlight'
 import type { BeatDragData } from '../lib/dnd'
-import { Check } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
+import { plainText } from '../lib/mentions'
 import { MentionText } from './MentionText'
 
 type ViewProps = HTMLAttributes<HTMLDivElement> & {
@@ -14,11 +15,13 @@ type ViewProps = HTMLAttributes<HTMLDivElement> & {
   placeholder?: boolean
   overlay?: boolean
   dimmed?: boolean
+  /** Its arc's name picks another arc to move it to. */
+  arcPicker?: boolean
 }
 
 /** The card shown inside a chapter. */
 export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatCardView(
-  { beat, arc, placeholder, overlay, dimmed, className, style, ...rest },
+  { beat, arc, placeholder, overlay, dimmed, arcPicker, className, style, ...rest },
   ref,
 ) {
   const classes = ['beat-card']
@@ -48,14 +51,48 @@ export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatC
             <Check size={12} strokeWidth={3} />
           </span>
         )}
-        <span className="arc-chip">
-          <span className="arc-dot" />
-          <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />
-        </span>
+        {arcPicker ? (
+          <ArcPicker beat={beat} arc={arc} />
+        ) : (
+          <span className="arc-chip">
+            <span className="arc-dot" />
+            <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />
+          </span>
+        )}
       </div>
     </div>
   )
 })
+
+/** A card's arc, to choose another one for the beat (without picking the card up or opening it). */
+function ArcPicker({ beat, arc }: { beat: Beat; arc: Arc | undefined }) {
+  const arcs = useStory((s) => s.arcs)
+  const setBeatArc = useStory((s) => s.setBeatArc)
+  const lookup = useMentionLookup()
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  return (
+    <label
+      className="arc-chip picker"
+      title="Move it to another arc"
+      onClick={stop}
+      onPointerDown={stop}
+      onMouseDown={stop}
+      onTouchStart={stop}
+      onKeyDown={stop}
+    >
+      <span className="arc-dot" />
+      <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />
+      <ChevronDown size={11} className="arc-chip-more" aria-hidden />
+      <select value={beat.arcId} onChange={(e) => setBeatArc(beat.id, e.target.value)} aria-label="Arc (choose another to move the beat to it)">
+        {arcs.map((a) => (
+          <option key={a.id} value={a.id}>
+            {plainText(a.name, lookup).trim() || 'Untitled arc'}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
 
 interface DraggableProps {
   beatId: string
@@ -79,6 +116,7 @@ export function DraggableBeatCard({ beatId, activeBeatId }: DraggableProps) {
       arc={arc}
       placeholder={activeBeatId === beatId}
       dimmed={highlight !== null && !involves(beat, arc, highlight)}
+      arcPicker
       {...attributes}
       {...listeners}
       aria-roledescription="draggable beat"

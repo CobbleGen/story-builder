@@ -316,8 +316,15 @@ export function deleteArc(data: StoryData, id: string): StoryData {
   return dropMapRefs(next, new Set([id, ...doomed]))
 }
 
+/**
+ * Moves an arc to another place in the list of arcs. When things happen
+ * stays as it was (beats in no chapter come in their arcs' order until the
+ * timeline is arranged).
+ */
 export function moveArc(data: StoryData, from: number, to: number): StoryData {
-  return { ...data, arcs: moveItem(data.arcs, from, to) }
+  const next = { ...data, arcs: moveItem(data.arcs, from, to) }
+  const order = timeOrder(data)
+  return sameIds(timeOrder(next), order) ? next : { ...next, timeline: order }
 }
 
 /** Adds a character to an arc's cast (on = true) or removes them. */
@@ -587,18 +594,59 @@ function cleanWhen(value: unknown): string | undefined {
   return line.trim() ? line : undefined
 }
 
-/** Moves a beat to another arc, slotting it in by chapter order. */
+/** Moves a beat to another arc (see moveBeatsToArc). */
 export function setBeatArc(data: StoryData, id: string, arcId: string): StoryData {
-  const beat = data.beats[id]
+  return moveBeatsToArc(data, [id], arcId)
+}
+
+/**
+ * Moves beats to another arc, keeping when they happen and where they're
+ * read. Each goes into the arc's order by story time, just after the arc's
+ * beats that happen before it. An arc has one beat at a moment, so one that
+ * happened at once with a beat of that arc (or with another of the beats
+ * moving there) no longer does: it happens just after it.
+ */
+export function moveBeatsToArc(data: StoryData, ids: string | string[], arcId: string): StoryData {
   const target = data.arcs.find((a) => a.id === arcId)
-  if (!beat || !target || beat.arcId === arcId) return data
-  let next: StoryData = {
-    ...data,
-    beats: { ...data.beats, [id]: { ...beat, arcId } },
+  const set = new Set(idsOf(data, ids).filter((id) => data.beats[id].arcId !== arcId))
+  if (!target || !set.size) return data
+  const order = timeOrder(data)
+  const moving = order.filter((id) => set.has(id))
+  // Each moment's arcs: those of the beats staying, and then of those moving there, first come first.
+  const arcsAt = new Map<string, Set<string>>()
+  for (const b of Object.values(data.beats)) {
+    if (!b.moment || set.has(b.id)) continue
+    if (!arcsAt.has(b.moment)) arcsAt.set(b.moment, new Set())
+    arcsAt.get(b.moment)!.add(b.arcId)
   }
-  next = mapArcs(next, (a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a))
-  const index = arcIndexFor(next, target, id)
-  return mapArcs(next, (a) => (a.id === arcId ? { ...a, beatIds: insertAt(a.beatIds, id, index) } : a))
+  const beats = { ...data.beats }
+  for (const id of moving) {
+    const beat: Beat = { ...data.beats[id], arcId }
+    if (beat.moment) {
+      if (!arcsAt.has(beat.moment)) arcsAt.set(beat.moment, new Set())
+      const taken = arcsAt.get(beat.moment)!
+      if (taken.has(arcId)) delete beat.moment
+      else taken.add(arcId)
+    }
+    beats[id] = beat
+  }
+  // Into the arc's order by story time.
+  const when = new Map(order.map((id, i) => [id, i]))
+  let list = target.beatIds
+  for (const id of moving) {
+    let at = 0
+    list.forEach((b, i) => {
+      if ((when.get(b) ?? Infinity) < when.get(id)!) at = i + 1
+    })
+    list = [...list.slice(0, at), id, ...list.slice(at)]
+  }
+  const arcs = data.arcs.map((a) => {
+    if (a.id === arcId) return { ...a, beatIds: list }
+    return a.beatIds.some((b) => set.has(b)) ? { ...a, beatIds: a.beatIds.filter((b) => !set.has(b)) } : a
+  })
+  const next: StoryData = { ...data, arcs, beats: tidyMoments(beats) }
+  // Beats in no chapter are read (and, until arranged, happen) in their arcs' order: arranged as they were instead.
+  return sameIds(timeOrder(next), order) ? next : { ...next, timeline: order }
 }
 
 /** Puts a beat into a chapter at an index (end by default), or unassigns it with null. */
@@ -860,10 +908,13 @@ function joinMoment(data: StoryData, ids: string[], others: string[]): StoryData
   return { ...data, beats: tidyMoments(beats) }
 }
 
-/** Whether `moving` can all happen at once with `staying`: never two beats of one arc at one moment. */
-function canStack(data: StoryData, moving: string[], staying: string[]): boolean {
+/**
+ * Whether `moving` can all happen at once with `staying` (as beats of
+ * `arcId`, if they're going to it): never two beats of one arc at one moment.
+ */
+function canStack(data: StoryData, moving: string[], staying: string[], arcId?: string): boolean {
   if (!staying.length) return false
-  const arcs = moving.map((id) => data.beats[id]?.arcId)
+  const arcs = moving.map((id) => arcId ?? data.beats[id]?.arcId)
   return new Set(arcs).size === arcs.length && !staying.some((b) => arcs.includes(data.beats[b]?.arcId))
 }
 
@@ -894,11 +945,18 @@ export type ReadingSpot = TimelineSpot & { chapterId: string | null }
  * Moves beats (one, or several at once) in story time (see storyStops),
  * arranging the timeline; those that were on top of each other stay so. On
  * top of another moment they happen at the same time as its beats, which
- * can't be of their arcs (nor can two of them be of one arc).
+ * can't be of their arcs (nor can two of them be of one arc). With `arcId`,
+ * they go to that arc too (see moveBeatsToArc).
  */
-export function moveInStory(data: StoryData, ids: string | string[], spot: TimelineSpot): StoryData {
+export function moveInStory(data: StoryData, ids: string | string[], spot: TimelineSpot, arcId?: string): StoryData {
+  const moved = moveInStoryOnly(data, ids, spot, arcId)
+  return moved && arcId ? moveBeatsToArc(moved, ids, arcId) : (moved ?? data)
+}
+
+/** moveInStory but for the arc: null if they can't go there. */
+function moveInStoryOnly(data: StoryData, ids: string | string[], spot: TimelineSpot, arcId?: string): StoryData | null {
   const moving = idsOf(data, ids)
-  if (!moving.length) return data
+  if (!moving.length) return null
   const set = new Set(moving)
   const stops = storyStops(data)
   const rest: Stop[] = stops.map((s) => (isMoment(s) ? { beats: s.beats.filter((b) => !set.has(b)) } : s))
@@ -906,13 +964,13 @@ export function moveInStory(data: StoryData, ids: string | string[], spot: Timel
   let next: StoryData
   if ('column' in spot) {
     const target = rest[spot.column]
-    if (!target || !isMoment(target) || !canStack(data, moving, target.beats)) return data
+    if (!target || !isMoment(target) || !canStack(data, moving, target.beats, arcId)) return null
     const staying = target.beats
     const ordered = groups.flat()
     rest[spot.column] = { beats: [...staying, ...ordered] }
     next = joinMoment({ ...data, timeline: flatten(rest) }, ordered, staying)
   } else {
-    if (spot.gap < 0 || spot.gap > stops.length) return data
+    if (spot.gap < 0 || spot.gap > stops.length) return null
     rest.splice(spot.gap, 0, ...groups.map((beats) => ({ beats })))
     next = detach({ ...data, timeline: flatten(rest) }, groups)
   }
@@ -959,11 +1017,18 @@ function placeAll(data: StoryData, ids: string[], chapterId: string | null, inde
  * reading order (see readingSections): into the chapter of the spot, at
  * that place among its beats, or out of every chapter. On top of another
  * column they happen at the same time as its beats too (and so come just
- * after them in story time); taken off a stack, they no longer do.
+ * after them in story time); taken off a stack, they no longer do. With
+ * `arcId`, they go to that arc too (see moveBeatsToArc).
  */
-export function moveInReading(data: StoryData, ids: string | string[], spot: ReadingSpot): StoryData {
+export function moveInReading(data: StoryData, ids: string | string[], spot: ReadingSpot, arcId?: string): StoryData {
+  const moved = moveInReadingOnly(data, ids, spot, arcId)
+  return moved && arcId ? moveBeatsToArc(moved, ids, arcId) : (moved ?? data)
+}
+
+/** moveInReading but for the arc: null if they can't go there. */
+function moveInReadingOnly(data: StoryData, ids: string | string[], spot: ReadingSpot, arcId?: string): StoryData | null {
   const moving = idsOf(data, ids)
-  if (!moving.length || (spot.chapterId && !data.chapters.some((c) => c.id === spot.chapterId))) return data
+  if (!moving.length || (spot.chapterId && !data.chapters.some((c) => c.id === spot.chapterId))) return null
   const set = new Set(moving)
   const sections = readingSections(data)
   const shown = sections.flatMap((s) => s.columns)
@@ -974,7 +1039,7 @@ export function moveInReading(data: StoryData, ids: string | string[], spot: Rea
   const indexBefore = (n: number) => columns.slice(0, n).flat().filter((b) => !set.has(b)).length
   if ('column' in spot) {
     const staying = columns[spot.column]?.filter((b) => !set.has(b)) ?? []
-    if (!canStack(data, moving, staying)) return data
+    if (!canStack(data, moving, staying, arcId)) return null
     const placed = placeAll(data, ordered, spot.chapterId, indexBefore(spot.column + 1))
     return joinMoment(afterInTime(placed, ordered, staying), ordered, staying)
   }

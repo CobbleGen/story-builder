@@ -66,6 +66,7 @@ const LABELS: Record<string, string> = {
   applyChapterLayout: 'move beat',
   moveInStory: 'move beat in time',
   moveInReading: 'move beat',
+  moveToArc: 'move beat to another arc',
   resetTimeline: 'reset the timeline',
   // "move where the book begins" (or ends); see labelOf.
   moveBookMarker: 'move where the book',
@@ -122,8 +123,8 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
   if (name === 'insertChapter' && target === 'split') return 'split chapter'
   if (name === 'moveBookMarker') return `${LABELS[name]} ${target === 'end' ? 'ends' : 'begins'}`
   // Several beats moved at once.
-  if ((name === 'moveInStory' || name === 'moveInReading') && Array.isArray(target) && target.length > 1) {
-    return name === 'moveInStory' ? 'move beats in time' : 'move beats'
+  if ((name === 'moveInStory' || name === 'moveInReading' || name === 'moveToArc') && Array.isArray(target) && target.length > 1) {
+    return name === 'moveInStory' ? 'move beats in time' : name === 'moveToArc' ? 'move beats to another arc' : 'move beats'
   }
   return labelFor(name)
 }

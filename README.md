@@ -20,6 +20,10 @@ assistant such as Claude read all of it and give you feedback (see
   dashed circle means it isn't in a chapter yet. Drag beats from here onto
   the board. Dropping a board beat on the sidebar takes it back out of its
   chapter. Hovering an arc dims every other arc's beats on the board.
+- **Moving a beat to another arc** on the board: drop it (from the board or
+  the sidebar) on another arc's name in the sidebar, or click the arc's
+  name on its card and pick one. It stays in its chapter, and keeps when it
+  happens.
 - **Arc pages** (the ↗ next to an arc, or double-click the arc) show all of an arc's beats in order.
   Add new beats (they start unplaced), drag to reorder, and pick a chapter
   from each beat's chapter pill. Assign the characters involved in the arc.
@@ -124,16 +128,22 @@ assistant such as Claude read all of it and give you feedback (see
   one revelation closing several arcs, say. Drag it off again to part them.
   A + shows by the pointer in an arc's lane: between two beats it adds one
   right there (in story order it's in no chapter yet; in reading order it's
-  in that chapter), and in the empty place above or below another arc's
-  beat it adds one happening at the same time. Each arc's name has a + for
-  a beat at the end of the book (in reading order, after everything else),
-  and **New arc** under the lanes adds an arc. Drag across empty space to
-  box in several beats (Shift or Ctrl to add to them, or Ctrl-click beats
-  one by one), then drag any of them to move them all at once, in their
-  order; a click on empty space or Esc lets go. With the keyboard, Space
-  picks a beat up, ← and → step it from place to place, and Space puts it
-  down. Beats told out of order are marked **Flashback** or
-  **Flash-forward**.
+  in that chapter), and in the empty place above or below another arc's beat
+  it adds one happening at the same time. Each arc's name has a + for a beat
+  at the end of the book (in reading order, after everything else), and
+  **New arc** under the lanes adds an arc. Drag a beat up or down into
+  another arc's lane to move it to that arc, there in time (in the empty
+  place above or below a beat, it happens at once with it; dropped right
+  onto another arc's beat, it keeps its own arc and happens at once with it,
+  as before); the lane lights up and the beat takes its colour. Drag an
+  arc's name up or down to put the arcs in another order; nothing moves in
+  time. Drag across empty space to box in several beats (Shift or Ctrl to
+  add to them, or Ctrl-click beats one by one), then drag any of them to
+  move them all at once, in their order; a click on empty space or Esc lets
+  go. With the keyboard, Space picks a beat up, ← and → step it from place
+  to place, ↑ and ↓ into another arc's lane, and Space puts it down; an
+  arc's name moves with Space and ↑ ↓ too, and Enter opens it. Beats told
+  out of order are marked **Flashback** or **Flash-forward**.
 - **Where the book begins and ends**: in story order, two lines run through
   every lane, **Book begins** and **Book ends**, at the very beginning and
   end to start with. Drag a line (or the book at its top) to its place in

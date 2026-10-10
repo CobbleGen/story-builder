@@ -27,7 +27,7 @@ import type { ChapterLayout } from '../store/storyOps'
 import { insertionIndex, moveInLayout } from '../lib/placement'
 import { Sidebar } from '../components/Sidebar'
 import { BeatCardView } from '../components/BeatCard'
-import { chapterSortId, type BeatDragData, type ChapterDragData, type DragData } from '../lib/dnd'
+import { chapterSortId, type ArcDropData, type BeatDragData, type ChapterDragData, type DragData } from '../lib/dnd'
 import { flash } from '../lib/flash'
 import { useScrollMemory } from '../lib/trail'
 import { ChapterColumn, ChapterOverlay } from './ChapterColumn'
@@ -36,10 +36,11 @@ const dragData = (item: { data: { current?: unknown } } | null | undefined) =>
   item?.data.current as DragData | undefined
 
 /**
- * Chapters only collide with chapters. Beats land in the chapter (or the
- * sidebar drop zone) under the pointer; the exact slot is worked out from the
- * card midpoints in onDragMove. (A dragged beat can lose its data while its
- * card is out of every chapter, so anything that isn't a chapter is a beat.)
+ * Chapters only collide with chapters. Beats land in the chapter (or on an
+ * arc in the sidebar, or the sidebar drop zone) under the pointer; the exact
+ * slot is worked out from the card midpoints in onDragMove. (A dragged beat
+ * can lose its data while its card is out of every chapter, so anything that
+ * isn't a chapter is a beat.)
  */
 const collisionDetection: CollisionDetection = (args) => {
   const type = dragData(args.active)?.type
@@ -51,12 +52,15 @@ const collisionDetection: CollisionDetection = (args) => {
   }
   const targets = args.droppableContainers.filter((d) => {
     const t = dragData(d)?.type
-    return t === 'chapter' || t === 'unassign'
+    return t === 'chapter' || t === 'unassign' || t === 'arc'
   })
-  if (!args.pointerCoordinates) return rectIntersection({ ...args, droppableContainers: targets })
+  // With the keyboard, not onto the sidebar's arcs (a card's arc picks another): into the sidebar takes it out of its chapter, as ever.
+  if (!args.pointerCoordinates) return rectIntersection({ ...args, droppableContainers: targets.filter((d) => dragData(d)?.type !== 'arc') })
   const hits = pointerWithin({ ...args, droppableContainers: targets })
-  const unassign = hits.find((h) => targets.find((d) => d.id === h.id && dragData(d)?.type === 'unassign'))
-  return unassign ? [unassign] : hits.slice(0, 1)
+  const of = (type: string) => hits.find((h) => targets.find((d) => d.id === h.id && dragData(d)?.type === type))
+  // An arc in the sidebar before the sidebar around it.
+  const first = of('arc') ?? of('unassign')
+  return first ? [first] : hits.slice(0, 1)
 }
 
 /** Chapters use sortable keyboard moves; beats step down a column or jump across chapters. */
@@ -104,10 +108,13 @@ export function BoardPage() {
   const addChapter = useStory((s) => s.addChapter)
   const moveChapter = useStory((s) => s.moveChapter)
   const applyChapterLayout = useStory((s) => s.applyChapterLayout)
+  const setBeatArc = useStory((s) => s.setBeatArc)
 
   const [activeDrag, setActiveDrag] = useState<BeatDragData | ChapterDragData | null>(null)
   const [preview, setPreview] = useState<ChapterLayout | null>(null)
   const [dropChapterId, setDropChapterId] = useState<string | null>(null)
+  // The arc a dragged beat is over in the sidebar: dropped, it goes to that arc.
+  const [dropArcId, setDropArcId] = useState<string | null>(null)
   const [focusChapterId, setFocusChapterId] = useState<string | null>(null)
   // What is being dragged. dnd-kit's active.data goes blank while the dragged
   // card is out of every chapter (its node unmounts), so keep our own copy.
@@ -166,13 +173,14 @@ export function BoardPage() {
     setActiveDrag(null)
     setLayout(null)
     setDropChapterId(null)
+    setDropArcId(null)
     originalRef.current = null
     pointerY.current = null
   }
 
   const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     const data = dragData(active)
-    if (!data || data.type === 'unassign') return
+    if (!data || data.type === 'unassign' || data.type === 'arc') return
     dragRef.current = data
     setActiveDrag(data)
     if (data.type === 'beat') {
@@ -194,7 +202,12 @@ export function BoardPage() {
     if (data?.type !== 'beat' || !base || !over) return
     const target = dragData(over)
     let next = base
-    if (target?.type === 'unassign') {
+    setDropArcId(target?.type === 'arc' ? target.arcId : null)
+    if (target?.type === 'arc') {
+      // Onto another arc: it stays where it was in the chapters.
+      next = originalRef.current!
+      setDropChapterId(null)
+    } else if (target?.type === 'unassign') {
       // Dropping a board beat on the sidebar unplaces it; a sidebar beat just goes back.
       next = data.origin === 'board' ? moveInLayout(base, data.beatId, null) : originalRef.current!
       setDropChapterId(null)
@@ -215,6 +228,8 @@ export function BoardPage() {
       const from = chapters.findIndex((c) => chapterSortId(c.id) === active.id)
       const to = chapters.findIndex((c) => chapterSortId(c.id) === over.id)
       if (from !== -1 && to !== -1) moveChapter(from, to)
+    } else if (data?.type === 'beat' && dragData(over)?.type === 'arc') {
+      setBeatArc(data.beatId, (dragData(over) as ArcDropData).arcId)
     } else if (data?.type === 'beat' && previewRef.current) {
       applyChapterLayout(previewRef.current)
     }
@@ -245,7 +260,11 @@ export function BoardPage() {
       onDragCancel={reset}
     >
       <div className="workspace">
-        <Sidebar dragEnabled unassignActive={activeDrag?.type === 'beat' && activeDrag.origin === 'board'} />
+        <Sidebar
+          dragEnabled
+          unassignActive={activeDrag?.type === 'beat' && activeDrag.origin === 'board'}
+          movingArcId={activeBeat?.arcId ?? null}
+        />
         <main ref={keepScroll} className="board" aria-label="Chapter board">
           <SortableContext items={sortIds} strategy={horizontalListSortingStrategy}>
             {chapters.map((chapter, i) => (
@@ -270,7 +289,12 @@ export function BoardPage() {
       </div>
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
         {activeBeat ? (
-          <BeatCardView beat={activeBeat} arc={arcs.find((a) => a.id === activeBeat.arcId)} overlay />
+          <BeatCardView
+            beat={activeBeat}
+            arc={arcs.find((a) => a.id === (dropArcId ?? activeBeat.arcId))}
+            overlay
+            className={dropArcId ? 'over-arc' : undefined}
+          />
         ) : activeChapterIndex !== -1 ? (
           <ChapterOverlay chapter={chapters[activeChapterIndex]} number={activeChapterIndex + 1} />
         ) : null}

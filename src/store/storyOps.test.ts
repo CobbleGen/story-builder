@@ -43,6 +43,8 @@ import {
   addBeatInStory,
   moveInReading,
   moveInStory,
+  moveBeatsToArc,
+  moveArc,
   moveBookMarker,
   moveChapterEdge,
   insertChapter,
@@ -901,6 +903,97 @@ describe('timeline', () => {
     next = moveInStory(next, c, { gap: 5 })
     expect(storyColumns(next)).toEqual([[a], [b], [x], [loose], [c]])
     expect([next.beats[c], next.beats[loose]].some((k) => 'moment' in k)).toBe(false)
+  })
+
+  it('moves beats to another arc, keeping when they happen and where they’re read', () => {
+    let { data, a, b, c, loose, main, love } = story()
+    const arcBeats = (d: StoryData) => d.arcs.map((arc) => arc.beatIds)
+    // c (main, chapter two) to love: after b, which happens before it
+    let next = moveBeatsToArc(data, c, love)
+    expect(next.beats[c].arcId).toBe(love)
+    expect(arcBeats(next)).toEqual([[a], [b, c, loose]])
+    expect(storyOrder(next)).toEqual(storyOrder(data))
+    expect(readingOrder(next)).toEqual(readingOrder(data))
+    expect(next.timeline).toEqual([])
+    expectConsistent(next)
+    // Already there, or no such arc: nothing changes
+    expect(moveBeatsToArc(next, c, love)).toBe(next)
+    expect(moveBeatsToArc(next, c, 'nope')).toBe(next)
+    // Beats in no chapter are read in their arcs' order; when that changes, story time is kept as it was
+    let early: string
+    ;[data, early] = addBeat(data, { arcId: main, title: 'early' })
+    data = moveInStory(data, early, { gap: 1 })
+    expect(storyOrder(data)).toEqual([early, a, b, c, loose])
+    next = moveBeatsToArc(data, loose, main)
+    expect(storyOrder(next)).toEqual([early, a, b, c, loose])
+    // (Moved in time, early stayed last in main's own order: loose goes after it.)
+    expect(arcBeats(next)[0]).toEqual([a, c, early, loose])
+    expectConsistent(next)
+  })
+
+  it('takes a beat moved to another arc off a moment that arc already has a beat at', () => {
+    let { data, a, b, c, loose, main, love } = story()
+    // loose (love) happens at once with c (main)
+    data = moveInStory(data, loose, { column: 3 })
+    expect(storyColumns(data)).toEqual([[a], [b], [c, loose]])
+    // To main: c's arc, so just after c instead
+    const next = moveBeatsToArc(data, loose, main)
+    expect(storyColumns(next)).toEqual([[a], [b], [c], [loose]])
+    expect(next.beats[c]).not.toHaveProperty('moment')
+    expect(next.beats[loose]).not.toHaveProperty('moment')
+    // Both to a third arc: the first keeps the moment... with no one, so neither has it
+    let third: string
+    ;[data, third] = addArc(data, { name: 'Third', color: '#00f' })
+    const both = moveBeatsToArc(data, [c, loose], third)
+    expect(storyColumns(both)).toEqual([[a], [b], [c], [loose]])
+    expect(both.arcs[2].beatIds).toEqual([c, loose])
+    expectConsistent(both)
+    void love
+  })
+
+  it('moves beats in time or reading order and to another arc at once', () => {
+    let { data, a, b, c, loose, ch1, ch2, main, love } = story()
+    // In story time: c to love, before a
+    let next = moveInStory(data, c, { gap: 1 }, love)
+    expect(storyColumns(next)).toEqual([[c], [a], [b], [loose]])
+    expect(next.beats[c].arcId).toBe(love)
+    // Onto a's moment: as main it couldn't, as love it can
+    expect(moveInStory(data, c, { column: 1 })).toBe(data)
+    next = moveInStory(data, c, { column: 1 }, love)
+    expect(storyColumns(next)).toEqual([[a, c], [b], [loose]])
+    expect(next.beats[c].arcId).toBe(love)
+    // Not onto a moment that arc has a beat at
+    expect(moveInStory(data, c, { column: 2 }, love)).toBe(data)
+    // Put down where it is, in another lane: only the arc changes
+    next = moveInStory(data, c, { gap: 3 }, love)
+    expect(storyColumns(next)).toEqual(storyColumns(data))
+    expect(next.beats[c].arcId).toBe(love)
+    // In reading order: into chapter one, as love, at once with a
+    next = moveInReading(data, c, { chapterId: ch1, column: 0 }, love)
+    expect(chapterBeats(next)[0]).toEqual([a, c, b])
+    expect(next.beats[c].arcId).toBe(love)
+    expect(next.beats[c].moment).toBe(next.beats[a].moment)
+    // ...and to main, into chapter two
+    next = moveInReading(data, b, { chapterId: ch2, gap: 1 }, main)
+    expect(chapterBeats(next)[1]).toEqual([c, b])
+    expect(next.arcs[0].beatIds).toEqual([a, c, b])
+    expectConsistent(next)
+    void loose
+  })
+
+  it('moves an arc in the list without moving anything in time', () => {
+    let { data, a, b, c, loose, main } = story()
+    let x: string
+    ;[data, x] = addBeat(data, { arcId: main, title: 'x' })
+    // In no chapter: x (main) is read before loose (love), and happens before it
+    expect(storyOrder(data)).toEqual([a, b, c, x, loose])
+    const next = moveArc(data, 1, 0)
+    expect(next.arcs.map((arc) => arc.name)).toEqual(['Love', 'Main'])
+    expect(readingOrder(next)).toEqual([a, b, c, loose, x])
+    expect(storyOrder(next)).toEqual([a, b, c, x, loose])
+    // With nothing in no chapter to reorder, the timeline stays unarranged
+    const plain = moveArc(story().data, 1, 0)
+    expect(plain.timeline).toEqual([])
   })
 
   it('moves a beat in reading order, into other chapters and places in them', () => {
