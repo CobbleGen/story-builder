@@ -1,4 +1,5 @@
 import type { Beat } from '../types'
+import { outlineKind } from '../lib/outlines'
 import { isMoment, storyStops } from '../store/storyOps'
 import { beatLines, chapterFacts, jumpsOf } from './chapters'
 import type { Story } from './story'
@@ -36,7 +37,22 @@ export function outline(story: Story): string {
     if (a.characterIds.length) lines.push(`Characters in it: ${a.characterIds.map(story.nameOf).join(', ')}`)
     const beats = a.beatIds.map((id) => data.beats[id]).filter(Boolean)
     const where = (b: Beat) => (b.chapterId ? `chapter ${story.numberOf(b.chapterId)}` : 'not in a chapter')
-    lines.push(beats.length ? beats.map((b, i) => `${i + 1}. ${story.beatName(b)}${b.done ? ' (written)' : ''} — ${where(b)}`).join('\n') : 'No beats yet.')
+    // The structure the writer laid over the arc, if any: the step each beat stands for.
+    const outline = outlineKind(a.outline?.kind)
+    const stepsOn = (b: Beat) => (outline ? outline.steps.filter((st) => a.outline!.steps[st.id] === b.id).map((st) => st.name) : [])
+    if (outline) lines.push(`Outline: ${outline.name}, laid over this arc by the writer (${outline.summary}) Each beat below names the step of it that it stands for.`)
+    lines.push(
+      beats.length
+        ? beats
+            .map((b, i) => {
+              const steps = stepsOn(b)
+              return `${i + 1}. ${story.beatName(b)}${b.done ? ' (written)' : ''} — ${where(b)}${steps.length ? ` — outline: ${steps.join('; ')}` : ''}`
+            })
+            .join('\n')
+        : 'No beats yet.',
+    )
+    const loose = outline?.steps.filter((st) => !a.outline!.steps[st.id]) ?? []
+    if (loose.length) lines.push(`Steps of the outline on no beat yet: ${loose.map((st) => st.name).join('; ')}`)
     return lines.join('\n')
   })
   out.push(`## Arcs, each with its beats in the arc's own order\n\n${arcs.join('\n\n') || 'No arcs yet.'}`)

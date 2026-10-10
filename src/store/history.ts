@@ -58,6 +58,10 @@ const LABELS: Record<string, string> = {
   updateArc: 'edit arc',
   deleteArc: 'delete arc',
   moveArc: 'move arc',
+  // "choose arc outline", or "remove arc outline"; see labelOf.
+  setArcOutline: 'choose arc outline',
+  spreadArcOutline: 'spread out the outline',
+  placeOutlineStep: 'move outline step',
   moveArcBeat: 'reorder beats',
   addBeat: 'add beat',
   updateBeat: 'edit beat',
@@ -121,6 +125,7 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
   if (name === 'insertChapter' && target === 'split') return 'split chapter'
+  if (name === 'setArcOutline' && target === null) return 'remove arc outline'
   if (name === 'moveBookMarker') return `${LABELS[name]} ${target === 'end' ? 'ends' : 'begins'}`
   // Several beats moved at once.
   if ((name === 'moveInStory' || name === 'moveInReading' || name === 'moveToArc') && Array.isArray(target) && target.length > 1) {

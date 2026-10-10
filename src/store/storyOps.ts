@@ -26,6 +26,7 @@ import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
 import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
+import { outlineKind, spreadSteps } from '../lib/outlines'
 import { outlineWords } from '../lib/progress'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
@@ -321,6 +322,56 @@ export function deleteArc(data: StoryData, id: string): StoryData {
  * stays as it was (beats in no chapter come in their arcs' order until the
  * timeline is arranged).
  */
+/**
+ * Lays a common story structure over an arc (see lib/outlines), its steps
+ * spread over the arc's beats to begin with; or, with null, takes it off.
+ */
+export function setArcOutline(data: StoryData, arcId: string, kind: string | null): StoryData {
+  const outline = kind ? outlineKind(kind) : undefined
+  const arc = data.arcs.find((a) => a.id === arcId)
+  if (!arc || (kind && !outline) || (!kind && !arc.outline)) return data
+  return mapArcs(data, (a) => {
+    if (a.id !== arcId) return a
+    if (!outline) {
+      if (!a.outline) return a
+      const rest = { ...a }
+      delete rest.outline
+      return rest
+    }
+    return { ...a, outline: { kind: outline.id, steps: spreadSteps(outline, a.beatIds) } }
+  })
+}
+
+/** Spreads an arc's outline over its beats afresh, as when it was chosen. */
+export function spreadArcOutline(data: StoryData, arcId: string): StoryData {
+  const arc = data.arcs.find((a) => a.id === arcId)
+  const outline = outlineKind(arc?.outline?.kind)
+  if (!arc?.outline || !outline) return data
+  const steps = spreadSteps(outline, arc.beatIds)
+  const same = Object.keys(steps).length === Object.keys(arc.outline.steps).length && Object.entries(steps).every(([k, v]) => arc.outline!.steps[k] === v)
+  return same ? data : mapArcs(data, (a) => (a.id === arcId ? { ...a, outline: { ...a.outline!, steps } } : a))
+}
+
+/** Puts a step of an arc's outline on one of its beats, or (null) on none. */
+export function placeOutlineStep(data: StoryData, arcId: string, stepId: string, beatId: string | null): StoryData {
+  const arc = data.arcs.find((a) => a.id === arcId)
+  const outline = outlineKind(arc?.outline?.kind)
+  if (!arc?.outline || !outline?.steps.some((s) => s.id === stepId)) return data
+  if (beatId !== null && !arc.beatIds.includes(beatId)) return data
+  if ((arc.outline.steps[stepId] ?? null) === beatId) return data
+  const steps = { ...arc.outline.steps }
+  if (beatId) steps[stepId] = beatId
+  else delete steps[stepId]
+  return mapArcs(data, (a) => (a.id === arcId ? { ...a, outline: { ...a.outline!, steps } } : a))
+}
+
+/** An arc without its outline's steps on `beats` (they're no longer its). */
+function offOutline(arc: Arc, beats: Set<string>): Arc {
+  if (!arc.outline || !Object.values(arc.outline.steps).some((b) => beats.has(b))) return arc
+  const steps = Object.fromEntries(Object.entries(arc.outline.steps).filter(([, b]) => !beats.has(b)))
+  return { ...arc, outline: { ...arc.outline, steps } }
+}
+
 export function moveArc(data: StoryData, from: number, to: number): StoryData {
   const next = { ...data, arcs: moveItem(data.arcs, from, to) }
   const order = timeOrder(data)
@@ -642,7 +693,7 @@ export function moveBeatsToArc(data: StoryData, ids: string | string[], arcId: s
   }
   const arcs = data.arcs.map((a) => {
     if (a.id === arcId) return { ...a, beatIds: list }
-    return a.beatIds.some((b) => set.has(b)) ? { ...a, beatIds: a.beatIds.filter((b) => !set.has(b)) } : a
+    return a.beatIds.some((b) => set.has(b)) ? offOutline({ ...a, beatIds: a.beatIds.filter((b) => !set.has(b)) }, set) : a
   })
   const next: StoryData = { ...data, arcs, beats: tidyMoments(beats) }
   // Beats in no chapter are read (and, until arranged, happen) in their arcs' order: arranged as they were instead.
@@ -708,7 +759,7 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
       ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
       beats,
       timeline: data.timeline.includes(id) ? data.timeline.filter((b) => b !== id) : data.timeline,
-      arcs: data.arcs.map((a) => (a.id === beat.arcId ? { ...a, beatIds: a.beatIds.filter((b) => b !== id) } : a)),
+      arcs: data.arcs.map((a) => (a.id === beat.arcId ? offOutline({ ...a, beatIds: a.beatIds.filter((b) => b !== id) }, new Set([id])) : a)),
       chapters: beat.chapterId
         ? data.chapters.map((c) =>
             c.id === beat.chapterId ? { ...c, beatIds: c.beatIds.filter((b) => b !== id) } : c,
@@ -1765,6 +1816,19 @@ export function normalizeStory(input: unknown): StoryData {
       if (beat.arcId === arc.id && !seen.has(beat.id)) arc.beatIds.push(beat.id)
     }
   }
+  // An outline of a structure this version knows, its steps on beats of its arc.
+  list(raw.arcs).forEach((a, i) => {
+    const outline = isRecord(a.outline) ? a.outline : null
+    const kind = outlineKind(str(outline?.kind))
+    if (!outline || !kind || !arcs[i]) return
+    const known = new Set(kind.steps.map((s) => s.id))
+    const own = new Set(arcs[i].beatIds)
+    const placed = isRecord(outline.steps) ? outline.steps : {}
+    arcs[i].outline = {
+      kind: kind.id,
+      steps: Object.fromEntries(Object.entries(placed).filter(([stepId, b]) => known.has(stepId) && typeof b === 'string' && own.has(b))) as Record<string, string>,
+    }
+  })
 
   // Each placed beat appears once, in its own chapter.
   const placed = new Set<string>()

@@ -45,6 +45,9 @@ import {
   moveInStory,
   moveBeatsToArc,
   moveArc,
+  setArcOutline,
+  spreadArcOutline,
+  placeOutlineStep,
   moveBookMarker,
   moveChapterEdge,
   insertChapter,
@@ -1472,5 +1475,70 @@ describe('containers on the map', () => {
     expect(box).toEqual({ id: 'box', kind: 'container', x: 0, y: 0, title: '', width: 80, height: 260, color: '#c7dcf7', layout: 'vertical' })
     expect(box2).toMatchObject({ color: '#cfe9c8', layout: 'grid', title: 'The harbour' })
     expect([n1, n2, n3].map(parentOf)).toEqual(['box', undefined, undefined])
+  })
+})
+
+describe('arc outlines', () => {
+  function arcWithBeats(n: number) {
+    let { data, main, love, ch1 } = setup()
+    const ids: string[] = []
+    for (let i = 0; i < n; i++) {
+      let id: string
+      ;[data, id] = addBeat(data, { arcId: main, title: `b${i}`, chapterId: i === 0 ? ch1 : null })
+      ids.push(id)
+    }
+    return { data, main, love, ids }
+  }
+  const arcOf = (data: StoryData, id: string) => data.arcs.find((a) => a.id === id)!
+
+  it('lays an outline over an arc, spread over its beats, and takes it off', () => {
+    let { data, main, ids } = arcWithBeats(8)
+    data = setArcOutline(data, main, 'story-circle')
+    expect(arcOf(data, main).outline).toEqual({
+      kind: 'story-circle',
+      steps: { you: ids[0], need: ids[1], go: ids[2], search: ids[3], find: ids[4], take: ids[5], return: ids[6], change: ids[7] },
+    })
+    // Another one in its place; an unknown one does nothing
+    data = setArcOutline(data, main, 'kishotenketsu')
+    expect(arcOf(data, main).outline).toEqual({ kind: 'kishotenketsu', steps: { ki: ids[0], sho: ids[2], ten: ids[5], ketsu: ids[7] } })
+    expect(setArcOutline(data, main, 'nope')).toBe(data)
+    data = setArcOutline(data, main, null)
+    expect(arcOf(data, main)).not.toHaveProperty('outline')
+    expect(setArcOutline(data, main, null)).toBe(data)
+  })
+
+  it('moves a step to another beat or off every beat, and spreads them out again', () => {
+    let { data, main, ids } = arcWithBeats(4)
+    data = setArcOutline(data, main, 'kishotenketsu')
+    const first = data
+    data = placeOutlineStep(data, main, 'ten', ids[0])
+    expect(arcOf(data, main).outline!.steps.ten).toBe(ids[0])
+    data = placeOutlineStep(data, main, 'ketsu', null)
+    expect(arcOf(data, main).outline!.steps).not.toHaveProperty('ketsu')
+    // Not onto another arc's beat, nor a step it hasn't got; where it is already, nothing changes
+    expect(placeOutlineStep(data, main, 'ki', 'beat_elsewhere')).toBe(data)
+    expect(placeOutlineStep(data, main, 'call', ids[1])).toBe(data)
+    expect(placeOutlineStep(data, main, 'ten', ids[0])).toBe(data)
+    data = spreadArcOutline(data, main)
+    expect(arcOf(data, main).outline).toEqual(arcOf(first, main).outline)
+    expect(spreadArcOutline(data, main)).toBe(data)
+  })
+
+  it('takes steps off beats that are deleted or move to another arc, and keeps outlines tidy when loaded', () => {
+    let { data, main, love, ids } = arcWithBeats(4)
+    data = setArcOutline(data, main, 'kishotenketsu')
+    data = deleteBeat(data, ids[0])
+    expect(arcOf(data, main).outline!.steps).not.toHaveProperty('ki')
+    data = moveBeatsToArc(data, ids[3], love)
+    expect(arcOf(data, main).outline!.steps).not.toHaveProperty('ketsu')
+    expect(Object.keys(arcOf(data, main).outline!.steps).sort()).toEqual(['sho', 'ten'])
+    // Loaded: unknown steps and beats not in the arc dropped; an outline this version doesn't know, dropped
+    const raw = JSON.parse(JSON.stringify(data))
+    raw.arcs[0].outline.steps.ghost = ids[1]
+    raw.arcs[0].outline.steps.ki = 'beat_gone'
+    raw.arcs[1].outline = { kind: 'from-the-future', steps: {} }
+    const loaded = normalizeStory(raw)
+    expect(loaded.arcs[0].outline).toEqual(arcOf(data, main).outline)
+    expect(loaded.arcs[1]).not.toHaveProperty('outline')
   })
 })

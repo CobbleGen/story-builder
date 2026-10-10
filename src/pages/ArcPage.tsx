@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
   closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type Modifier,
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
@@ -27,6 +31,23 @@ import { displayName, plainText } from '../lib/mentions'
 import { ColorPicker } from '../components/ColorPicker'
 import { askConfirm } from '../lib/confirm'
 import { outlineWords } from '../lib/progress'
+import { outlineKind } from '../lib/outlines'
+import { OutlineBar, OutlineMarkView, OutlineMarks, STEP_TRAY, type StepDragData } from '../components/ArcOutline'
+
+const typeOf = (data: { current?: unknown } | undefined) => (data?.current as { type?: string } | undefined)?.type
+
+/** Beats sort among themselves; an outline's step lands on the beat (or the tray of steps on none) under the pointer. */
+const arcCollisions: CollisionDetection = (args) => {
+  if (typeOf(args.active.data) === 'step') {
+    const targets = args.droppableContainers.filter((d) => typeOf(d.data) === 'beat' || d.id === STEP_TRAY)
+    return args.pointerCoordinates ? pointerWithin({ ...args, droppableContainers: targets }) : []
+  }
+  return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((d) => typeOf(d.data) === 'beat') })
+}
+
+/** Beats move up and down in their list; steps anywhere. */
+const arcModifier: Modifier = (args) =>
+  typeOf(args.active?.data) === 'step' ? args.transform : restrictToParentElement({ ...args, transform: restrictToVerticalAxis(args) })
 
 export function ArcPage() {
   const { arcId } = useParams()
@@ -59,9 +80,13 @@ function ArcView({ arc }: { arc: Arc }) {
   const updateArc = useStory((s) => s.updateArc)
   const deleteArc = useStory((s) => s.deleteArc)
   const moveArcBeat = useStory((s) => s.moveArcBeat)
+  const placeOutlineStep = useStory((s) => s.placeOutlineStep)
   const { back } = useBack()
   const lookup = useMentionLookup()
   const [showColors, setShowColors] = useState(false)
+  // The outline's step being dragged to another beat.
+  const [movingStep, setMovingStep] = useState<string | null>(null)
+  const outline = outlineKind(arc.outline?.kind)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
@@ -73,6 +98,12 @@ function ArcView({ arc }: { arc: Arc }) {
   const words = useStory((s) => outlineWords(s).byArc[arc.id] ?? 0)
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setMovingStep(null)
+    const step = active.data.current as StepDragData | undefined
+    if (step?.type === 'step') {
+      if (over) placeOutlineStep(arc.id, step.stepId, over.id === STEP_TRAY ? null : String(over.id))
+      return
+    }
     if (!over || active.id === over.id) return
     moveArcBeat(arc.id, arc.beatIds.indexOf(String(active.id)), arc.beatIds.indexOf(String(over.id)))
   }
@@ -90,7 +121,7 @@ function ArcView({ arc }: { arc: Arc }) {
   }
 
   return (
-    <div className="arc-view" style={{ '--arc': arc.color } as React.CSSProperties}>
+    <div className={`arc-view${outline ? ' with-outline' : ''}`} style={{ '--arc': arc.color } as React.CSSProperties}>
       <BackLink />
       <header className="arc-hero">
         <div className="arc-hero-row">
@@ -148,17 +179,28 @@ function ArcView({ arc }: { arc: Arc }) {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        collisionDetection={arcCollisions}
+        modifiers={[arcModifier]}
+        onDragStart={({ active }) => {
+          const step = active.data.current as StepDragData | undefined
+          if (step?.type === 'step') setMovingStep(step.stepId)
+        }}
         onDragEnd={onDragEnd}
+        onDragCancel={() => setMovingStep(null)}
       >
+        <OutlineBar arc={arc} dragging={!!movingStep} />
         <SortableContext items={arc.beatIds} strategy={verticalListSortingStrategy}>
-          <ol className="arc-beats">
+          <ol className={`arc-beats${movingStep ? ' moving-step' : ''}`}>
             {arc.beatIds.map((id, i) =>
-              beats[id] ? <ArcBeatRow key={id} beat={beats[id]} index={i} /> : null,
+              beats[id] ? <ArcBeatRow key={id} arc={arc} beat={beats[id]} index={i} withOutline={!!outline} /> : null,
             )}
           </ol>
         </SortableContext>
+        <DragOverlay dropAnimation={null}>
+          {movingStep && outline?.steps.find((st) => st.id === movingStep) ? (
+            <OutlineMarkView outline={outline} step={outline.steps.find((st) => st.id === movingStep)!} overlay />
+          ) : null}
+        </DragOverlay>
       </DndContext>
       {arc.beatIds.length === 0 && (
         <p className="arc-empty">No beats yet. Add the moments of this arc in the order they happen.</p>
@@ -168,12 +210,14 @@ function ArcView({ arc }: { arc: Arc }) {
   )
 }
 
-function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
+function ArcBeatRow({ arc, beat, index, withOutline }: { arc: Arc; beat: Beat; index: number; withOutline: boolean }) {
   const chapters = useStory((s) => s.chapters)
   const placeBeat = useStory((s) => s.placeBeat)
   const openBeat = useUi((s) => s.openBeat)
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
-    useSortable({ id: beat.id })
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging, isOver, active } =
+    useSortable({ id: beat.id, data: { type: 'beat' } })
+  // An outline's step dragged over this beat.
+  const stepOver = isOver && typeOf(active?.data) === 'step'
   const lookup = useMentionLookup()
   const number = beat.chapterId ? chapterNumbers(chapters)[beat.chapterId] : null
   const chapter = chapters.find((c) => c.id === beat.chapterId)
@@ -181,62 +225,65 @@ function ArcBeatRow({ beat, index }: { beat: Beat; index: number }) {
   return (
     <li
       ref={setNodeRef}
-      className={`arc-beat${isDragging ? ' dragging' : ''}${number ? '' : ' unplaced'}`}
+      className={`arc-beat-row${withOutline ? ' with-outline' : ''}${stepOver ? ' step-over' : ''}`}
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <button
-        ref={setActivatorNodeRef}
-        className="grip-btn"
-        {...attributes}
-        {...listeners}
-        aria-label={`Reorder “${plainText(beat.title, lookup) || 'Untitled beat'}”`}
-      >
-        <GripVertical size={16} />
-      </button>
-      <span className="arc-beat-index">{index + 1}</span>
-      <button className="arc-beat-body" onClick={() => openBeat(beat.id)}>
-        <span className="beat-title">
-          <MentionText text={beat.title} fallback={<span className="muted">Untitled beat</span>} />
-        </span>
-        {beat.description && (
-          <span className="beat-desc">
-            <MentionText text={beat.description} />
-          </span>
-        )}
-      </button>
-      <label
-        className={`chapter-pill${number ? '' : ' unplaced'}`}
-        title={number ? 'Change chapter' : 'Not in a chapter yet — choose one, or drag it onto the board'}
-      >
-        {number ? (
-          <>
-            <BookOpen size={13} />
-            <span>
-              Ch {number}
-              {chapter?.title ? <span className="pill-sub"> · {plainText(chapter.title, lookup)}</span> : null}
-            </span>
-          </>
-        ) : (
-          <>
-            <CircleDashed size={13} />
-            <span>Not placed</span>
-          </>
-        )}
-        <ChevronDown size={12} />
-        <select
-          value={beat.chapterId ?? ''}
-          onChange={(e) => placeBeat(beat.id, e.target.value || null)}
-          aria-label="Chapter"
+      <div className={`arc-beat${isDragging ? ' dragging' : ''}${number ? '' : ' unplaced'}`}>
+        <button
+          ref={setActivatorNodeRef}
+          className="grip-btn"
+          {...attributes}
+          {...listeners}
+          aria-label={`Reorder “${plainText(beat.title, lookup) || 'Untitled beat'}”`}
         >
-          <option value="">Not in a chapter</option>
-          {chapters.map((c, i) => (
-            <option key={c.id} value={c.id}>
-              Chapter {i + 1}
-              {c.title ? `: ${plainText(c.title, lookup)}` : ''}
-            </option>
-          ))}
-        </select>
-      </label>
+          <GripVertical size={16} />
+        </button>
+        <span className="arc-beat-index">{index + 1}</span>
+        <button className="arc-beat-body" onClick={() => openBeat(beat.id)}>
+          <span className="beat-title">
+            <MentionText text={beat.title} fallback={<span className="muted">Untitled beat</span>} />
+          </span>
+          {beat.description && (
+            <span className="beat-desc">
+              <MentionText text={beat.description} />
+            </span>
+          )}
+        </button>
+        <label
+          className={`chapter-pill${number ? '' : ' unplaced'}`}
+          title={number ? 'Change chapter' : 'Not in a chapter yet — choose one, or drag it onto the board'}
+        >
+          {number ? (
+            <>
+              <BookOpen size={13} />
+              <span>
+                Ch {number}
+                {chapter?.title ? <span className="pill-sub"> · {plainText(chapter.title, lookup)}</span> : null}
+              </span>
+            </>
+          ) : (
+            <>
+              <CircleDashed size={13} />
+              <span>Not placed</span>
+            </>
+          )}
+          <ChevronDown size={12} />
+          <select
+            value={beat.chapterId ?? ''}
+            onChange={(e) => placeBeat(beat.id, e.target.value || null)}
+            aria-label="Chapter"
+          >
+            <option value="">Not in a chapter</option>
+            {chapters.map((c, i) => (
+              <option key={c.id} value={c.id}>
+                Chapter {i + 1}
+                {c.title ? `: ${plainText(c.title, lookup)}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {withOutline && <OutlineMarks arc={arc} beatId={beat.id} />}
     </li>
   )
 }

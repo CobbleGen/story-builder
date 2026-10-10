@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { RichNode, StoryData } from '../types'
 import { buildSampleStory } from '../store/sampleStory'
-import { addMapEdge, addMapNode, setChapterText, updateMapEdge } from '../store/storyOps'
+import { addMapEdge, addMapNode, placeOutlineStep, setArcOutline, setChapterText, updateMapEdge } from '../store/storyOps'
 import { NotFound, storyOf } from './story'
 import { readChapter, readManuscript } from './chapters'
 import { mindMaps, colourName } from './maps'
 import { findChapter } from './story'
 import { overview } from '.'
+import { outline } from './outline'
 
 const para = (text: string): RichNode => ({ type: 'paragraph', content: [{ type: 'text', text }] })
 
@@ -94,5 +95,18 @@ describe('the overview', () => {
     expect(text).toMatch(/3\. The Logbook — status: draft · 274 words \(3,000-word target\) · point of view: Mara/)
     expect(text).toMatch(/Backstory, before the book begins: Elias’s first run\./)
     expect(text).toMatch(/Who knows what — 1 text box, 4 characters, 1 place or thing, 1 arc, 1 chapter, 1 note; 6 lines/)
+  })
+})
+
+describe('arc outlines in the plan', () => {
+  it('names the structure an arc follows, the step each beat stands for, and the steps on none', () => {
+    let data = buildSampleStory()
+    const arc = data.arcs[0]
+    data = setArcOutline(data, arc.id, 'kishotenketsu')
+    data = placeOutlineStep(data, arc.id, 'ketsu', null)
+    const text = outline(storyOf(data))
+    expect(text).toMatch(/### The missing ship\nWhat really happened[^\n]*\nCharacters in it: Mara\nOutline: Kishōtenketsu, laid over this arc by the writer/)
+    expect(text).toMatch(/1\. The Aurelia signals from the reef — chapter 1 — outline: Ki: introduction/)
+    expect(text).toMatch(/Steps of the outline on no beat yet: Ketsu: reconciliation/)
   })
 })

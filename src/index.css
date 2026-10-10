@@ -1465,7 +1465,453 @@ a {
 
 /* ---------- Arc page ---------- */
 
+/* An arc's outline: a common story structure, its steps beside the beats they fall on. */
+.arc-view.with-outline {
+  --marks: 280px;
+  max-width: calc(780px + var(--marks) + 14px);
+}
+
+.arc-view.with-outline .arc-hero,
+.arc-view.with-outline .arc-composer,
+.arc-view.with-outline .arc-empty {
+  margin-right: calc(var(--marks) + 14px);
+}
+
+.arc-beat-row {
+  position: relative;
+}
+
+.arc-beat-row.with-outline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--marks);
+  align-items: start;
+  gap: 14px;
+}
+
+.outline-marks {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-self: stretch;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px;
+  border: 2px dashed transparent;
+  border-radius: 11px;
+}
+
+/* While a step is dragged: room for it beside every beat, lit where it would go (nothing moves). */
+.arc-beats.moving-step .outline-marks {
+  border-color: var(--line);
+}
+
+.arc-beat-row.step-over .outline-marks {
+  border-color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 6%, transparent);
+}
+
+.arc-beat-row.step-over .arc-beat {
+  border-color: var(--focus);
+}
+
+@container (max-width: 760px) {
+  .arc-view.with-outline .arc-hero,
+  .arc-view.with-outline .arc-composer,
+  .arc-view.with-outline .arc-empty {
+    margin-right: 0;
+  }
+
+  .arc-beat-row.with-outline {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .arc-beat-row.with-outline .outline-marks:not(:empty) {
+    padding-left: 34px;
+  }
+}
+
+.outline-mark {
+  position: relative;
+  display: block;
+}
+
+.outline-mark-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: grab;
+  touch-action: manipulation;
+}
+
+.outline-mark-face {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--arc) 35%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--arc) 7%, var(--surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.outline-mark-btn:hover .outline-mark-face,
+.outline-mark.open .outline-mark-face {
+  border-color: color-mix(in srgb, var(--arc) 65%, var(--line-strong));
+}
+
+.outline-mark-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.outline-mark.dragging .outline-mark-face {
+  border-style: dashed;
+  box-shadow: none;
+  opacity: 0.4;
+}
+
+.outline-mark-face.overlay {
+  width: 240px;
+  box-shadow: var(--shadow-lg);
+  cursor: grabbing;
+  transform: rotate(-1.5deg);
+}
+
+.outline-mark-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--arc) 18%, var(--tint));
+  color: color-mix(in srgb, var(--arc) 80%, var(--shade));
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.outline-mark-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.outline-mark-name {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.outline-mark-what {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+/* A step's details, opened from it. */
+.outline-step-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 290px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  cursor: default;
+}
+
+.outline-step-pop-of {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.outline-step-pop-name {
+  font-family: var(--serif);
+  font-size: 18px;
+}
+
+.outline-step-pop-what {
+  margin: 0 0 4px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.outline-step-pop-beat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.outline-step-pop-beat select {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+/* Above the beats: the outline, what to do with it, and its steps on no beat. */
+.outline-bar {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--arc) 5%, var(--surface));
+}
+
+.outline-bar.off {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.outline-bar-hint {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.outline-bar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.outline-bar-icon {
+  flex: none;
+  color: color-mix(in srgb, var(--arc) 75%, var(--shade));
+}
+
+.outline-bar-name {
+  font-weight: 650;
+}
+
+.outline-bar-count {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.outline-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.outline-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+}
+
+.outline-tray.open {
+  border-color: var(--line-strong);
+}
+
+.outline-tray.over {
+  border-color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 6%, transparent);
+}
+
+.outline-tray .outline-mark {
+  width: 240px;
+}
+
+.outline-tray-label {
+  width: 100%;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.outline-tray-hint {
+  align-self: center;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+/* Choosing an outline. */
+.outline-intro {
+  margin: 0 0 14px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.outline-picker {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  height: min(58vh, 520px);
+}
+
+.outline-list,
+.outline-preview {
+  overflow-y: auto;
+}
+
+.outline-list {
+  padding-right: 4px;
+}
+
+.outline-group-name {
+  margin: 10px 0 4px 10px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.outline-group:first-child .outline-group-name {
+  margin-top: 0;
+}
+
+.outline-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: left;
+}
+
+.outline-option:hover {
+  background: var(--hover);
+}
+
+.outline-option.chosen {
+  background: color-mix(in srgb, var(--arc) 14%, var(--surface));
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.outline-option-count {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.outline-option-current {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.outline-preview {
+  padding: 2px 6px 4px 16px;
+  border-left: 1px solid var(--line);
+}
+
+.outline-preview-name {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 20px;
+}
+
+.outline-preview-summary {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.outline-preview-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.outline-preview-steps li {
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.outline-preview-steps strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+/* The picker's buttons stay in sight while its long lists scroll. */
+.modal:has(.outline-picker) .modal-footer {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  .outline-picker {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .outline-list {
+    max-height: 220px;
+  }
+
+  .outline-preview {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+
 .arc-page {
+  container-type: inline-size;
   flex: 1;
   min-width: 0;
   overflow-y: auto;

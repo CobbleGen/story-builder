@@ -30,6 +30,19 @@ assistant such as Claude read all of it and give you feedback (see
   The link at the top of arc, character and place pages goes back to where
   you came from, named (the timeline, the mind map, another arc…), scrolled
   as you left it; deleting the arc goes back there too.
+- **Arc outlines** (optional): on an arc's page, **Arc outline** lays a
+  common story structure over the arc: the three-act structure, the Save the
+  Cat! beat sheet, the seven-point structure, Freytag's pyramid, the
+  Fichtean curve, Kishōtenketsu, the story spine, the Hero's Journey, the
+  story circle, the Heroine's Journey, positive, negative and flat character
+  arcs, and mystery, romance and heist outlines, each shown with its steps
+  before you choose. The steps then show beside the beats they fall on
+  (spread over the beats by where each falls in the arc), each saying what
+  should happen there. Drag a step to another beat, or onto **On no beat
+  yet**, or click it to read it in full and choose its beat. **Spread out**
+  puts them back where they fall; **Change** picks another structure and
+  **Remove** takes it off. Only the arc's page shows them, and AI assistants
+  reading the story see which step each beat stands for.
 - **Characters** live in the sidebar's Characters tab. Each has a colour and
   a page with your own attributes (age, wants, secrets, anything), their
   arcs, the chapters told from their point of view, and everywhere they're
@@ -345,6 +358,8 @@ any static host or sub-folder.
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
+- `src/lib/outlines.ts` and `src/components/ArcOutline.tsx`: the story
+  structures an arc's outline can follow, and the outline on its page
 - `src/lib/trail.ts` and `src/components/BackLink.tsx`: where you've been in
   the tab, so pages' back links (and scroll positions) take you back there
 - `src/pages/CharacterPage.tsx` and `src/pages/ElementPage.tsx`: a character's

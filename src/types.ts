@@ -42,6 +42,16 @@ export interface Arc {
   beatIds: string[]
   /** Characters involved in this arc. */
   characterIds: string[]
+  /** A common story structure laid over the arc, if the writer chose one. */
+  outline?: ArcOutline
+}
+
+/** A common story structure laid over an arc (see lib/outlines): the beat each of its steps is on. */
+export interface ArcOutline {
+  /** Which structure. */
+  kind: string
+  /** Step id → the beat (of this arc) it's on; a step not here isn't on a beat yet. */
+  steps: Record<string, string>
 }
 
 export interface CharacterAttribute {
