@@ -9,6 +9,7 @@ import { nextArcColor } from '../lib/colors'
 import { displayName, mentions, plainText } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { ELEMENT_KINDS } from '../store/storyOps'
+import { useScrollMemory } from '../lib/trail'
 import type { BeatDragData, UnassignDropData } from '../lib/dnd'
 import { ChapterTag } from './ChapterTag'
 import { ColorPicker } from './ColorPicker'
@@ -43,6 +44,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
   const expanded = useUi((s) => s.expandedArcs)
   const navigate = useNavigate()
   const lookup = useMentionLookup()
+  const keepScroll = useScrollMemory(`sidebar ${mode}`)
   const dropData: UnassignDropData = { type: 'unassign' }
   const { setNodeRef, isOver } = useDroppable({
     id: 'sidebar:unassign',
@@ -127,7 +129,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false }: Props) 
           <PanelLeftClose size={18} />
         </button>
       </div>
-      <div className="sidebar-scroll" role="tabpanel">
+      <div ref={keepScroll} className="sidebar-scroll" role="tabpanel">
         {mode === 'arcs' ? (
           <>
             {arcs.length === 0 && <p className="sidebar-empty">No arcs yet. Create one to start adding beats.</p>}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   DndContext,
   KeyboardSensor,
@@ -13,7 +13,9 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeft, BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { BackLink } from '../components/BackLink'
+import { useBack } from '../lib/trail'
 import type { Arc, Beat } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -57,7 +59,7 @@ function ArcView({ arc }: { arc: Arc }) {
   const updateArc = useStory((s) => s.updateArc)
   const deleteArc = useStory((s) => s.deleteArc)
   const moveArcBeat = useStory((s) => s.moveArcBeat)
-  const navigate = useNavigate()
+  const { back } = useBack()
   const lookup = useMentionLookup()
   const [showColors, setShowColors] = useState(false)
   const sensors = useSensors(
@@ -83,17 +85,13 @@ function ArcView({ arc }: { arc: Arc }) {
       confirmLabel: 'Delete arc',
       danger: true,
     })
-    if (ok) {
-      deleteArc(arc.id)
-      navigate('/')
-    }
+    // Back first: it goes once its page has (so the page isn't seen without it).
+    if (ok) back(() => deleteArc(arc.id))
   }
 
   return (
     <div className="arc-view" style={{ '--arc': arc.color } as React.CSSProperties}>
-      <Link to="/" className="back-link">
-        <ArrowLeft size={16} /> Chapter board
-      </Link>
+      <BackLink />
       <header className="arc-hero">
         <div className="arc-hero-row">
           <button

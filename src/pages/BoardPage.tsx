@@ -29,6 +29,7 @@ import { Sidebar } from '../components/Sidebar'
 import { BeatCardView } from '../components/BeatCard'
 import { chapterSortId, type BeatDragData, type ChapterDragData, type DragData } from '../lib/dnd'
 import { flash } from '../lib/flash'
+import { useScrollMemory } from '../lib/trail'
 import { ChapterColumn, ChapterOverlay } from './ChapterColumn'
 
 const dragData = (item: { data: { current?: unknown } } | null | undefined) =>
@@ -114,6 +115,7 @@ export function BoardPage() {
   const previewRef = useRef<ChapterLayout | null>(null)
   const originalRef = useRef<ChapterLayout | null>(null)
   const pointerY = useRef<number | null>(null)
+  const keepScroll = useScrollMemory('board')
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -244,7 +246,7 @@ export function BoardPage() {
     >
       <div className="workspace">
         <Sidebar dragEnabled unassignActive={activeDrag?.type === 'beat' && activeDrag.origin === 'board'} />
-        <main className="board" aria-label="Chapter board">
+        <main ref={keepScroll} className="board" aria-label="Chapter board">
           <SortableContext items={sortIds} strategy={horizontalListSortingStrategy}>
             {chapters.map((chapter, i) => (
               <ChapterColumn

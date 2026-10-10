@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, ChevronDown, Plus, Trash2, X } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { ArrowUpRight, ChevronDown, Plus, Trash2, X } from 'lucide-react'
+import { BackLink } from '../components/BackLink'
+import { useBack } from '../lib/trail'
 import type { Character } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -52,7 +54,7 @@ function CharacterView({ character }: { character: Character }) {
   const updateCharacter = useStory((s) => s.updateCharacter)
   const deleteCharacter = useStory((s) => s.deleteCharacter)
   const setPortrait = useStory((s) => s.setPortrait)
-  const navigate = useNavigate()
+  const { back } = useBack()
   const [showColors, setShowColors] = useState(false)
   const name = displayName(character)
   const places = useMentionPlaces(character.id)
@@ -68,10 +70,8 @@ function CharacterView({ character }: { character: Character }) {
       confirmLabel: 'Delete character',
       danger: true,
     })
-    if (ok) {
-      deleteCharacter(character.id)
-      navigate('/')
-    }
+    // Back first: it goes once its page has (so the page isn't seen without it).
+    if (ok) back(() => deleteCharacter(character.id))
   }
 
   const stats = [
@@ -82,9 +82,7 @@ function CharacterView({ character }: { character: Character }) {
 
   return (
     <div className="arc-view character-view" style={{ '--arc': character.color, '--char': character.color } as React.CSSProperties}>
-      <Link to="/" className="back-link">
-        <ArrowLeft size={16} /> Chapter board
-      </Link>
+      <BackLink />
       <header className="arc-hero with-portrait">
         <PortraitPicker
           imageId={character.portrait}

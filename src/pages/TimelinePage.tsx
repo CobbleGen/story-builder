@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   DndContext,
   KeyboardSensor,
@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, Plus, Rewind, X } from 'lucide-react'
+import { Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
 import type { Arc, Beat, Chapter } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type TimelineMode } from '../store/uiStore'
@@ -34,6 +34,7 @@ import { labelSpans, timeJumps, type Jump } from '../lib/timeline'
 import { plainText } from '../lib/mentions'
 import { nextArcColor } from '../lib/colors'
 import { askConfirm } from '../lib/confirm'
+import { useScrollMemory } from '../lib/trail'
 import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ChapterTag } from '../components/ChapterTag'
@@ -228,6 +229,7 @@ export function TimelinePage() {
   const setMode = useUi((s) => s.setTimelineMode)
   const lookup = useMentionLookup()
   const grid = useRef<HTMLDivElement>(null)
+  const keepScroll = useScrollMemory('timeline')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [dragging, setDragging] = useState<DragData | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
@@ -402,11 +404,12 @@ export function TimelinePage() {
   const placePlus = (e: React.PointerEvent) => {
     if (dragging || band || !grid.current) return
     const strip = grid.current.querySelector('.tl-axis')?.getBoundingClientRect()
-    if (mode === 'reading' && strip && e.clientY <= strip.bottom) {
+    const target = e.target as Element
+    // (The strip's + sits on its lower edge, a little over the lanes.)
+    if (mode === 'reading' && strip && (e.clientY <= strip.bottom || target.closest('.tl-chapter-add'))) {
       if (addAt) setAddAt(null)
-      // Over a chapter's title, only right over a gap: elsewhere a click opens the chapter.
-      const target = e.target as Element
-      const next = target.closest('.tl-ch-num, .tl-chapter-pop') ? null : chapterGapAt(e.clientX, !!target.closest('.tl-chapter-info'))
+      // Not while at a chapter's number (to drag or click it) or its details.
+      const next = target.closest('.tl-ch-num, .tl-chapter-pop') ? null : chapterGapAt(e.clientX)
       if (next !== chapterAdd) setChapterAdd(next)
       return
     }
@@ -430,13 +433,13 @@ export function TimelinePage() {
   /**
    * The gap (its slot) nearest a point across the chapter strip where a
    * chapter can be added (any in a chapter, or the start of the beats in
-   * none); `exactly`: only the gap right at that point.
+   * none).
    */
-  const chapterGapAt = (clientX: number, exactly = false): number | null => {
+  const chapterGapAt = (clientX: number): number | null => {
     const at = grid.current ? slotAt(grid.current, clientX) : null
     if (!at || at.index < 0) return null
     const slot = slots[at.index]
-    const nearest = slot.kind === 'column' && !exactly ? (at.x < at.width / 2 ? at.index - 1 : at.index + 1) : -1
+    const nearest = slot.kind === 'column' ? (at.x < at.width / 2 ? at.index - 1 : at.index + 1) : -1
     const index = slot.kind === 'gap' ? at.index : nearest
     const gap = slots[index]
     if (gap?.kind !== 'gap' || (gap.where.chapterId === null && gap.where.gap > 0)) return null
@@ -603,7 +606,7 @@ export function TimelinePage() {
           <NewArc />
         </div>
       ) : (
-        <div className="tl-scroll" onPointerDown={startBox}>
+        <div ref={keepScroll} className="tl-scroll" onPointerDown={startBox}>
           <DndContext
             sensors={sensors}
             collisionDetection={byPointer}
@@ -668,6 +671,7 @@ export function TimelinePage() {
               })}
               {mode === 'reading' &&
                 chapterAdd !== null &&
+                editing === null &&
                 !dragging &&
                 !band &&
                 (() => {
@@ -978,6 +982,7 @@ function ChapterEdge({
   onOpen: () => void
 }) {
   const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `edge-${drag.chapterId}`, data: drag })
+  const navigate = useNavigate()
   const [hot, setHot] = useState(false)
   const lit = `${hot || isDragging ? ' hot' : ''}${isDragging ? ' dragging' : ''}`
   const move = CSS.Translate.toString(transform)
@@ -987,10 +992,11 @@ function ChapterEdge({
       <div
         className={`tl-ch-num edge${lit}`}
         style={{ gridRow: 1, gridColumn: column, transform: move }}
-        title={`Drag to move where chapter ${number} begins. Click to change its details.`}
+        title={`Drag to move where chapter ${number} begins. Click to change its details, double-click to write it.`}
         {...listeners}
         {...hover}
         onClick={onOpen}
+        onDoubleClick={() => navigate(`/write/${drag.nextId}`)}
         aria-hidden
       >
         {number}
@@ -1039,13 +1045,22 @@ function ChapterHeading({
 }) {
   const characters = useStory((s) => s.characters)
   const lookup = useMentionLookup()
+  const navigate = useNavigate()
+  const write = () => navigate(`/write/${chapter.id}`)
   const pov = characters.find((c) => c.id === chapter.povCharacterId)
   const title = plainText(chapter.title, lookup).trim()
   const povName = pov ? plainText(pov.name, lookup).trim() || 'Unnamed character' : ''
   return (
     <>
       {first && (
-        <div className="tl-ch-num" style={{ gridRow: 1, gridColumn: from + 2 }} onClick={onOpen} title="Click to change its details" aria-hidden>
+        <div
+          className="tl-ch-num"
+          style={{ gridRow: 1, gridColumn: from + 2 }}
+          onClick={onOpen}
+          onDoubleClick={write}
+          title="Click to change its details, double-click to write it"
+          aria-hidden
+        >
           {number}
         </div>
       )}
@@ -1053,9 +1068,10 @@ function ChapterHeading({
         <button
           className="tl-chapter-info"
           onClick={onOpen}
+          onDoubleClick={write}
           aria-expanded={open}
           aria-label={`Chapter ${number}${title ? `: ${title}` : ''}${pov ? `, told by ${povName}` : ''}. Change its title, point of view or status`}
-          title="Change its title, point of view or status"
+          title="Click to change its title, point of view or status, double-click to write it"
         >
           <span className={`tl-chapter-name${title ? '' : ' untitled'}`}>{title ? <MentionText text={chapter.title} /> : 'Untitled'}</span>
           {pov && (
@@ -1100,6 +1116,10 @@ function ChapterDetails({ chapter, number, onClose }: { chapter: Chapter; number
       <div className="tl-chapter-pop-head">
         <span className="tl-chapter-pop-number">Chapter {number}</span>
         <StatusPicker chapter={chapter} />
+        <Link to={`/write/${chapter.id}`} className="chapter-write tl-chapter-pop-write" title="Open this chapter in the manuscript">
+          <PenLine size={13} />
+          Write
+        </Link>
       </div>
       <MentionTextarea
         autoFocus

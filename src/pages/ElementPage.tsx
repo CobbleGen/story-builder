@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Trash2 } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { ChevronDown, Trash2 } from 'lucide-react'
+import { BackLink } from '../components/BackLink'
+import { useBack } from '../lib/trail'
 import type { ElementKind, StoryElement } from '../types'
 import { useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -70,7 +72,7 @@ function ElementView({ element }: { element: StoryElement }) {
   const updateElement = useStory((s) => s.updateElement)
   const deleteElement = useStory((s) => s.deleteElement)
   const setPortrait = useStory((s) => s.setPortrait)
-  const navigate = useNavigate()
+  const { back } = useBack()
   const [showColors, setShowColors] = useState(false)
   const places = useMentionPlaces(element.id)
   const count = placeCount(places)
@@ -84,10 +86,8 @@ function ElementView({ element }: { element: StoryElement }) {
       confirmLabel: `Delete ${names.noun}`,
       danger: true,
     })
-    if (ok) {
-      deleteElement(element.id)
-      navigate('/')
-    }
+    // Back first: it goes once its page has (so the page isn't seen without it).
+    if (ok) back(() => deleteElement(element.id))
   }
 
   return (
@@ -95,9 +95,7 @@ function ElementView({ element }: { element: StoryElement }) {
       className="arc-view character-view element-view"
       style={{ '--arc': element.color, '--char': element.color } as React.CSSProperties}
     >
-      <Link to="/" className="back-link">
-        <ArrowLeft size={16} /> Chapter board
-      </Link>
+      <BackLink />
       <header className="arc-hero with-portrait">
         <PortraitPicker
           imageId={element.portrait}

@@ -19,6 +19,7 @@ import { useSaveStatus } from './store/persistence'
 import { useApplyTheme } from './lib/theme'
 import { tidyPicturesSoon } from './store/tidyPictures'
 import { startCloud } from './cloud'
+import { useKeepTrail } from './lib/trail'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
@@ -42,6 +43,7 @@ export default function App() {
 
   return (
     <HashRouter>
+      <Trail />
       <div className="app">
         <TopBar />
         <Routes>
@@ -81,4 +83,10 @@ export default function App() {
       </div>
     </HashRouter>
   )
+}
+
+/** Remembers where you've been in this tab, for the pages' back links. */
+function Trail() {
+  useKeepTrail()
+  return null
 }

@@ -2265,13 +2265,23 @@ a {
   padding-left: 8px;
   background: transparent;
   color: var(--ink-3);
+}
+
+/* On the board, an unset POV shows when you're at its chapter (always on touch screens). */
+.chapter .pov-pill.empty {
   opacity: 0;
   transition: opacity 0.12s;
 }
 
 .chapter:hover .pov-pill.empty,
-.pov-pill.empty:focus-within {
+.chapter .pov-pill.empty:focus-within {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .chapter .pov-pill.empty {
+    opacity: 1;
+  }
 }
 
 .pov-pill.empty:hover {
@@ -3149,10 +3159,6 @@ a {
   gap: 6px;
 }
 
-.write-meta .pov-pill.empty {
-  opacity: 1;
-}
-
 .chapter-jump {
   position: relative;
   display: inline-flex;
@@ -4002,15 +4008,16 @@ a {
   opacity: 1;
 }
 
-/* The strip's +: a new chapter at that point. */
+/* The strip's +: a new chapter at that point. It sits on the strip's lower edge, clear of the chapters' titles. */
 .tl-chapter-add {
   position: sticky;
   top: 0;
   z-index: 4;
   display: grid;
   place-items: center;
-  align-self: center;
+  align-self: end;
   justify-self: center;
+  translate: 0 75%;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -4048,9 +4055,16 @@ a {
 .tl-chapter-pop-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 8px;
+}
+
+.tl-chapter-pop-head .tl-chapter-pop-number {
+  margin-right: auto;
+}
+
+.tl-chapter-pop-write {
+  margin: 0;
 }
 
 .tl-chapter-pop-number {

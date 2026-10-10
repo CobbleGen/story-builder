@@ -23,12 +23,16 @@ assistant such as Claude read all of it and give you feedback (see
 - **Arc pages** (the ↗ next to an arc, or double-click the arc) show all of an arc's beats in order.
   Add new beats (they start unplaced), drag to reorder, and pick a chapter
   from each beat's chapter pill. Assign the characters involved in the arc.
+  The link at the top of arc, character and place pages goes back to where
+  you came from, named (the timeline, the mind map, another arc…), scrolled
+  as you left it; deleting the arc goes back there too.
 - **Characters** live in the sidebar's Characters tab. Each has a colour and
   a page with your own attributes (age, wants, secrets, anything), their
   arcs, the chapters told from their point of view, and everywhere they're
   mentioned. Hovering a character dims beats they aren't part of.
-- **Point of view**: pick a chapter's POV character from its header; the
-  chapter takes on that character's colour.
+- **Point of view**: pick a chapter's POV character from its header (on the
+  board, an unset one shows when you're at the chapter); the chapter takes
+  on that character's colour.
 - **Places, objects and groups** live in the sidebar's **World** tab, sorted
   by kind (place, object, group, other). They work like characters: each has
   a colour, a page with its own attributes and suggestions for the kind, and
@@ -153,10 +157,12 @@ assistant such as Claude read all of it and give you feedback (see
   its number, title and point of view. Drag a chapter's number to move where
   it begins, as with the line below it. Click the number or the title to
   give the chapter a title, point of view and status right there (Enter or
-  Esc closes it). Hover the strip for a +: between two of a chapter's beats
-  it splits the chapter there, the new chapter taking the beats after it;
-  between chapters, or at either end, it adds an empty one. The chapters
-  after it are renumbered, and the new one opens to be named.
+  Esc closes it); double-click it, or **Write** in its details, to open it
+  in the manuscript. Hover the strip for a + on its lower edge: between two
+  of a chapter's beats it splits the chapter there, the new chapter taking
+  the beats after it; between chapters, or at either end, it adds an empty
+  one. The chapters after it are renumbered, and the new one opens to be
+  named.
 - **Opening up cards on the mind map**: a chapter card's **Pages** button
   shows the chapter's text a page at a time (arrows or the page picker to move
   through it), and **Beats** lists its beats. An arc card lists its beats in
@@ -329,6 +335,8 @@ any static host or sub-folder.
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
+- `src/lib/trail.ts` and `src/components/BackLink.tsx`: where you've been in
+  the tab, so pages' back links (and scroll positions) take you back there
 - `src/pages/CharacterPage.tsx` and `src/pages/ElementPage.tsx`: a character's
   page and a place or thing's page
 - `src/pages/TimelinePage.tsx` and `src/lib/timeline.ts`: the timeline and how
