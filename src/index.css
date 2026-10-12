@@ -4428,6 +4428,53 @@ a {
   cursor: grab;
 }
 
+/* A beat lasting several moments: across them, fading into its arc's colour after the first. */
+.tl-card.lasting {
+  background: linear-gradient(90deg, var(--surface) 0 calc(var(--tl-col) - 20px), color-mix(in srgb, var(--arc) 10%, var(--surface)) calc(var(--tl-col) + 40px));
+}
+
+.tl-card.resizing {
+  z-index: 6;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Its right edge, dragged to make it last longer or shorter. */
+.tl-resize {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 12px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.tl-resize::after {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 3px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--arc) 80%, var(--ink-3));
+  opacity: 0;
+  transition: opacity 0.12s;
+  content: '';
+}
+
+.tl-card:hover .tl-resize::after,
+.tl-card:focus-visible .tl-resize::after,
+.tl-card.resizing .tl-resize::after {
+  opacity: 0.8;
+}
+
+@media (hover: none) {
+  .tl-resize::after {
+    opacity: 0.5;
+  }
+}
+
 .tl-card.dragging {
   z-index: 6;
   box-shadow: var(--shadow-lg);

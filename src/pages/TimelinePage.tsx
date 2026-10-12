@@ -192,6 +192,17 @@ function laneAt(
 const hit = (container: DroppableContainer, value = 0): Collision => ({ id: container.id, data: { droppableContainer: container, value } })
 
 /**
+ * Where across the timeline a dragged card aims (`x`, the pointer's place
+ * by default): a beat lasting several moments, by its first one, wherever
+ * it was picked up.
+ */
+function aimOf(containers: DroppableContainer[], rects: Map<UniqueIdentifier, ClientRect>, card: ClientRect, x: number): number {
+  const column = containers.find((c) => (c.data.current as DropData | undefined)?.kind === 'column')
+  const width = column ? rects.get(column.id)?.width : undefined
+  return width && card.width > width * 1.5 ? card.left + width / 2 : x
+}
+
+/**
  * Where dragged beats would go, by the pointer's place across the timeline:
  * onto the column under it (to happen at once with those beats, if none is of
  * their arcs), or else into the nearest gap; and, up or down, the lane
@@ -200,9 +211,9 @@ const hit = (container: DroppableContainer, value = 0): Collision => ({ id: cont
  * lane it's nearest.
  */
 const byPointer: CollisionDetection = ({ active, collisionRect, droppableRects, droppableContainers, pointerCoordinates }) => {
-  const x = pointerCoordinates?.x ?? collisionRect.left + collisionRect.width / 2
-  const y = pointerCoordinates?.y ?? collisionRect.top + collisionRect.height / 2
   const drag = active.data.current as DragData | undefined
+  const x = aimOf(droppableContainers, droppableRects, collisionRect, pointerCoordinates?.x ?? collisionRect.left + collisionRect.width / 2)
+  const y = pointerCoordinates?.y ?? collisionRect.top + collisionRect.height / 2
   const lane = drag?.kind === 'beats' || drag?.kind === 'arc' ? laneAt(droppableContainers, droppableRects, y, drag.kind === 'arc') : undefined
   if (drag?.kind === 'arc') return lane ? [hit(lane)] : []
   const laneArc = lane ? (lane.data.current as LaneData).arcId : null
@@ -261,7 +272,7 @@ const stepThroughSlots: KeyboardCoordinateGetter = (event, { currentCoordinates,
   const step = event.code === 'ArrowLeft' ? -1 : event.code === 'ArrowRight' ? 1 : 0
   if (!step || drag?.kind === 'arc') return undefined
   event.preventDefault()
-  const x = collisionRect.left + collisionRect.width / 2
+  const x = aimOf(droppableContainers.getEnabled(), droppableRects, collisionRect, collisionRect.left + collisionRect.width / 2)
   const y = collisionRect.top + collisionRect.height / 2
   const lane = drag?.kind === 'beats' ? laneAt(droppableContainers.getEnabled(), droppableRects, y, false) : undefined
   const laneArc = lane ? (lane.data.current as LaneData).arcId : null
@@ -320,6 +331,7 @@ export function TimelinePage() {
   const putChaptersInStoryOrder = useStory((s) => s.matchStoryOrder)
   const insertChapter = useStory((s) => s.insertChapter)
   const moveArc = useStory((s) => s.moveArc)
+  const setBeatUntil = useStory((s) => s.setBeatUntil)
   const mode = useUi((s) => s.timelineMode)
   const setMode = useUi((s) => s.setTimelineMode)
   const lookup = useMentionLookup()
@@ -330,6 +342,8 @@ export function TimelinePage() {
   const [overId, setOverId] = useState<string | null>(null)
   // The lane a beat or an arc's name is dragged over (by its arc).
   const [overLane, setOverLane] = useState<string | null>(null)
+  // A beat whose end is being dragged, to make it last longer or shorter: the slot it reaches.
+  const [resizing, setResizing] = useState<{ id: string; to: number } | null>(null)
   const [addAt, setAddAt] = useState<AddAt | null>(null)
   const [picked, setPicked] = useState<Set<string>>(NO_SELECTION)
   const [band, setBand] = useState<{ l: number; t: number; r: number; b: number } | null>(null)
@@ -412,6 +426,88 @@ export function TimelinePage() {
     }
     return { slots, headings, last }
   }, [mode, chapters, arcs, beats, timeline, lookup, numbers, openDraft])
+
+  // In story order, beats that last a while: the slot of the last moment each reaches.
+  const { reach, limitOf } = useMemo(() => {
+    const slotOf = new Map<string, number>()
+    slots.forEach((slot, i) => {
+      if (slot.kind === 'column') for (const b of slot.beats) slotOf.set(b, i)
+    })
+    /** The furthest a beat in slot `from` can reach: just before its arc's next beat, or the last moment. */
+    const limitOf = (id: string, from: number) => {
+      const arcId = beats[id]?.arcId
+      let limit = slots.length - 1
+      for (let i = from + 1; i < slots.length; i++) {
+        const slot = slots[i]
+        if (slot.kind === 'column' && slot.beats.some((b) => b !== id && beats[b]?.arcId === arcId)) {
+          limit = i - 1
+          break
+        }
+      }
+      while (limit > from && slots[limit].kind !== 'column') limit--
+      return limit
+    }
+    const reach = new Map<string, number>()
+    if (mode === 'story') {
+      for (const beat of Object.values(beats)) {
+        const from = slotOf.get(beat.id)
+        const until = beat.until ? slotOf.get(beat.until) : undefined
+        if (from === undefined || until === undefined || until <= from) continue
+        let to = Math.min(until, limitOf(beat.id, from))
+        while (to > from && slots[to].kind !== 'column') to--
+        if (to > from) reach.set(beat.id, to)
+      }
+    }
+    return { reach, limitOf }
+  }, [mode, slots, beats])
+
+  /** Lasting through slot `to` (a moment; its own: just its own moment). */
+  const lastUntil = (id: string, from: number, to: number) => {
+    const slot = slots[to]
+    setBeatUntil(id, to > from && slot?.kind === 'column' ? (slot.beats.find((b) => b !== id) ?? null) : null)
+  }
+
+  /** Dragging a beat's end (story order): it lasts through the moments it's dragged across. */
+  const startResize = (e: React.PointerEvent, id: string, from: number) => {
+    const el = grid.current
+    if (!el || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const limit = limitOf(id, from)
+    const toAt = (clientX: number) => {
+      const at = slotAt(el, clientX)
+      let to = at ? Math.max(from, Math.min(at.index, limit)) : from
+      while (to > from && slots[to].kind !== 'column') to--
+      return to
+    }
+    setResizing({ id, to: reach.get(id) ?? from })
+    const move = (ev: PointerEvent) => setResizing({ id, to: toAt(ev.clientX) })
+    const done = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+      window.removeEventListener('pointercancel', done)
+      setResizing(null)
+      if (ev.type !== 'pointerup') return
+      lastUntil(id, from, toAt(ev.clientX))
+      // The click that ends it (on the card, grown under the pointer) doesn't open the beat.
+      const swallow = (click: MouseEvent) => click.stopPropagation()
+      window.addEventListener('click', swallow, { capture: true, once: true })
+      setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 300)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+    window.addEventListener('pointercancel', done)
+  }
+
+  /** With the keyboard (Shift ← →), a beat lasts a moment less or more. */
+  const resizeBy = (id: string, from: number, step: -1 | 1) => {
+    const limit = limitOf(id, from)
+    let to = reach.get(id) ?? from
+    do to += step
+    while (to > from && to <= limit && slots[to]?.kind !== 'column')
+    if (to < from || to > limit) return
+    lastUntil(id, from, to)
+  }
 
   // Esc lets go of the beats picked out.
   useEffect(() => {
@@ -526,7 +622,10 @@ export function TimelinePage() {
     let next: AddAt | null = null
     const at = arcId ? slotAt(grid.current, e.clientX) : null
     const slot = at ? slots[at.index] : undefined
-    if (arcId && at && slot?.kind === 'gap') next = { arcId, slot: at.index }
+    // Not inside a beat lasting several moments.
+    const lasting = (e.target as Element).closest<HTMLElement>('.tl-card[data-to]')
+    if (lasting && at && at.index > Number(lasting.dataset.from) && at.index <= Number(lasting.dataset.to)) next = null
+    else if (arcId && at && slot?.kind === 'gap') next = { arcId, slot: at.index }
     else if (arcId && at && slot?.kind === 'column') {
       const inside = at.x > at.width * 0.2 && at.x < at.width * 0.8
       const near = at.x < at.width / 2 ? at.index - 1 : at.index + 1
@@ -683,7 +782,7 @@ export function TimelinePage() {
         </div>
         <p className="tl-hint">
           {mode === 'story'
-            ? 'When things happen in the story’s world. Drag beats to move them in time, up or down into another arc, or onto another arc’s beat so they happen at once. Drag the two lines to where the book begins and ends, and an arc’s name to reorder the arcs. Drag across empty space to pick out several.'
+            ? 'When things happen in the story’s world. Drag beats to move them in time, up or down into another arc, or onto another arc’s beat so they happen at once. Drag a beat’s right edge to make it last longer. Drag the two lines to where the book begins and ends, and an arc’s name to reorder the arcs. Drag across empty space to pick out several.'
             : 'The order readers meet things. Drag beats to another place or chapter, up or down into another arc, or onto another arc’s beat to tell them together. Drag the line between two chapters to move beats from one to the other, and an arc’s name to reorder the arcs. Drag across empty space to pick out several.'}
         </p>
         {selected.length > 0 && (
@@ -905,6 +1004,7 @@ export function TimelinePage() {
                   const row = lanes.get(beat?.arcId)
                   if (!beat || row === undefined) return null
                   const moving = selection.has(id) ? selected : [id]
+                  const to = resizing?.id === id ? resizing.to : (reach.get(id) ?? i)
                   return (
                     <BeatTile
                       key={id}
@@ -912,6 +1012,10 @@ export function TimelinePage() {
                       arc={arcs[row]}
                       row={row + 2}
                       column={i + 2}
+                      span={mode === 'story' ? { from: i, to } : undefined}
+                      resizing={resizing?.id === id}
+                      onResize={mode === 'story' ? (e) => startResize(e, id, i) : undefined}
+                      onResizeKey={mode === 'story' ? (step) => !dragging && resizeBy(id, i, step) : undefined}
                       number={beat.chapterId ? numbers[beat.chapterId] : null}
                       jump={jumps.get(id)}
                       showWhen={mode === 'reading'}
@@ -1423,24 +1527,35 @@ interface TileProps {
   lifted: boolean
   /** The colour of the arc it's being dragged to, if another. */
   color?: string
+  /** In story order, the slots it covers (beyond `from` when it lasts a while), and its end is dragged to change that. */
+  span?: { from: number; to: number }
+  resizing?: boolean
+  onResize?: (e: React.PointerEvent) => void
+  onResizeKey?: (step: -1 | 1) => void
   drag: DragData
   onPick: () => void
   onOpen: () => void
 }
 
-function BeatTile({ beat, arc, row, column, number, jump, showWhen, together, picked, carried, lifted, color, drag, onPick, onOpen }: TileProps) {
+function BeatTile(props: TileProps) {
+  const { beat, arc, row, column, number, jump, showWhen, together, picked, carried, lifted, color, drag, onPick, onOpen } = props
+  const { span, resizing, onResize, onResizeKey } = props
   const openBeat = useUi((s) => s.openBeat)
   const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: beat.id, data: drag })
+  const lasting = span && span.to > span.from
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
   return (
     <div
       ref={setNodeRef}
-      className={`tl-card draggable${isDragging ? ' dragging' : ''}${together ? ' together' : ''}${picked ? ' picked' : ''}${carried && !isDragging ? ' carried' : ''}${lifted ? ' lifted' : ''}`}
+      className={`tl-card draggable${isDragging ? ' dragging' : ''}${together ? ' together' : ''}${picked ? ' picked' : ''}${carried && !isDragging ? ' carried' : ''}${lifted ? ' lifted' : ''}${lasting ? ' lasting' : ''}${resizing ? ' resizing' : ''}`}
       data-lane={arc.id}
       data-beat={beat.id}
+      data-from={lasting ? span.from : undefined}
+      data-to={lasting ? span.to : undefined}
       style={
         {
           gridRow: row,
-          gridColumn: column,
+          gridColumn: lasting ? `${column} / span ${span.to - span.from + 1}` : column,
           '--arc': color ?? arc.color,
           transform: CSS.Translate.toString(transform),
         } as React.CSSProperties
@@ -1456,10 +1571,26 @@ function BeatTile({ beat, arc, row, column, number, jump, showWhen, together, pi
         openBeat(beat.id)
       }}
       onKeyDown={(e) => {
+        // Shift ← and → make it last a moment less or more (in story order).
+        if (onResizeKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          e.preventDefault()
+          return onResizeKey(e.key === 'ArrowLeft' ? -1 : 1)
+        }
         listeners?.onKeyDown?.(e)
         if (e.key === 'Enter' && !e.defaultPrevented) openBeat(beat.id)
       }}
     >
+      {onResize && (
+        <span
+          className="tl-resize"
+          onPointerDown={onResize}
+          onMouseDown={stop}
+          onTouchStart={stop}
+          onClick={stop}
+          title="Drag to make it last longer or shorter (or Shift ← →)"
+          aria-hidden
+        />
+      )}
       <span className="tl-card-title">
         <MentionText text={beat.title} fallback={<span className="muted">Untitled beat</span>} />
       </span>

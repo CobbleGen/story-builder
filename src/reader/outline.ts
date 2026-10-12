@@ -1,6 +1,6 @@
 import type { Beat } from '../types'
 import { outlineKind } from '../lib/outlines'
-import { isMoment, storyStops } from '../store/storyOps'
+import { isMoment, storyColumns, storyStops } from '../store/storyOps'
 import { beatLines, chapterFacts, jumpsOf } from './chapters'
 import type { Story } from './story'
 
@@ -73,10 +73,16 @@ export function timeline(story: Story): string {
       ? 'The order things happen in the story’s world, as the writer arranged it on the timeline; it can differ from the order they’re read in. Beats joined by “+ at the same moment” happen at once. [when] is the writer’s note of when a beat happens.'
       : 'The writer hasn’t arranged story time apart from the chapters, so it follows the reading order (beats in no chapter come last). Beats joined by “+ at the same moment” happen at once. [when] is the writer’s note of when a beat happens.',
   ]
+  // A beat lasting a while lasts until a later one (through the moments between).
+  const column = new Map(storyColumns(data).flatMap((beats, i) => beats.map((id) => [id, i] as const)))
+  const lasts = (b: Beat) => {
+    const until = b.until ? data.beats[b.until] : undefined
+    return until && (column.get(until.id) ?? -1) > (column.get(b.id) ?? Infinity) ? `, lasting until ${story.beatName(until)}` : ''
+  }
   const describe = (b: Beat) => {
     const where = b.chapterId ? `chapter ${story.numberOf(b.chapterId)}` : 'in no chapter'
     const jump = jumps.get(b.id)
-    return `${story.beatName(b)} (${story.arcName(story.arc(b.arcId))}, ${where}${jump ? `, ${jump}` : ''})`
+    return `${story.beatName(b)} (${story.arcName(story.arc(b.arcId))}, ${where}${jump ? `, ${jump}` : ''}${lasts(b)})`
   }
   const sections: { title: string; lines: string[] }[] = [{ title: 'Before the book begins (backstory)', lines: [] }]
   let n = 0

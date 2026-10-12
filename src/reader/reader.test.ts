@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { RichNode, StoryData } from '../types'
 import { buildSampleStory } from '../store/sampleStory'
-import { addMapEdge, addMapNode, placeOutlineStep, setArcOutline, setChapterText, updateMapEdge } from '../store/storyOps'
+import { addMapEdge, addMapNode, placeOutlineStep, setArcOutline, setBeatUntil, setChapterText, storyColumns, updateMapEdge } from '../store/storyOps'
 import { NotFound, storyOf } from './story'
 import { readChapter, readManuscript } from './chapters'
 import { mindMaps, colourName } from './maps'
 import { findChapter } from './story'
 import { overview } from '.'
-import { outline } from './outline'
+import { outline, timeline } from './outline'
 
 const para = (text: string): RichNode => ({ type: 'paragraph', content: [{ type: 'text', text }] })
 
@@ -108,5 +108,15 @@ describe('arc outlines in the plan', () => {
     expect(text).toMatch(/### The missing ship\nWhat really happened[^\n]*\nCharacters in it: Mara\nOutline: Kishōtenketsu, laid over this arc by the writer/)
     expect(text).toMatch(/1\. The Aurelia signals from the reef — chapter 1 — outline: Ki: introduction/)
     expect(text).toMatch(/Steps of the outline on no beat yet: Ketsu: reconciliation/)
+  })
+})
+
+describe('beats lasting a while in story time', () => {
+  it('says how long', () => {
+    let data = buildSampleStory()
+    const columns = storyColumns(data)
+    data = setBeatUntil(data, columns[1][0], columns[3][0])
+    const name = (id: string) => data.beats[id].title
+    expect(timeline(storyOf(data))).toMatch(new RegExp(`${name(columns[1][0]).slice(0, 12)}[^\\n]*lasting until ${name(columns[3][0]).slice(0, 12)}`))
   })
 })

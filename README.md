@@ -155,8 +155,12 @@ assistant such as Claude read all of it and give you feedback (see
   move them all at once, in their order; a click on empty space or Esc lets
   go. With the keyboard, Space picks a beat up, ← and → step it from place
   to place, ↑ and ↓ into another arc's lane, and Space puts it down; an
-  arc's name moves with Space and ↑ ↓ too, and Enter opens it. Beats told
-  out of order are marked **Flashback** or **Flash-forward**.
+  arc's name moves with Space and ↑ ↓ too, and Enter opens it. In story
+  order, drag a beat's right edge to make it last several moments (with the
+  keyboard, Shift ← and → on a beat): it lasts until a later beat, so a beat
+  added in between makes it longer; moved, it keeps its length; and it never
+  runs into its arc's next beat. In reading order each beat has one place.
+  Beats told out of order are marked **Flashback** or **Flash-forward**.
 - **Where the book begins and ends**: in story order, two lines run through
   every lane, **Book begins** and **Book ends**, at the very beginning and
   end to start with. Drag a line (or the book at its top) to its place in

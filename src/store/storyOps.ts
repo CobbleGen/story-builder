@@ -754,6 +754,20 @@ export function deleteBeat(data: StoryData, id: string): StoryData {
   if (!beat) return data
   const beats = { ...data.beats }
   delete beats[id]
+  // Beats that lasted until it: until a beat at once with it, or else the moment before (if that's still after them).
+  const lasting = Object.values(beats).filter((b) => b.until === id)
+  if (lasting.length) {
+    const columns = storyColumns(data)
+    const at = columnIndex(data)
+    const col = at.get(id) ?? -1
+    for (const b of lasting) {
+      const until = columns[col]?.find((m) => m !== id) ?? (col - 1 > (at.get(b.id) ?? Infinity) ? columns[col - 1][0] : undefined)
+      const copy = { ...b }
+      if (until) copy.until = until
+      else delete copy.until
+      beats[b.id] = copy
+    }
+  }
   return dropMapRefs(
     {
       ...mapTexts(data, (doc) => stripBeatLinks(doc, new Set([id]))),
@@ -1001,7 +1015,60 @@ export type ReadingSpot = TimelineSpot & { chapterId: string | null }
  */
 export function moveInStory(data: StoryData, ids: string | string[], spot: TimelineSpot, arcId?: string): StoryData {
   const moved = moveInStoryOnly(data, ids, spot, arcId)
-  return moved && arcId ? moveBeatsToArc(moved, ids, arcId) : (moved ?? data)
+  const next = moved && arcId ? moveBeatsToArc(moved, ids, arcId) : (moved ?? data)
+  return next === data ? data : keepLengths(data, next, idsOf(data, ids))
+}
+
+/** For each beat, the index of its moment (column) in story time. */
+function columnIndex(data: TimeData): Map<string, number> {
+  const at = new Map<string, number>()
+  storyColumns(data).forEach((column, i) => column.forEach((b) => at.set(b, i)))
+  return at
+}
+
+/**
+ * How long a beat lasts in story time: through the moment of `until`, a
+ * beat happening later (null: just its own moment). Beats added in
+ * between, it lasts through them too.
+ */
+export function setBeatUntil(data: StoryData, id: string, until: string | null): StoryData {
+  const beat = data.beats[id]
+  if (!beat) return data
+  if (until !== null) {
+    const at = columnIndex(data)
+    if (!data.beats[until] || (at.get(until) ?? -1) <= (at.get(id) ?? Infinity)) return data
+  }
+  if ((beat.until ?? null) === until) return data
+  const next = { ...beat }
+  if (until) next.until = until
+  else delete next.until
+  return { ...data, beats: { ...data.beats, [id]: next } }
+}
+
+/** Beats that last a while, moved in story time: lasting as many moments as they did (until a beat that far on). */
+function keepLengths(before: StoryData, after: StoryData, moved: string[]): StoryData {
+  const lasting = moved.filter((id) => {
+    const until = before.beats[id]?.until
+    return until && !moved.includes(until) && after.beats[id]
+  })
+  if (!lasting.length) return after
+  const was = columnIndex(before)
+  const columns = storyColumns(after)
+  const now = columnIndex(after)
+  let beats = after.beats
+  for (const id of lasting) {
+    const length = (was.get(before.beats[id].until!) ?? 0) - (was.get(id) ?? 0)
+    const start = now.get(id)
+    if (start === undefined || length <= 0) continue
+    const end = Math.min(start + length, columns.length - 1)
+    const until = end > start ? columns[end].find((b) => b !== id) : undefined
+    if (until === beats[id].until) continue
+    const beat = { ...beats[id] }
+    if (until) beat.until = until
+    else delete beat.until
+    beats = { ...beats, [id]: beat }
+  }
+  return beats === after.beats ? after : { ...after, beats }
 }
 
 /** moveInStory but for the arc: null if they can't go there. */
@@ -1798,7 +1865,9 @@ export function normalizeStory(input: unknown): StoryData {
     const when = cleanWhen(b.when)
     if (when) beats[id].when = when
     if (typeof b.moment === 'string' && b.moment) beats[id].moment = b.moment.slice(0, 80)
+    if (typeof b.until === 'string' && b.until && b.until !== id) beats[id].until = b.until
   }
+  for (const beat of Object.values(beats)) if (beat.until && !beats[beat.until]) delete beat.until
   // A moment is shared by beats happening at once: one alone in it isn't in it.
   const sharing = new Map<string, number>()
   for (const beat of Object.values(beats)) if (beat.moment) sharing.set(beat.moment, (sharing.get(beat.moment) ?? 0) + 1)

@@ -15,6 +15,11 @@ export interface Beat {
    * they stand on top of each other on the timeline.
    */
   moment?: string
+  /**
+   * A beat that lasts a while in story time lasts until another, later beat:
+   * through that beat's moment (and any added in between).
+   */
+  until?: string
 }
 
 /** How far along a chapter is. */

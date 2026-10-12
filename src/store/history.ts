@@ -58,6 +58,7 @@ const LABELS: Record<string, string> = {
   updateArc: 'edit arc',
   deleteArc: 'delete arc',
   moveArc: 'move arc',
+  setBeatUntil: 'change how long a beat lasts',
   // "choose arc outline", or "remove arc outline"; see labelOf.
   setArcOutline: 'choose arc outline',
   spreadArcOutline: 'spread out the outline',

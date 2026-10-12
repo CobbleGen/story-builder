@@ -20,6 +20,7 @@ interface StoryActions {
   updateArc: (...args: Tail<Parameters<typeof ops.updateArc>>) => void
   deleteArc: (...args: Tail<Parameters<typeof ops.deleteArc>>) => void
   moveArc: (...args: Tail<Parameters<typeof ops.moveArc>>) => void
+  setBeatUntil: (...args: Tail<Parameters<typeof ops.setBeatUntil>>) => void
   setArcOutline: (...args: Tail<Parameters<typeof ops.setArcOutline>>) => void
   spreadArcOutline: (...args: Tail<Parameters<typeof ops.spreadArcOutline>>) => void
   placeOutlineStep: (...args: Tail<Parameters<typeof ops.placeOutlineStep>>) => void
@@ -151,6 +152,7 @@ export const useStory = create<StoryStore>()(
         updateArc: (...a) => apply(ops.updateArc(data(), ...a), 'updateArc', a[0]),
         deleteArc: (...a) => apply(ops.deleteArc(data(), ...a), 'deleteArc', a[0]),
         moveArc: (...a) => apply(ops.moveArc(data(), ...a), 'moveArc', a[0]),
+        setBeatUntil: (...a) => apply(ops.setBeatUntil(data(), ...a), 'setBeatUntil', a[0]),
         setArcOutline: (...a) => apply(ops.setArcOutline(data(), ...a), 'setArcOutline', a[1]),
         spreadArcOutline: (...a) => apply(ops.spreadArcOutline(data(), ...a), 'spreadArcOutline', a[0]),
         placeOutlineStep: (...a) => apply(ops.placeOutlineStep(data(), ...a), 'placeOutlineStep', a[0]),

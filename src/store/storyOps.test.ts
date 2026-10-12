@@ -45,6 +45,7 @@ import {
   moveInStory,
   moveBeatsToArc,
   moveArc,
+  setBeatUntil,
   setArcOutline,
   spreadArcOutline,
   placeOutlineStep,
@@ -997,6 +998,58 @@ describe('timeline', () => {
     // With nothing in no chapter to reorder, the timeline stays unarranged
     const plain = moveArc(story().data, 1, 0)
     expect(plain.timeline).toEqual([])
+  })
+
+  it('lets a beat last until a later one, through beats added in between, keeping its length as it moves', () => {
+    let { data, a, b, c, loose, love } = story()
+    const span = (d: StoryData, id: string) => {
+      const cols = storyColumns(d)
+      const at = (x: string) => cols.findIndex((col) => col.includes(x))
+      return d.beats[id].until ? at(d.beats[id].until!) - at(id) + 1 : 1
+    }
+    let next = setBeatUntil(data, a, c)
+    expect(next.beats[a].until).toBe(c)
+    expect(span(next, a)).toBe(3)
+    // Not until itself, an earlier beat, or one that isn't there; and back to its own moment
+    expect(setBeatUntil(next, c, a)).toBe(next)
+    expect(setBeatUntil(next, a, a)).toBe(next)
+    expect(setBeatUntil(next, a, 'nope')).toBe(next)
+    expect(setBeatUntil(next, a, null).beats[a]).not.toHaveProperty('until')
+    // A beat added in between: it lasts through that one too
+    let x: string
+    ;[next, x] = addBeatInStory(next, { arcId: love, title: 'x' }, { gap: 2 })
+    expect(storyColumns(next)).toEqual([[a], [x], [b], [c], [loose]])
+    expect(span(next, a)).toBe(4)
+    // Moved later in time, it lasts as many moments as it did; past the last moment, just its own
+    data = setBeatUntil(data, a, b)
+    next = moveInStory(data, a, { gap: 4 })
+    expect(storyColumns(next)).toEqual([[b], [c], [a], [loose]])
+    expect(next.beats[a].until).toBe(loose)
+    next = moveInStory(data, a, { gap: 5 })
+    expect(storyColumns(next)).toEqual([[b], [c], [loose], [a]])
+    expect(next.beats[a]).not.toHaveProperty('until')
+  })
+
+  it('keeps a beat lasting when the beat it lasts until is deleted, and drops what can’t be kept', () => {
+    let { data, a, b, c } = story()
+    // The beat it lasted until deleted: until the moment before
+    data = setBeatUntil(data, a, c)
+    let next = deleteBeat(data, c)
+    expect(next.beats[a].until).toBe(b)
+    // ...or until a beat that happened at once with it
+    let s = story()
+    let d = moveInStory(s.data, s.loose, { column: 3 })
+    d = setBeatUntil(d, s.a, s.c)
+    expect(deleteBeat(d, s.c).beats[s.a].until).toBe(s.loose)
+    // Nothing left after it: just its own moment
+    s = story()
+    d = setBeatUntil(s.data, s.a, s.b)
+    expect(deleteBeat(d, s.b).beats[s.a]).not.toHaveProperty('until')
+    // Loaded: a beat it lasts until that isn't there is let go
+    const raw = JSON.parse(JSON.stringify(data))
+    raw.beats[a].until = 'beat_gone'
+    expect(normalizeStory(raw).beats[a]).not.toHaveProperty('until')
+    expect(normalizeStory(JSON.parse(JSON.stringify(data))).beats[a].until).toBe(c)
   })
 
   it('moves a beat in reading order, into other chapters and places in them', () => {
