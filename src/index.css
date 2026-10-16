@@ -29,8 +29,9 @@
   --success: #3a7d44;
   --overlay: rgba(30, 28, 24, 0.32);
   --canvas-dots: #cfc9bd;
-  /* Chart marks: validated against both surfaces (dataviz checks). */
+  /* Chart marks: validated against both surfaces (dataviz checks), words added and words cut as a pair. */
   --chart-accent: #3e63dd;
+  --chart-cut: #eb6834;
   /* Search matches, like a highlighter pen. */
   --mark: rgba(245, 190, 50, 0.42);
 
@@ -71,6 +72,7 @@
   --overlay: rgba(0, 0, 0, 0.55);
   --canvas-dots: #3a3732;
   --chart-accent: #6482f0;
+  --chart-cut: #d95926;
   --mark: rgba(245, 190, 50, 0.3);
   color-scheme: dark;
 }
@@ -5805,9 +5807,10 @@ button.tl-new-arc:hover {
 
 .words-chart-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
   margin-bottom: 6px;
 }
 
@@ -5866,11 +5869,11 @@ button.tl-new-arc:hover {
   transition: opacity 0.1s;
 }
 
-.chart-bar.negative {
-  fill: var(--ink-3);
+.chart-bar.cut {
+  fill: var(--chart-cut);
 }
 
-.chart-bar.active {
+.active > .chart-bar {
   opacity: 0.72;
 }
 
@@ -5879,13 +5882,31 @@ button.tl-new-arc:hover {
   stroke-width: 1;
 }
 
+.chart-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-left: auto;
+}
+
 .chart-key {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
   color: var(--ink-2);
   font-size: 12px;
+}
+
+.chart-key-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--chart-accent);
+}
+
+.chart-key-swatch.cut {
+  background: var(--chart-cut);
 }
 
 .chart-key-line {
@@ -5972,7 +5993,7 @@ button.tl-new-arc:hover {
   vertical-align: middle;
 }
 
-.chart-table td:last-child,
+.chart-table .num,
 .progress-table .num {
   font-variant-numeric: tabular-nums;
   text-align: right;

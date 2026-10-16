@@ -166,7 +166,7 @@ export function restore(copy: StoryData, now: StoryData, takenAt: number): Story
     const text = current && (!then || current.updatedAt > takenAt) ? current : then
     if (text) texts[chapter.id] = text
   }
-  return { ...copy, texts, wordLog: now.wordLog, outlineLog: now.outlineLog }
+  return { ...copy, texts, wordLog: now.wordLog, wordCuts: now.wordCuts, outlineLog: now.outlineLog, outlineCuts: now.outlineCuts }
 }
 
 let noticeId = 0

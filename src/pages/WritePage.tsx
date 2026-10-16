@@ -12,6 +12,8 @@ import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
 import { manuscriptExtensions } from '../editor/extensions'
 import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
+import { countWords, wordChange } from '../editor/wordChanges'
+import { tally, type WordTally } from '../lib/progress'
 import type { TextFind } from '../lib/search'
 import { Toolbar } from '../editor/Toolbar'
 import { SelectionMenu } from '../editor/SelectionMenu'
@@ -25,11 +27,6 @@ import { StatusPicker } from '../components/StatusPicker'
 const SAVE_DELAY_MS = 400
 const SAFE_COLOR = /^#[0-9a-f]{3,8}$/i
 const SAFE_ID = /^[\w-]+$/
-
-function countWords(doc: PmNode): number {
-  const text = doc.textBetween(0, doc.content.size, ' ', (leaf) => (leaf.type.name === MENTION_NODE ? 'x' : ' '))
-  return text.split(/\s+/).filter(Boolean).length
-}
 
 /** Beat title from selected text: the text itself, shortened at a word if long. */
 function titleFrom(text: string): { title: string; description: string } {
@@ -102,6 +99,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const [draft, setDraft] = useState<{ from: number; to: number; title: string; description: string } | null>(null)
   const blocked = useRef(false)
   const unsaved = useRef<PmNode | null>(null)
+  // Words added and cut since the last save, as they change the day's tallies.
+  const written = useRef<WordTally>({ added: 0, cut: 0 })
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => setLastChapterId(chapter.id), [chapter.id, setLastChapterId])
@@ -109,10 +108,12 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const saveNow = useCallback(() => {
     clearTimeout(timer.current)
     const doc = unsaved.current
+    const change = written.current
     unsaved.current = null
+    written.current = { added: 0, cut: 0 }
     setDirty(false)
     if (!doc || blocked.current) return
-    setChapterText(chapter.id, { doc: doc.toJSON(), words: countWords(doc), updatedAt: Date.now() })
+    setChapterText(chapter.id, { doc: doc.toJSON(), words: countWords(doc), updatedAt: Date.now() }, dayKey(), change)
   }, [chapter.id, setChapterText])
 
   const extensions = useMemo(() => manuscriptExtensions(`Start writing chapter ${index + 1}…`), [index])
@@ -126,8 +127,20 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       setContentError(true)
       e.setEditable(false)
     },
-    onUpdate: ({ editor: e, transaction }) => {
-      if (!transaction.docChanged) return
+    onUpdate: ({ editor: e, transaction, appendedTransactions }) => {
+      const transactions = [transaction, ...appendedTransactions]
+      if (!transactions.some((tr) => tr.docChanged)) return
+      // Each change's words, counted against the day's tallies as they'll be once saved.
+      for (const tr of transactions) {
+        const change = wordChange(tr)
+        if (!change) continue
+        const story = useStory.getState()
+        const day = dayKey()
+        const was = written.current
+        const before = { added: (story.wordLog[day] ?? 0) + was.added, cut: (story.wordCuts[day] ?? 0) + was.cut }
+        const after = tally(before, change)
+        written.current = { added: was.added + after.added - before.added, cut: was.cut + after.cut - before.cut }
+      }
       unsaved.current = e.state.doc
       setDirty(true)
       clearTimeout(timer.current)
@@ -343,7 +356,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
           </span>
           <button className="write-status-link" onClick={() => setProgressOpen(true)} title="Word count and goals">
             · {totalWords.toLocaleString()} in the manuscript
-            {todayWords ? ` · ${todayWords > 0 ? '+' : '−'}${Math.abs(todayWords).toLocaleString()} today` : ''}
+            {todayWords ? ` · +${todayWords.toLocaleString()} today` : ''}
           </button>
           <span className={`save-state ${saveStatus === 'error' ? 'error' : ''}`}>{saveLabel}</span>
         </div>

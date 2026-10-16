@@ -25,7 +25,7 @@ describe('undo history', () => {
     expect(current.chapters[0].title).toBe('The')
   })
 
-  it('keeps chapter text written since the copy, and the word log', () => {
+  it('keeps chapter text written since the copy, and the word logs', () => {
     let [data, ch] = addChapter(emptyStory(), { title: 'One' })
     data = setChapterText(data, ch, { doc, words: 10, updatedAt: 1000 }, '2026-01-01')
     const copy = { ...data, chapters: data.chapters.map((c) => ({ ...c, title: 'Old' })) }
@@ -35,6 +35,7 @@ describe('undo history', () => {
     expect(back.chapters[0].title).toBe('Old')
     expect(back.texts[ch].words).toBe(50)
     expect(back.wordLog).toBe(later.wordLog)
+    expect(back.wordCuts).toBe(later.wordCuts)
     // Written before the copy: the copy's text wins.
     expect(restore(copy, later, 4000).texts[ch].words).toBe(10)
     // A chapter the copy doesn't have takes its text away with it.

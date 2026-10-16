@@ -2,15 +2,16 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 interface Day {
   day: string
-  words: number
+  added: number
+  cut: number
 }
 
 interface Props {
   /** Oldest first; the last is today. */
   days: Day[]
-  /** Daily goal, drawn as a line across the chart. */
+  /** Daily goal (words added), drawn as a line across the chart. */
   goal?: number
-  /** What's counted ("Words written", "Outline words"). */
+  /** What's counted ("Words added and cut", "Outline words added and cut"). */
   what?: string
 }
 
@@ -18,6 +19,10 @@ const PAD = { top: 20, right: 10, bottom: 24, left: 42 }
 const PLOT_HEIGHT = 150
 const MAX_BAR = 24
 const RADIUS = 4
+/** Between a day's words added (above the line) and cut (below it). */
+const GAP = 2
+/** However few the words, a column you can see. */
+const MIN_BAR = 2
 
 const longDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 const shortDate = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
@@ -25,7 +30,8 @@ const toDate = (day: string) => {
   const [y, m, d] = day.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
-const signed = (n: number) => (n > 0 ? `+${n.toLocaleString()}` : n < 0 ? `−${Math.abs(n).toLocaleString()}` : '0')
+const minus = (n: number) => (n < 0 ? `−${Math.abs(n).toLocaleString()}` : n.toLocaleString())
+const words = (n: number) => `${n.toLocaleString()} word${n === 1 ? '' : 's'}`
 
 /** A round step for axis ticks: 1, 2, 2.5 or 5 times a power of ten. */
 function niceStep(rough: number): number {
@@ -43,8 +49,11 @@ function columnPath(x: number, w: number, base: number, end: number): string {
   return `M${x},${base}V${end - r}Q${x},${end} ${x + r},${end}H${x + w - r}Q${x + w},${end} ${x + w},${end - r}V${base}Z`
 }
 
-/** Words written each day, as columns; negative days (more cut than written) hang below the line. */
-export function WordsChart({ days, goal, what = 'Words written' }: Props) {
+/**
+ * Words added each day, as columns, and words cut, hanging below the line:
+ * counted apart, so cutting never takes away from writing.
+ */
+export function WordsChart({ days, goal, what = 'Words added and cut' }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(520)
   const [active, setActive] = useState<number | null>(null)
@@ -60,9 +69,9 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
     return () => observer.disconnect()
   }, [asTable])
 
-  const values = days.map((d) => d.words)
-  const high = Math.max(10, goal ?? 0, ...values)
-  const low = Math.min(0, ...values)
+  const anyCut = days.some((d) => d.cut > 0)
+  const high = Math.max(10, goal ?? 0, ...days.map((d) => d.added))
+  const low = -Math.max(0, ...days.map((d) => d.cut))
   const step = niceStep((high - low) / 3)
   const top = Math.ceil(high / step) * step
   const bottom = Math.floor(low / step) * step
@@ -76,6 +85,12 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
   const lastIndex = days.length - 1
   const x = (i: number) => PAD.left + band * i + (band - barWidth) / 2
   const shown = active ?? null
+  const today = days[lastIndex] ?? { day: '', added: 0, cut: 0 }
+  // Where a day's columns start (a little off the line) and end.
+  const addedBase = y(0) - GAP / 2
+  const cutBase = y(0) + GAP / 2
+  const addedEnd = (n: number) => Math.min(y(n), addedBase - MIN_BAR)
+  const cutEnd = (n: number) => Math.max(y(-n), cutBase + MIN_BAR)
 
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -86,7 +101,8 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
     else if (e.key === 'End') setActive(lastIndex)
   }
 
-  const total = values.reduce((a, b) => a + b, 0)
+  const added = days.reduce((n, d) => n + d.added, 0)
+  const cut = days.reduce((n, d) => n + d.cut, 0)
 
   return (
     <div className="words-chart">
@@ -94,10 +110,26 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
         <h3>
           {what}, last {days.length} days
         </h3>
-        {goal && !asTable ? (
-          <span className="chart-key">
-            <span className="chart-key-line" aria-hidden />
-            Daily goal · {goal.toLocaleString()}
+        {!asTable && (anyCut || goal) ? (
+          <span className="chart-keys">
+            {anyCut && (
+              <>
+                <span className="chart-key">
+                  <span className="chart-key-swatch" aria-hidden />
+                  Added
+                </span>
+                <span className="chart-key">
+                  <span className="chart-key-swatch cut" aria-hidden />
+                  Cut
+                </span>
+              </>
+            )}
+            {goal ? (
+              <span className="chart-key">
+                <span className="chart-key-line" aria-hidden />
+                Daily goal · {goal.toLocaleString()}
+              </span>
+            ) : null}
           </span>
         ) : null}
         <button className="btn ghost small" onClick={() => setAsTable((t) => !t)} aria-pressed={asTable}>
@@ -110,14 +142,20 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
             <thead>
               <tr>
                 <th scope="col">Day</th>
-                <th scope="col">Words</th>
+                <th scope="col" className="num">
+                  Added
+                </th>
+                <th scope="col" className="num">
+                  Cut
+                </th>
               </tr>
             </thead>
             <tbody>
               {[...days].reverse().map((d) => (
                 <tr key={d.day}>
                   <td>{longDate.format(toDate(d.day))}</td>
-                  <td>{signed(d.words)}</td>
+                  <td className="num">{d.added.toLocaleString()}</td>
+                  <td className="num">{d.cut.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -129,7 +167,7 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
           className="chart-plot"
           tabIndex={0}
           role="img"
-          aria-label={`${what}: ${signed(total)} over the last ${days.length} days; today ${signed(values[lastIndex] ?? 0)}. Use the arrow keys to read each day.`}
+          aria-label={`${what}: ${words(added)} added and ${words(cut)} cut over the last ${days.length} days; today ${words(today.added)} added${today.cut ? `, ${words(today.cut)} cut` : ''}. Use the arrow keys to read each day.`}
           onKeyDown={onKey}
           onBlur={() => setActive(null)}
           onPointerLeave={() => setActive(null)}
@@ -139,33 +177,31 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
               <g key={t}>
                 <line className={t === 0 ? 'chart-base' : 'chart-grid'} x1={PAD.left} x2={PAD.left + plotWidth} y1={y(t)} y2={y(t)} />
                 <text className="chart-tick" x={PAD.left - 8} y={y(t)} dy="0.32em" textAnchor="end">
-                  {t.toLocaleString()}
+                  {minus(t)}
                 </text>
               </g>
             ))}
-            {days.map((d, i) =>
-              d.words ? (
-                <path
-                  key={d.day}
-                  className={`chart-bar${d.words < 0 ? ' negative' : ''}${shown === i ? ' active' : ''}`}
-                  d={columnPath(x(i), barWidth, y(0), y(d.words))}
-                />
-              ) : null,
-            )}
+            {/* Added up from the line, cut down from it, a little apart. */}
+            {days.map((d, i) => (
+              <g key={d.day} className={shown === i ? 'active' : undefined}>
+                {d.added > 0 && <path className="chart-bar" d={columnPath(x(i), barWidth, addedBase, addedEnd(d.added))} />}
+                {d.cut > 0 && <path className="chart-bar cut" d={columnPath(x(i), barWidth, cutBase, cutEnd(d.cut))} />}
+              </g>
+            ))}
             {goal ? (
               <line className="chart-goal" x1={PAD.left} x2={PAD.left + plotWidth} y1={y(goal)} y2={y(goal)} />
             ) : null}
-            {/* Only today's column carries its number; the rest are in the tooltip and the table. */}
-            {values[lastIndex] ? (
-              <text
-                className="chart-value"
-                x={x(lastIndex) + barWidth / 2}
-                y={values[lastIndex] > 0 ? y(values[lastIndex]) - 5 : y(values[lastIndex]) + 13}
-                textAnchor="middle"
-              >
-                {signed(values[lastIndex])}
+            {/* Only today's columns carry their numbers; the rest are in the tooltip and the table. */}
+            {today.added > 0 && (
+              <text className="chart-value" x={x(lastIndex) + barWidth / 2} y={addedEnd(today.added) - 5} textAnchor="middle">
+                +{today.added.toLocaleString()}
               </text>
-            ) : null}
+            )}
+            {today.cut > 0 && (
+              <text className="chart-value" x={x(lastIndex) + barWidth / 2} y={cutEnd(today.cut) + 13} textAnchor="middle">
+                −{today.cut.toLocaleString()}
+              </text>
+            )}
             {days.map((d, i) => {
               const back = lastIndex - i
               if (back % 7 !== 0) return null
@@ -175,7 +211,7 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
                 </text>
               )
             })}
-            {/* Hit areas: the whole column of each day, taller and wider than its bar. */}
+            {/* Hit areas: the whole column of each day, taller and wider than its bars. */}
             {days.map((d, i) => (
               <rect
                 key={d.day}
@@ -194,12 +230,12 @@ export function WordsChart({ days, goal, what = 'Words written' }: Props) {
               className="chart-tooltip"
               style={{
                 left: Math.max(60, Math.min(width - 60, x(shown) + barWidth / 2)),
-                top: y(Math.max(0, values[shown])) - 10,
+                top: (days[shown].added ? addedEnd(days[shown].added) : y(0)) - 10,
               }}
             >
-              <strong>{signed(values[shown])} words</strong>
+              <strong>{days[shown].added ? `${words(days[shown].added)} added` : 'Nothing added'}</strong>
+              {days[shown].cut > 0 && <span>{words(days[shown].cut)} cut</span>}
               <span>{longDate.format(toDate(days[shown].day))}</span>
-              {values[shown] < 0 && <span>More cut than written</span>}
             </div>
           )}
         </div>

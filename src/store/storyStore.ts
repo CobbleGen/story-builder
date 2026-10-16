@@ -91,7 +91,9 @@ export const STORY_KEYS = [
   'mindMaps',
   'goals',
   'wordLog',
+  'wordCuts',
   'outlineLog',
+  'outlineCuts',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -107,7 +109,9 @@ export const pickData = (s: StoryData): StoryData => ({
   mindMaps: s.mindMaps,
   goals: s.goals,
   wordLog: s.wordLog,
+  wordCuts: s.wordCuts,
   outlineLog: s.outlineLog,
+  outlineCuts: s.outlineCuts,
 })
 
 /**
@@ -132,10 +136,10 @@ export const useStory = create<StoryStore>()(
         if (name) remember(before, name, target)
         set(pickData(name === 'replaceStory' ? next : ops.logOutline(before, next)))
       }
-      /** Undo and redo change the outline's words as much as any other change. */
+      /** Undo and redo change the outline's words as much as any other change (undoing takes back what was counted). */
       const step = (direction: 'undo' | 'redo') => {
         const before = data()
-        travel(direction, before, (next) => set(pickData(ops.logOutline(before, next))))
+        travel(direction, before, (next) => set(pickData(ops.logOutline(before, next, ops.dayKey(), direction === 'undo'))))
       }
       const withId = <Id extends string | null>([next, id]: [StoryData, Id], name: string, target?: unknown) => {
         apply(next, name, target)

@@ -120,3 +120,15 @@ describe('beats lasting a while in story time', () => {
     expect(timeline(storyOf(data))).toMatch(new RegExp(`${name(columns[1][0]).slice(0, 12)}[^\\n]*lasting until ${name(columns[3][0]).slice(0, 12)}`))
   })
 })
+
+describe('writing progress', () => {
+  it('gives each day’s words added and cut apart', async () => {
+    const { progress } = await import('./progress')
+    const data = { ...buildSampleStory(), goals: { daily: 500 }, wordLog: { '2026-10-15': 620 }, wordCuts: { '2026-10-15': 140, '2026-10-16': 30 } }
+    const text = progress(storyOf(data), '2026-10-16')
+    expect(text).toMatch(/words added and words cut, counted apart; the daily goal is words added/)
+    expect(text).toMatch(/Thu, Oct 15: 620 added, 140 cut/)
+    expect(text).toMatch(/Fri, Oct 16: 0 added, 30 cut/)
+    expect(text).toMatch(/Writing streak: 1 day meeting the daily goal/)
+  })
+})

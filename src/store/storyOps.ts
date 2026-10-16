@@ -27,7 +27,7 @@ import { isDoc, stripBeatLinks, unlinkMentions } from '../lib/richText'
 import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
 import { outlineKind, spreadSteps } from '../lib/outlines'
-import { outlineWords } from '../lib/progress'
+import { netChange, outlineWords, tally, type WordChange } from '../lib/progress'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
@@ -207,31 +207,54 @@ export function dayKey(time: number = Date.now()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** A day's tallies in a pair of logs (words added, words cut), after a change. */
+function logWords(
+  added: Record<string, number>,
+  cuts: Record<string, number>,
+  day: string,
+  change: WordChange,
+): [Record<string, number>, Record<string, number>] {
+  const was = { added: added[day] ?? 0, cut: cuts[day] ?? 0 }
+  const now = tally(was, change)
+  return [
+    now.added === was.added ? added : { ...added, [day]: now.added },
+    now.cut === was.cut ? cuts : { ...cuts, [day]: now.cut },
+  ]
+}
+
 /**
- * Saves a chapter's text. The change in its word count is added to the
- * day's tally in the word log (`day` null to leave the log alone).
+ * Saves a chapter's text, with the words it added and cut counted in the
+ * day's tallies (`day` null to leave them alone). The editor says what was
+ * written and what was cut; otherwise it's worked out from the word count.
  */
 export function setChapterText(
   data: StoryData,
   chapterId: string,
   text: ChapterText,
   day: string | null = dayKey(),
+  change?: WordChange,
 ): StoryData {
   if (!data.chapters.some((c) => c.id === chapterId)) return data
   const next = { ...data, texts: { ...data.texts, [chapterId]: text } }
-  const change = text.words - (data.texts[chapterId]?.words ?? 0)
-  if (!day || !change) return next
-  return { ...next, wordLog: { ...data.wordLog, [day]: (data.wordLog[day] ?? 0) + change } }
+  if (!day) return next
+  const [wordLog, wordCuts] = logWords(
+    data.wordLog,
+    data.wordCuts,
+    day,
+    change ?? netChange(text.words - (data.texts[chapterId]?.words ?? 0)),
+  )
+  return wordLog === data.wordLog && wordCuts === data.wordCuts ? next : { ...next, wordLog, wordCuts }
 }
 
 /**
- * After a change: how many words it added to the outline (or cut from it),
- * added to the day's tally in the outline log.
+ * After a change: the words it added to the outline or cut from it, in the
+ * day's tallies (undoing, it takes back what was counted).
  */
-export function logOutline(before: StoryData, after: StoryData, day: string = dayKey()): StoryData {
+export function logOutline(before: StoryData, after: StoryData, day: string = dayKey(), undo = false): StoryData {
   const change = outlineWords(after).total - outlineWords(before).total
   if (!change) return after
-  return { ...after, outlineLog: { ...after.outlineLog, [day]: (after.outlineLog[day] ?? 0) + change } }
+  const [outlineLog, outlineCuts] = logWords(after.outlineLog, after.outlineCuts, day, netChange(change, undo))
+  return { ...after, outlineLog, outlineCuts }
 }
 
 export function setGoals(data: StoryData, patch: StoryGoals): StoryData {
@@ -259,7 +282,9 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     mindMaps: [defaultMindMap()],
     goals: {},
     wordLog: {},
+    wordCuts: {},
     outlineLog: {},
+    outlineCuts: {},
   }
 }
 
@@ -2116,6 +2141,21 @@ export function normalizeStory(input: unknown): StoryData {
         .slice(-400)
         .map(([day, n]) => [day, Math.round(n as number)]),
     )
+  // Older saves kept one number a day, words added less words cut: a day
+  // with more cut than added is taken as all cut.
+  const logsOf = (adds: unknown, cutsOf: unknown): [Record<string, number>, Record<string, number>] => {
+    const added = logOf(adds)
+    const cuts = logOf(cutsOf)
+    for (const [day, n] of Object.entries(cuts)) if (n < 0) delete cuts[day]
+    for (const [day, n] of Object.entries(added)) {
+      if (n >= 0) continue
+      cuts[day] = (cuts[day] ?? 0) - n
+      delete added[day]
+    }
+    return [added, cuts]
+  }
+  const [wordLog, wordCuts] = logsOf(raw.wordLog, raw.wordCuts)
+  const [outlineLog, outlineCuts] = logsOf(raw.outlineLog, raw.outlineCuts)
 
   return linkMentions({
     title: str(raw.title, 'Untitled story'),
@@ -2128,7 +2168,9 @@ export function normalizeStory(input: unknown): StoryData {
     timeline: cleanTimeline(ids(raw.timeline), beats),
     mindMaps,
     goals,
-    wordLog: logOf(raw.wordLog),
-    outlineLog: logOf(raw.outlineLog),
+    wordLog,
+    wordCuts,
+    outlineLog,
+    outlineCuts,
   })
 }

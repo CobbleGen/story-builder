@@ -214,14 +214,20 @@ assistant such as Claude read all of it and give you feedback (see
 - **Word counts and goals** (the target icon in the top bar, or ⋯): the whole
   draft's words, a goal for the draft and for each day, the last 30 days'
   writing as a chart (or a table), a streak, and every chapter's words
-  against its target.
+  against its target. Words added and words cut are counted apart: the chart
+  shows each day's words added above the line and words cut below it, and
+  the daily goal (and the streak) counts only words added, so cutting never
+  sets you back. Editing a word (a typo fixed) is neither; undo takes back
+  what it undoes; text moved by dragging, or by cutting and pasting it, is
+  neither written nor cut.
 - **Outline words** are counted separately from the manuscript: everything
   written in beats (titles and descriptions), arcs (names and descriptions)
   and chapters' titles and summaries. The top bar shows the count next to
   the manuscript's (or alone, while there's no manuscript yet), and the
   **Outline** tab of word counts has today's and the last 7 days' outline
   words, a streak, a 30-day chart, and the words in each arc. An arc's page
-  shows its words too. Words cut, or undone, come off the day's count.
+  shows its words too. Here too, words cut are counted apart from words
+  added, and undoing takes back what was counted.
 - **Export the manuscript** (⋯ → Export manuscript…) as a Word document, a
   PDF (through the print window), plain text or Markdown, laid out as a
   manuscript: double spaced, each chapter on a new page, with an optional
@@ -371,7 +377,8 @@ any static host or sub-folder.
 - `src/pages/TimelinePage.tsx` and `src/lib/timeline.ts`: the timeline and how
   flashbacks are found
 - `src/pages/WritePage.tsx` and `src/editor/`: the manuscript editor (TipTap),
-  its beat links, mentions and beats checklist
+  its beat links, mentions and beats checklist; `src/editor/wordChanges.ts`:
+  the words each change adds and cuts (with `tally` in `src/lib/progress.ts`)
 - `src/map/containers.ts`: how cards stack on containers, move with them, and
   go onto and off them when dropped
 - `src/map/`: the mind map (React Flow canvas, its cards, notes, lines and

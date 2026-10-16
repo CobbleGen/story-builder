@@ -255,8 +255,14 @@ export interface StoryData {
   /** A story can have several mind maps (card and line ids are unique across them). */
   mindMaps: MindMap[]
   goals: StoryGoals
-  /** Local date (YYYY-MM-DD) -> words added that day, less words cut. */
+  /**
+   * Local date (YYYY-MM-DD) -> words added to the manuscript that day. Words
+   * cut are counted apart, in `wordCuts`, so cutting never takes away from it.
+   */
   wordLog: Record<string, number>
+  /** Local date -> words cut from the manuscript that day. */
+  wordCuts: Record<string, number>
   /** The same for the outline (beats, arcs, chapter titles and summaries), kept apart. */
   outlineLog: Record<string, number>
+  outlineCuts: Record<string, number>
 }

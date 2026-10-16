@@ -31,11 +31,13 @@ export function progress(story: Story, today: string): string {
     )
   }
 
-  const days = recentDays(data.wordLog, today, 14)
-  if (days.some((d) => d.words)) {
+  const days = recentDays(data.wordLog, data.wordCuts, today, 14)
+  if (days.some((d) => d.added || d.cut)) {
     const streak = writingStreak(data.wordLog, today, data.goals.daily)
+    const day = (d: (typeof days)[number]) =>
+      `${dayName.format(new Date(`${d.day}T12:00:00Z`))}: ${d.added.toLocaleString('en')} added${d.cut ? `, ${d.cut.toLocaleString('en')} cut` : ''}`
     out.push(
-      `## The last two weeks (words added, less words cut)\n${days.map((d) => `${dayName.format(new Date(`${d.day}T12:00:00Z`))}: ${d.words.toLocaleString('en')}`).join('\n')}\n${streak ? `Writing streak: ${count(streak, 'day')}${data.goals.daily ? ' meeting the daily goal' : ''}.` : ''}`.trim(),
+      `## The last two weeks (words added and words cut, counted apart; the daily goal is words added)\n${days.map(day).join('\n')}\n${streak ? `Writing streak: ${count(streak, 'day')}${data.goals.daily ? ' meeting the daily goal' : ''}.` : ''}`.trim(),
     )
   } else {
     out.push('## The last two weeks\nNo words written in the manuscript in the last two weeks.')

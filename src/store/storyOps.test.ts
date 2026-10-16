@@ -471,16 +471,32 @@ describe('mind map', () => {
     expect(normalizeStory(withLine).mindMaps[0].edges[0]).toMatchObject({ sourceAnchor: `beat:${beat}`, targetAnchor: `attr:${attr}` })
   })
 
-  it('tallies the words written each day, and keeps goals', () => {
+  it('tallies the words added and cut each day, apart, and keeps goals', () => {
     let { data, ch1, ch2 } = setup()
     const doc = { type: 'doc', content: [] }
     data = setChapterText(data, ch1, { doc, words: 300, updatedAt: 1 }, '2026-09-01')
     data = setChapterText(data, ch1, { doc, words: 250, updatedAt: 2 }, '2026-09-02')
     data = setChapterText(data, ch2, { doc, words: 120, updatedAt: 3 }, '2026-09-02')
     data = setChapterText(data, ch2, { doc, words: 120, updatedAt: 4 }, '2026-09-03')
-    expect(data.wordLog).toEqual({ '2026-09-01': 300, '2026-09-02': 70 })
-    // Saving without a day (the example story) leaves the log alone.
-    expect(setChapterText(data, ch1, { doc, words: 900, updatedAt: 5 }, null).wordLog).toBe(data.wordLog)
+    // Cutting 50 doesn't take away from the 120 added that day
+    expect(data.wordLog).toEqual({ '2026-09-01': 300, '2026-09-02': 120 })
+    expect(data.wordCuts).toEqual({ '2026-09-02': 50 })
+    // The editor says what was written and cut: 40 written, 30 cut over a save
+    data = setChapterText(data, ch2, { doc, words: 130, updatedAt: 5 }, '2026-09-02', { added: 40, cut: 30 })
+    expect([data.wordLog['2026-09-02'], data.wordCuts['2026-09-02']]).toEqual([160, 80])
+    // Undoing: written words undone come off the words added, cut words back off the words cut
+    data = setChapterText(data, ch2, { doc, words: 120, updatedAt: 6 }, '2026-09-02', { added: 0, cut: 0, unwritten: 10 })
+    data = setChapterText(data, ch2, { doc, words: 150, updatedAt: 7 }, '2026-09-02', { added: 0, cut: 0, uncut: 30 })
+    expect([data.wordLog['2026-09-02'], data.wordCuts['2026-09-02']]).toEqual([150, 50])
+    // Undoing more than that day's: the rest counts the other way
+    const next = setChapterText(data, ch2, { doc, words: 50, updatedAt: 8 }, '2026-09-03', { added: 0, cut: 0, unwritten: 100 })
+    expect([next.wordLog['2026-09-03'], next.wordCuts['2026-09-03']]).toEqual([undefined, 100])
+    // No change, no new tallies
+    expect(setChapterText(data, ch2, { doc, words: 150, updatedAt: 9 }, '2026-09-02').wordLog).toBe(data.wordLog)
+    // Saving without a day (the example story) leaves the logs alone.
+    const quiet = setChapterText(data, ch1, { doc, words: 900, updatedAt: 5 }, null)
+    expect([quiet.wordLog, quiet.wordCuts]).toEqual([data.wordLog, data.wordCuts])
+    expect(quiet.wordLog).toBe(data.wordLog)
     data = setGoals(data, { draft: 80000, daily: 500 })
     expect(data.goals).toEqual({ draft: 80000, daily: 500 })
     data = setGoals(data, { daily: 0 })
@@ -488,6 +504,11 @@ describe('mind map', () => {
     const loaded = normalizeStory({ ...data, goals: { draft: -3, daily: 400 }, wordLog: { '2026-09-01': 10, nonsense: 5, '2026-09-02': 'x' } })
     expect(loaded.goals).toEqual({ daily: 400 })
     expect(loaded.wordLog).toEqual({ '2026-09-01': 10 })
+    // Older saves kept words added less words cut: a day with more cut is all cut
+    const old = normalizeStory({ ...data, wordLog: { '2026-09-01': 10, '2026-09-02': -40 }, wordCuts: undefined })
+    expect([old.wordLog, old.wordCuts]).toEqual([{ '2026-09-01': 10 }, { '2026-09-02': 40 }])
+    expect(normalizeStory(old)).toEqual(old)
+    expect(normalizeStory({ ...data, wordCuts: { '2026-09-01': -3, '2026-09-02': 7 } }).wordCuts).toEqual({ '2026-09-02': 7 })
   })
 
   it('counts the outline’s words apart from the manuscript, and tallies them each day', () => {
@@ -505,14 +526,19 @@ describe('mind map', () => {
     expect([counted.beats, counted.byArc[main], counted.byArc[love], counted.total]).toEqual([6, 7, 1, 11])
     data = logOutline(before, data, '2026-09-01')
     expect(data.outlineLog).toEqual({ '2026-09-01': 6 })
-    // Words cut count against the day; changes with no words in them leave the log be
+    // Words cut are counted apart; changes with no words in them leave the logs be
     const longer = data
     data = logOutline(longer, updateBeat(longer, b, { description: '' }), '2026-09-01')
-    expect(data.outlineLog).toEqual({ '2026-09-01': 3 })
+    expect([data.outlineLog, data.outlineCuts]).toEqual([{ '2026-09-01': 6 }, { '2026-09-01': 3 }])
     const placed = placeBeat(data, b, data.chapters[0].id)
     expect(logOutline(data, placed, '2026-09-02')).toBe(placed)
+    // Undoing takes back what was counted: the cut comes off the words cut
+    // (undo brings back the copy as it was, with today's logs)
+    const undone = logOutline(data, { ...longer, outlineLog: data.outlineLog, outlineCuts: data.outlineCuts }, '2026-09-01', true)
+    expect([undone.outlineLog, undone.outlineCuts]).toEqual([{ '2026-09-01': 6 }, { '2026-09-01': 0 }])
     expect(normalizeStory({ ...data, outlineLog: { '2026-09-01': 3, nope: 4 } }).outlineLog).toEqual({ '2026-09-01': 3 })
     expect(normalizeStory({ title: 'Old' }).outlineLog).toEqual({})
+    expect(normalizeStory({ title: 'Old' }).outlineCuts).toEqual({})
   })
 
   it('keeps each chapter’s status and word target', () => {

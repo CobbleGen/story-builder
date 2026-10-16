@@ -9,7 +9,9 @@ import { MentionText } from './MentionText'
 import { StatusPicker } from './StatusPicker'
 import { WordsChart } from './WordsChart'
 
-const signed = (n: number) => (n > 0 ? `+${n.toLocaleString()}` : n < 0 ? `−${Math.abs(n).toLocaleString()}` : '0')
+const plus = (n: number) => (n > 0 ? `+${n.toLocaleString()}` : '0')
+/** What a day's (or week's) words added say beside them: the goal, and what was cut, counted apart. */
+const addedNote = (cut: number, goal?: string) => [goal ?? 'words added', cut ? `${cut.toLocaleString()} cut` : ''].filter(Boolean).join(' · ')
 
 /** A word target to type in: empty for none. Saved on Enter or when leaving the field. */
 function TargetInput({ value, onChange, label, placeholder = 'None' }: { value?: number; onChange: (v: number) => void; label: string; placeholder?: string }) {
@@ -117,16 +119,20 @@ function ManuscriptProgress({ total, close }: { total: number; close: () => void
   const chapters = useStory((s) => s.chapters)
   const goals = useStory((s) => s.goals)
   const log = useStory((s) => s.wordLog)
+  const cuts = useStory((s) => s.wordCuts)
   const setGoals = useStory((s) => s.setGoals)
   const updateChapter = useStory((s) => s.updateChapter)
 
   const today = dayKey()
-  const days = recentDays(log, today, 30)
+  const days = recentDays(log, cuts, today, 30)
+  // The daily goal is words added: cutting never takes away from it.
   const todayWords = log[today] ?? 0
-  const week = days.slice(-7).reduce((n, d) => n + d.words, 0)
+  const week = days.slice(-7)
+  const weekAdded = week.reduce((n, d) => n + d.added, 0)
+  const weekCut = week.reduce((n, d) => n + d.cut, 0)
   const streak = writingStreak(log, today, goals.daily)
   const draftProgress = progressTo(total, goals.draft)
-  const dayProgress = progressTo(Math.max(0, todayWords), goals.daily)
+  const dayProgress = progressTo(todayWords, goals.daily)
 
   return (
     <>
@@ -136,8 +142,12 @@ function ManuscriptProgress({ total, close }: { total: number; close: () => void
           value={total.toLocaleString()}
           note={goals.draft ? `${Math.round((draftProgress ?? 0) * 100)}% of ${goals.draft.toLocaleString()}` : 'words'}
         />
-        <Stat label="Today" value={signed(todayWords)} note={goals.daily ? `of ${goals.daily.toLocaleString()} a day` : 'words'} />
-        <Stat label="Last 7 days" value={signed(week)} note="words" />
+        <Stat
+          label="Today"
+          value={plus(todayWords)}
+          note={addedNote(cuts[today] ?? 0, goals.daily ? `of ${goals.daily.toLocaleString()} a day` : undefined)}
+        />
+        <Stat label="Last 7 days" value={plus(weekAdded)} note={addedNote(weekCut)} />
         <Stat label="Streak" value={`${streak} day${streak === 1 ? '' : 's'}`} note={goals.daily ? 'meeting the daily goal' : 'writing every day'} />
       </div>
 
@@ -158,8 +168,8 @@ function ManuscriptProgress({ total, close }: { total: number; close: () => void
             {goals.daily
               ? todayWords >= goals.daily
                 ? 'Done for today'
-                : `${(goals.daily - Math.max(0, todayWords)).toLocaleString()} to go today`
-              : 'words a day'}
+                : `${(goals.daily - todayWords).toLocaleString()} to go today`
+              : 'words added a day'}
           </span>
         </label>
       </div>
@@ -226,19 +236,23 @@ function OutlineProgress({ outline, close }: { outline: OutlineWords; close: () 
   const arcs = useStory((s) => s.arcs)
   const chapters = useStory((s) => s.chapters)
   const log = useStory((s) => s.outlineLog)
+  const cuts = useStory((s) => s.outlineCuts)
 
   const today = dayKey()
-  const days = recentDays(log, today, 30)
-  const todayWords = log[today] ?? 0
-  const week = days.slice(-7).reduce((n, d) => n + d.words, 0)
+  const days = recentDays(log, cuts, today, 30)
+  const week = days.slice(-7)
   const streak = writingStreak(log, today)
 
   return (
     <>
       <div className="stat-row">
         <Stat label="Outline" value={outline.total.toLocaleString()} note="words" />
-        <Stat label="Today" value={signed(todayWords)} note="words" />
-        <Stat label="Last 7 days" value={signed(week)} note="words" />
+        <Stat label="Today" value={plus(log[today] ?? 0)} note={addedNote(cuts[today] ?? 0)} />
+        <Stat
+          label="Last 7 days"
+          value={plus(week.reduce((n, d) => n + d.added, 0))}
+          note={addedNote(week.reduce((n, d) => n + d.cut, 0))}
+        />
         <Stat label="Streak" value={`${streak} day${streak === 1 ? '' : 's'}`} note="adding to it every day" />
       </div>
       <p className="progress-note">
@@ -246,7 +260,7 @@ function OutlineProgress({ outline, close }: { outline: OutlineWords; close: () 
         counted apart from the manuscript.
       </p>
 
-      <WordsChart days={days} what="Outline words" />
+      <WordsChart days={days} what="Outline words added and cut" />
 
       <h3 className="progress-heading">By arc</h3>
       <div className="progress-table-wrap">

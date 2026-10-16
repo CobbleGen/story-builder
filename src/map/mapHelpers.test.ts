@@ -114,14 +114,25 @@ describe('anchors for lines', () => {
 
 describe('progress', () => {
   it('counts recent days, streaks and totals', async () => {
-    const { daysBefore, recentDays, writingStreak, totalWords, progressTo } = await import('../lib/progress')
+    const { daysBefore, recentDays, writingStreak, totalWords, progressTo, tally, netChange } = await import('../lib/progress')
+    // Words added and cut are counted apart; taking back (undoing) comes off what was counted
+    expect(tally({ added: 100, cut: 10 }, { added: 5, cut: 40 })).toEqual({ added: 105, cut: 50 })
+    expect(tally({ added: 100, cut: 10 }, { added: 0, cut: 0, unwritten: 30, uncut: 4 })).toEqual({ added: 70, cut: 6 })
+    expect(tally({ added: 20, cut: 0 }, { added: 0, cut: 0, unwritten: 50 })).toEqual({ added: 0, cut: 30 })
+    expect(tally({ added: 0, cut: 5 }, { added: 0, cut: 0, uncut: 25 })).toEqual({ added: 20, cut: 0 })
+    expect([netChange(12), netChange(-7), netChange(-7, true), netChange(3, true)]).toEqual([
+      { added: 12, cut: 0 },
+      { added: 0, cut: 7 },
+      { added: 0, cut: 0, unwritten: 7 },
+      { added: 0, cut: 0, uncut: 3 },
+    ])
     expect(daysBefore('2026-03-01', 1)).toBe('2026-02-28')
     expect(daysBefore('2026-01-01', 1)).toBe('2025-12-31')
     const log = { '2026-09-28': 300, '2026-09-29': 120, '2026-09-30': 0, '2026-10-01': 50 }
-    expect(recentDays(log, '2026-10-01', 3)).toEqual([
-      { day: '2026-09-29', words: 120 },
-      { day: '2026-09-30', words: 0 },
-      { day: '2026-10-01', words: 50 },
+    expect(recentDays(log, { '2026-09-30': 80 }, '2026-10-01', 3)).toEqual([
+      { day: '2026-09-29', added: 120, cut: 0 },
+      { day: '2026-09-30', added: 0, cut: 80 },
+      { day: '2026-10-01', added: 50, cut: 0 },
     ])
     expect(writingStreak(log, '2026-10-01')).toBe(1)
     expect(writingStreak({ '2026-09-29': 10, '2026-09-30': 20 }, '2026-10-01')).toBe(2)
