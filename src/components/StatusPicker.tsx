@@ -4,11 +4,11 @@ import { useStory } from '../store/storyStore'
 import { CHAPTER_STATUSES } from '../store/storyOps'
 import { STATUS_LABELS } from '../lib/chapterStatus'
 
-/** A chapter's status (outline, draft, revised, done), as a small coloured pill to change it. */
+/** A chapter's status (outline, draft, revised, done, or shelved for now), as a small coloured pill to change it. */
 export function StatusPicker({ chapter }: { chapter: Chapter }) {
   const updateChapter = useStory((s) => s.updateChapter)
   return (
-    <label className={`status-pill status-${chapter.status}`} title="How far along this chapter is">
+    <label className={`status-pill status-${chapter.status}`} title={chapter.status === 'shelved' ? 'Shelved: set aside for now, left out of the word count and export' : 'How far along this chapter is (or shelve it for now)'}>
       <span className="status-dot" aria-hidden />
       <select
         value={chapter.status}

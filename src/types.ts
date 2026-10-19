@@ -22,8 +22,11 @@ export interface Beat {
   until?: string
 }
 
-/** How far along a chapter is. */
-export type ChapterStatus = 'outline' | 'draft' | 'revised' | 'done'
+/**
+ * How far along a chapter is, or shelved: set aside for now, kept as it is
+ * but left out of the book (its word count and export).
+ */
+export type ChapterStatus = 'outline' | 'draft' | 'revised' | 'done' | 'shelved'
 
 export interface Chapter {
   id: string

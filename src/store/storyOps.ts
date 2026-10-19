@@ -1785,7 +1785,7 @@ export function deleteMindMap(data: StoryData, id: string): StoryData {
 
 // ---------- Integrity ----------
 
-export const CHAPTER_STATUSES: ChapterStatus[] = ['outline', 'draft', 'revised', 'done']
+export const CHAPTER_STATUSES: ChapterStatus[] = ['outline', 'draft', 'revised', 'done', 'shelved']
 
 /** A word target: a whole number of words, or nothing. */
 export function cleanTarget(value: unknown): number | undefined {

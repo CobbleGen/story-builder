@@ -1,6 +1,6 @@
 import type { MapNode } from '../types'
 import { displayName } from '../lib/mentions'
-import { outlineWords, totalWords } from '../lib/progress'
+import { manuscriptWords, outlineWords } from '../lib/progress'
 import { beatsInBook, storyOrder } from '../store/storyOps'
 import { chapterFacts, jumpsOf } from './chapters'
 import { count, kindNoun, type Story } from './story'
@@ -24,11 +24,11 @@ const CARD_KINDS: Record<MapNode['kind'], [string, string]> = {
 export function overview(story: Story): string {
   const { data } = story
   const beats = Object.values(data.beats)
-  const words = totalWords(data.texts)
+  const { total: words, shelved } = manuscriptWords(data)
   const out = [
     `# ${data.title.trim() || 'Untitled story'}`,
     [
-      `${count(data.chapters.length, 'chapter')} · ${count(words, 'word')} written in the manuscript`,
+      `${count(data.chapters.length, 'chapter')} · ${count(words, 'word')} written in the manuscript${shelved ? ` (and ${count(shelved, 'word')} in shelved chapters, set aside for now)` : ''}`,
       `${count(beats.length, 'beat')} planned (${beats.filter((b) => b.done).length} ticked off as written) in ${count(data.arcs.length, 'arc')}`,
       `${count(data.characters.length, 'character')} · ${count(data.elements.length, 'place, object or group', 'places, objects or groups')} · ${count(data.mindMaps.length, 'mind map')}`,
       `${count(outlineWords(data).total, 'word')} of outline notes`,

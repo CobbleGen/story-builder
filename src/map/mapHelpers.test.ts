@@ -114,7 +114,14 @@ describe('anchors for lines', () => {
 
 describe('progress', () => {
   it('counts recent days, streaks and totals', async () => {
-    const { daysBefore, recentDays, writingStreak, totalWords, progressTo, tally, netChange } = await import('../lib/progress')
+    const { daysBefore, recentDays, writingStreak, totalWords, progressTo, tally, netChange, manuscriptWords } = await import('../lib/progress')
+    // The book's words leave shelved chapters out, counted apart
+    const texts = { a: { doc: { type: 'doc' }, words: 100, updatedAt: 0 }, b: { doc: { type: 'doc' }, words: 40, updatedAt: 0 } }
+    const chapters = [
+      { id: 'a', title: '', summary: '', beatIds: [], povCharacterId: null, status: 'draft' as const },
+      { id: 'b', title: '', summary: '', beatIds: [], povCharacterId: null, status: 'shelved' as const },
+    ]
+    expect(manuscriptWords({ chapters, texts })).toEqual({ total: 100, shelved: 40 })
     // Words added and cut are counted apart; taking back (undoing) comes off what was counted
     expect(tally({ added: 100, cut: 10 }, { added: 5, cut: 40 })).toEqual({ added: 105, cut: 50 })
     expect(tally({ added: 100, cut: 10 }, { added: 0, cut: 0, unwritten: 30, uncut: 4 })).toEqual({ added: 70, cut: 6 })

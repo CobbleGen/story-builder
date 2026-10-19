@@ -12,6 +12,7 @@ import {
   type ExportFormat,
   type HeadingStyle,
 } from '../lib/manuscript'
+import { isShelved } from '../lib/chapterStatus'
 import { loadPictures } from '../lib/exportPictures'
 import { downloadBlob, printHtml, slug } from '../lib/download'
 import { plainText } from '../lib/mentions'
@@ -37,6 +38,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const manuscript = useMemo(() => buildManuscript({ title, chapters, texts }, lookup, options), [title, chapters, texts, lookup, options])
   const unwritten = chapters.filter((c) => !texts[c.id]?.words).length
+  const shelved = chapters.filter(isShelved).length
   const format = FORMATS.find((f) => f.id === options.format) ?? FORMATS[0]
   const first = chapters[0]
   const firstTitle = first ? plainText(first.title, lookup).trim() : ''
@@ -152,6 +154,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             )}
           </span>
         </label>
+        {shelved > 0 && (
+          <label className="export-check">
+            <input type="checkbox" checked={options.skipShelved} onChange={(e) => setOptions({ skipShelved: e.target.checked })} />
+            <span>
+              Leave out shelved chapters
+              <span className="muted">
+                {' '}
+                ({shelved} of {chapters.length})
+              </span>
+            </span>
+          </label>
+        )}
       </div>
       {failed && (
         <p className="export-error" role="alert">

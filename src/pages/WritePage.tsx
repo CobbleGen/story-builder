@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
+import { Archive, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
 import { useMentionables, useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -14,6 +14,7 @@ import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
 import { countWords, wordChange } from '../editor/wordChanges'
 import { tally, type WordTally } from '../lib/progress'
+import { isShelved } from '../lib/chapterStatus'
 import type { TextFind } from '../lib/search'
 import { Toolbar } from '../editor/Toolbar'
 import { SelectionMenu } from '../editor/SelectionMenu'
@@ -217,8 +218,11 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     editor,
     selector: ({ editor: e }) => (e ? countWords(e.state.doc) : 0),
   })
-  const totalWords =
-    Object.entries(texts).reduce((sum, [id, t]) => (id === chapter.id ? sum : sum + t.words), 0) + (words ?? 0)
+  // The book's words, this chapter's as they are now (shelved chapters are left out).
+  const totalWords = chapters.reduce(
+    (sum, c) => (isShelved(c) ? sum : sum + (c.id === chapter.id ? (words ?? 0) : (texts[c.id]?.words ?? 0))),
+    0,
+  )
   const todayWords = useStory((s) => s.wordLog[dayKey()] ?? 0)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
 
@@ -240,7 +244,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const prev = chapters[index - 1]
   const next = chapters[index + 1]
   const chapterLabel = (c: Chapter, i: number) =>
-    `Chapter ${i + 1}${c.title ? `: ${plainText(c.title, lookup)}` : ''}`
+    `Chapter ${i + 1}${c.title ? `: ${plainText(c.title, lookup)}` : ''}${isShelved(c) ? ' (shelved)' : ''}`
 
   const openNewBeat = () => {
     const { from, to, empty } = editor.state.selection
@@ -321,6 +325,15 @@ function ChapterWriter({ chapter, index }: WriterProps) {
                 onChange={(summary) => updateChapter(chapter.id, { summary })}
               />
             </header>
+            {isShelved(chapter) && (
+              <div className="write-shelved" role="note">
+                <Archive size={16} aria-hidden />
+                <span>Shelved for now: its words aren’t counted in the manuscript, and it’s left out when you export.</span>
+                <button className="btn ghost small" onClick={() => updateChapter(chapter.id, { status: words ? 'draft' : 'outline' })}>
+                  Put it back
+                </button>
+              </div>
+            )}
             {contentError && (
               <div className="write-error" role="alert">
                 This chapter’s text couldn’t be opened, so editing is paused to keep it safe. You can restore an

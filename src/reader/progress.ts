@@ -1,4 +1,4 @@
-import { outlineWords, recentDays, totalWords, writingStreak } from '../lib/progress'
+import { manuscriptWords, outlineWords, recentDays, writingStreak } from '../lib/progress'
 import { chapterFacts } from './chapters'
 import { count, statusLabel, type Story } from './story'
 
@@ -9,12 +9,12 @@ const dayName = new Intl.DateTimeFormat('en', { weekday: 'short', day: 'numeric'
 /** `today` is a date (YYYY-MM-DD) in the writer's days, which the word log is kept in. */
 export function progress(story: Story, today: string): string {
   const { data } = story
-  const words = totalWords(data.texts)
+  const { total: words, shelved } = manuscriptWords(data)
   const outline = outlineWords(data)
   const beats = Object.values(data.beats)
   const out = [`# Writing progress: ${data.title.trim() || 'Untitled story'}`]
 
-  const lines = [`Manuscript: ${count(words, 'word')}.`]
+  const lines = [`Manuscript: ${count(words, 'word')}${shelved ? ` (shelved chapters, set aside for now, have ${count(shelved, 'more word')} and aren’t counted)` : ''}.`]
   if (data.goals.draft) lines.push(`Goal for the draft: ${count(data.goals.draft, 'word')} (${Math.round((words / data.goals.draft) * 100)}% there).`)
   if (data.goals.daily) lines.push(`Daily goal: ${count(data.goals.daily, 'word')}.`)
   lines.push(`Outline notes (beats, arcs, chapter titles and summaries): ${count(outline.total, 'word')}.`)

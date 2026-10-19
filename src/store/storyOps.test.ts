@@ -547,6 +547,10 @@ describe('mind map', () => {
     data = updateChapter(data, ch1, { status: 'revised', targetWords: 2500.4 })
     expect(data.chapters[0]).toMatchObject({ status: 'revised', targetWords: 2500 })
     expect(updateChapter(data, ch1, { status: 'nonsense' as never })).toBe(data)
+    // Shelved for now: kept as it is, and through a reload
+    const shelved = updateChapter(data, ch1, { status: 'shelved' })
+    expect(shelved.chapters[0].status).toBe('shelved')
+    expect(normalizeStory(shelved).chapters[0].status).toBe('shelved')
     expect(updateChapter(data, ch1, { targetWords: 0 }).chapters[0]).not.toHaveProperty('targetWords')
     // Saves from before statuses: written chapters count as drafts.
     const old = normalizeStory({

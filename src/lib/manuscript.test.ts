@@ -94,6 +94,11 @@ describe('manuscript export', () => {
       ['Chapter 3', null],
     ])
     expect(build(data, { headings: 'number' }).chapters[0]).toMatchObject({ label: 'Chapter 1', title: null })
+    // A shelved chapter is left out unless asked for (its number stays the story's too)
+    const shelved = { ...data, chapters: data.chapters.map((c, i) => (i === 0 ? { ...c, status: 'shelved' as const } : c)) }
+    expect(build(shelved).chapters.map((c) => c.label)).toEqual(['Chapter 3'])
+    expect(build(shelved).words).toBeLessThan(m.words)
+    expect(build(shelved, { skipShelved: false }).chapters.map((c) => c.label)).toEqual(['Chapter 1', 'Chapter 3'])
     expect(aboutWords(12_345)).toBe('about 12,300 words')
     expect(aboutWords(1)).toBe('1 word')
   })

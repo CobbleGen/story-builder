@@ -32,7 +32,7 @@ import { UndoButtons } from './UndoControls'
 import { AccountButton, AssistantDialog } from './Account'
 import { cloud, useCloud } from '../cloud'
 import { useUi } from '../store/uiStore'
-import { outlineWords, totalWords } from '../lib/progress'
+import { manuscriptWords, outlineWords } from '../lib/progress'
 import { SEARCH_KEYS } from '../lib/searchShortcut'
 
 export function TopBar() {
@@ -47,7 +47,9 @@ export function TopBar() {
   const setTheme = useUi((s) => s.setTheme)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
   const setSearchOpen = useUi((s) => s.setSearchOpen)
-  const total = useStory((s) => totalWords(s.texts))
+  // Shelved chapters are left out of the book's count.
+  const total = useStory((s) => manuscriptWords(s).total)
+  const shelved = useStory((s) => manuscriptWords(s).shelved)
   const outline = useStory((s) => outlineWords(s).total)
   const goal = useStory((s) => s.goals.draft)
 
@@ -166,12 +168,12 @@ export function TopBar() {
         <button
           className="topbar-progress"
           onClick={() => setProgressOpen(true)}
-          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript, ${outline.toLocaleString()} in the outline: word counts and goals`}
+          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript${shelved ? ` (${shelved.toLocaleString()} more in shelved chapters)` : ''}, ${outline.toLocaleString()} in the outline: word counts and goals`}
           aria-label="Word counts and goals"
         >
           <Target size={16} />
           {/* While there's only an outline, its count; then the manuscript's, with the outline's beside it where there's room. */}
-          {!total && outline ? (
+          {!total && !shelved && outline ? (
             <span className="topbar-words">{outline.toLocaleString()} outline words</span>
           ) : (
             <>

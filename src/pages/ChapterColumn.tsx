@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
 import { PovPicker } from '../components/PovPicker'
+import { isShelved } from '../lib/chapterStatus'
 import { StatusPicker } from '../components/StatusPicker'
 import { plainText } from '../lib/mentions'
 import { BeatComposer } from '../components/BeatComposer'
@@ -76,7 +77,7 @@ export function ChapterColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}`}
+      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}${isShelved(chapter) ? ' shelved' : ''}`}
       style={{ transform: CSS.Translate.toString(transform), transition, '--pov': pov?.color } as React.CSSProperties}
       aria-label={`Chapter ${number}`}
       data-chapter={chapter.id}

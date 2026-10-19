@@ -5,6 +5,18 @@ import type { StoryData } from '../types'
 export const totalWords = (texts: StoryData['texts']) =>
   Object.values(texts).reduce((n, t) => n + (t.words || 0), 0)
 
+/** The book's words: every chapter's but the shelved ones', which are counted apart. */
+export function manuscriptWords(data: Pick<StoryData, 'chapters' | 'texts'>): { total: number; shelved: number } {
+  let total = 0
+  let shelved = 0
+  for (const c of data.chapters) {
+    const words = data.texts[c.id]?.words || 0
+    if (c.status === 'shelved') shelved += words
+    else total += words
+  }
+  return { total, shelved }
+}
+
 const MENTION = /@\{[^}]+\}/g
 
 /** The words in a piece of stored text, a mention counting as one (as in the manuscript). */

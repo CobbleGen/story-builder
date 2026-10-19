@@ -16,7 +16,7 @@ import { EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, looksLikeKey, ty
 export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change anything.
 
 How a story is organised:
-- Chapters, in reading order, hold the manuscript. Each has a status (outline, draft, revised or done), and may have a summary, a word target and a point-of-view character.
+- Chapters, in reading order, hold the manuscript. Each has a status (outline, draft, revised or done, or shelved: set aside for now and left out of the book's word count and export), and may have a summary, a word target and a point-of-view character.
 - Beats are the planned events of the story. Each belongs to an arc (a storyline, plot thread or relationship) and is placed in a chapter, in order, or not placed yet. The writer ticks a beat off when it's written, and can link it to the passage that tells it.
 - Story time is the order things happen in the story's world, which can differ from the reading order (flashbacks, flash-forwards). Beats in different arcs can share a moment, happening at once. Two lines mark where the book begins and ends in story time: beats before are backstory, beats after are aftermath. A beat's "when" is the writer's own note ("The next morning").
 - Characters, and places, objects and groups, have a description and details the writer defines (Age, Wants, Fears…). Names in any text can be links (@mentions) to them.

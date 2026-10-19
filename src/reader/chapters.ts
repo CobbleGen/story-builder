@@ -114,8 +114,14 @@ export function readManuscript(story: Story, from = 1, to?: number, budget = MAN
   for (let n = from; n <= last; n++) {
     const c = chapters[n - 1]
     const doc = story.data.texts[c.id]?.doc
-    const paragraphs = doc ? textParagraphs(doc, story) : []
-    const text = paragraphs.length ? paragraphs.join('\n\n') : '(Nothing written yet.)'
+    // Shelved chapters are set aside, not part of the book: named, but their text only from read_chapter.
+    const shelved = c.status === 'shelved'
+    const paragraphs = doc && !shelved ? textParagraphs(doc, story) : []
+    const text = shelved
+      ? `(Shelved: set aside for now and not part of the book${wordsIn(story, c) ? `; read_chapter ${n} has its ${count(wordsIn(story, c), 'word')}` : ''}.)`
+      : paragraphs.length
+        ? paragraphs.join('\n\n')
+        : '(Nothing written yet.)'
     if (used > 0 && used + text.length > budget) {
       next = `To carry on: read_manuscript with from_chapter ${n}.`
       break

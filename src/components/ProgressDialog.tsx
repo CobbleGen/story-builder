@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useStory } from '../store/storyStore'
 import { useUi, type ProgressTab } from '../store/uiStore'
 import { dayKey } from '../store/storyOps'
-import { outlineWords, progressTo, recentDays, totalWords, writingStreak, type OutlineWords } from '../lib/progress'
+import { manuscriptWords, outlineWords, progressTo, recentDays, writingStreak, type OutlineWords } from '../lib/progress'
+import { isShelved } from '../lib/chapterStatus'
 import { Modal } from './Modal'
 import { MentionText } from './MentionText'
 import { StatusPicker } from './StatusPicker'
@@ -84,9 +85,9 @@ export function ProgressDialog() {
   const beats = useStory((s) => s.beats)
   const outline = useMemo(() => outlineWords({ beats, arcs, chapters }), [beats, arcs, chapters])
   const close = () => setOpen(false)
-  const total = totalWords(texts)
-  // Until one is picked: the outline, while that's all there is.
-  const tab = picked ?? (!total && outline.total ? 'outline' : 'manuscript')
+  const { total, shelved } = manuscriptWords({ chapters, texts })
+  // Until one is picked: the outline, while that's all there is (shelved chapters' words count as a manuscript).
+  const tab = picked ?? (!total && !shelved && outline.total ? 'outline' : 'manuscript')
   const counts: Record<ProgressTab, number> = { manuscript: total, outline: outline.total }
 
   return (
@@ -108,13 +109,17 @@ export function ProgressDialog() {
           ))}
         </div>
       </div>
-      {tab === 'manuscript' ? <ManuscriptProgress total={total} close={close} /> : <OutlineProgress outline={outline} close={close} />}
+      {tab === 'manuscript' ? (
+        <ManuscriptProgress total={total} shelved={shelved} close={close} />
+      ) : (
+        <OutlineProgress outline={outline} close={close} />
+      )}
     </Modal>
   )
 }
 
-/** The manuscript's words: today's and lately, goals, and each chapter's. */
-function ManuscriptProgress({ total, close }: { total: number; close: () => void }) {
+/** The manuscript's words: today's and lately, goals, and each chapter's (shelved ones apart). */
+function ManuscriptProgress({ total, shelved, close }: { total: number; shelved: number; close: () => void }) {
   const texts = useStory((s) => s.texts)
   const chapters = useStory((s) => s.chapters)
   const goals = useStory((s) => s.goals)
@@ -140,7 +145,12 @@ function ManuscriptProgress({ total, close }: { total: number; close: () => void
         <Stat
           label="Manuscript"
           value={total.toLocaleString()}
-          note={goals.draft ? `${Math.round((draftProgress ?? 0) * 100)}% of ${goals.draft.toLocaleString()}` : 'words'}
+          note={[
+            goals.draft ? `${Math.round((draftProgress ?? 0) * 100)}% of ${goals.draft.toLocaleString()}` : 'words',
+            shelved ? `${shelved.toLocaleString()} shelved` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         />
         <Stat
           label="Today"
@@ -198,7 +208,7 @@ function ManuscriptProgress({ total, close }: { total: number; close: () => void
             {chapters.map((c, i) => {
               const words = texts[c.id]?.words ?? 0
               return (
-                <tr key={c.id}>
+                <tr key={c.id} className={isShelved(c) ? 'shelved' : undefined}>
                   <td>
                     <Link to={`/write/${c.id}`} className="progress-chapter" onClick={close}>
                       <span className="progress-num">{i + 1}</span>

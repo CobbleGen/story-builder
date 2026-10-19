@@ -13,6 +13,15 @@ assistant such as Claude read all of it and give you feedback (see
   chapter by its "Chapter N" label to reorder the book (numbers update
   automatically). Each chapter has a **status** (outline, draft, revised,
   done) shown as a coloured pill, and can have a word target.
+- **Shelved chapters**: set a chapter's status to **Shelved** to set it aside
+  for now. It keeps its place, text and beats, but looks set aside (a dashed,
+  hatched card; marked on the timeline strip and in the manuscript), and its
+  words are left out of the manuscript's count and the draft goal (shown
+  apart, as "shelved") and out of the export (unless you tick it back in).
+  Writing in it still counts toward the day's words. "Put it back" on its
+  manuscript page makes it a draft again. Chapter numbers stay as on the
+  board, so move a shelved chapter to the end to keep the export's numbers
+  in a row.
 - **Beats** are cards, colour-coded by the **arc** they belong to. Click a
   beat to edit its title and notes, or to change its arc or chapter.
 - **Arcs sidebar** (left, collapsible) lists every arc. Click an arc to

@@ -132,3 +132,18 @@ describe('writing progress', () => {
     expect(text).toMatch(/Writing streak: 1 day meeting the daily goal/)
   })
 })
+
+describe('shelved chapters', () => {
+  it('leaves them out of the book’s words and reads them only on their own', () => {
+    let data = buildSampleStory()
+    const logbook = data.chapters[2]
+    const words = data.texts[logbook.id].words
+    data = { ...data, chapters: data.chapters.map((c) => (c.id === logbook.id ? { ...c, status: 'shelved' as const } : c)) }
+    const story = storyOf(data)
+    expect(overview(story)).toMatch(new RegExp(`0 words written in the manuscript \\(and ${words} words in shelved chapters, set aside for now\\)`))
+    expect(readChapter(story, 3)).toMatch(/status: shelved/)
+    const manuscript = readManuscript(story)
+    expect(manuscript).toMatch(new RegExp(`## Chapter 3: The Logbook\\n\\n\\(Shelved: set aside for now and not part of the book; read_chapter 3 has its ${words} words\\.\\)`))
+    expect(readChapter(story, 3)).toMatch(/She started with the desk/)
+  })
+})

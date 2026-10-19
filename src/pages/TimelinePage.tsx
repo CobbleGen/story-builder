@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core'
 import { restrictToHorizontalAxis, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
+import { Archive, Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
 import type { Arc, Beat, Chapter } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type TimelineMode } from '../store/uiStore'
@@ -44,6 +44,7 @@ import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ChapterTag } from '../components/ChapterTag'
 import { PovPicker } from '../components/PovPicker'
+import { isShelved } from '../lib/chapterStatus'
 import { StatusPicker } from '../components/StatusPicker'
 
 const MODES: { mode: TimelineMode; label: string }[] = [
@@ -1366,13 +1367,16 @@ function ChapterHeading({
           {number}
         </div>
       )}
-      <div className={`tl-span tl-chapter${open ? ' open' : ''}`} style={{ gridRow: 1, gridColumn: `${from + 2} / ${to + 2}` }}>
+      <div
+        className={`tl-span tl-chapter${open ? ' open' : ''}${isShelved(chapter) ? ' shelved' : ''}`}
+        style={{ gridRow: 1, gridColumn: `${from + 2} / ${to + 2}` }}
+      >
         <button
           className="tl-chapter-info"
           onClick={onOpen}
           onDoubleClick={write}
           aria-expanded={open}
-          aria-label={`Chapter ${number}${title ? `: ${title}` : ''}${pov ? `, told by ${povName}` : ''}. Change its title, point of view or status`}
+          aria-label={`Chapter ${number}${title ? `: ${title}` : ''}${pov ? `, told by ${povName}` : ''}${isShelved(chapter) ? ', shelved' : ''}. Change its title, point of view or status`}
           title="Click to change its title, point of view or status, double-click to write it"
         >
           <span className={`tl-chapter-name${title ? '' : ' untitled'}`}>{title ? <MentionText text={chapter.title} /> : 'Untitled'}</span>
@@ -1380,6 +1384,12 @@ function ChapterHeading({
             <span className="tl-chapter-pov" style={{ '--char': pov.color } as React.CSSProperties}>
               <Eye size={12} aria-hidden />
               {povName}
+            </span>
+          )}
+          {isShelved(chapter) && (
+            <span className="tl-chapter-shelved">
+              <Archive size={12} aria-hidden />
+              Shelved
             </span>
           )}
         </button>
