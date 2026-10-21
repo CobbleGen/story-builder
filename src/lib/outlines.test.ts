@@ -17,6 +17,8 @@ describe('arc outlines', () => {
       })
     }
     expect(outlineKind('heros-journey')?.steps).toHaveLength(12)
+    expect(outlineKind('detective-thriller')).toMatchObject({ group: 'Genres', name: 'Detective thriller' })
+    expect(outlineKind('detective-thriller')?.steps).toHaveLength(14)
     expect(outlineKind('nope')).toBeUndefined()
   })
 

@@ -44,8 +44,8 @@ assistant such as Claude read all of it and give you feedback (see
   Cat! beat sheet, the seven-point structure, Freytag's pyramid, the
   Fichtean curve, Kishōtenketsu, the story spine, the Hero's Journey, the
   story circle, the Heroine's Journey, positive, negative and flat character
-  arcs, and mystery, romance and heist outlines, each shown with its steps
-  before you choose. The steps then show beside the beats they fall on
+  arcs, and mystery (whodunit), detective thriller, romance and heist
+  outlines, each shown with its steps before you choose. The steps then show beside the beats they fall on
   (spread over the beats by where each falls in the arc), each saying what
   should happen there. Drag a step to another beat, or onto **On no beat
   yet**, or click it to read it in full and choose its beat. **Spread out**
