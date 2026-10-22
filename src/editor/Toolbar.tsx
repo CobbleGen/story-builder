@@ -4,6 +4,7 @@ import { useEditorState } from '@tiptap/react'
 import { insertPictures } from './picture'
 import {
   Bold,
+  Focus,
   ImagePlus,
   Italic,
   List,
@@ -47,7 +48,7 @@ const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator
 
 type Block = 'paragraph' | 'h1' | 'h2' | 'h3'
 
-export function Toolbar({ editor }: { editor: Editor }) {
+export function Toolbar({ editor, onFocusMode, focusKeys }: { editor: Editor; onFocusMode?: () => void; focusKeys?: string }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const state = useEditorState({
     editor,
@@ -144,6 +145,14 @@ export function Toolbar({ editor }: { editor: Editor }) {
       >
         <RemoveFormatting size={17} />
       </ToolButton>
+      {onFocusMode && (
+        <>
+          <span className="tool-sep" />
+          <ToolButton label="Focus mode: only the page on screen" shortcut={focusKeys} onClick={onFocusMode}>
+            <Focus size={17} />
+          </ToolButton>
+        </>
+      )}
     </div>
   )
 }

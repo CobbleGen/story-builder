@@ -4114,6 +4114,114 @@ a {
   right: 16px;
 }
 
+/* ---------- Focus mode: only the page ---------- */
+
+.focus-mode .topbar,
+.write-page.focus .chapter-nav {
+  display: none;
+}
+
+.write-page.focus {
+  background: var(--paper);
+}
+
+.write-page.focus .write-paper {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.write-page.focus .write-paper.has-pov {
+  box-shadow: none;
+}
+
+/* The toolbar and the status line wait, faint, until the pointer comes near. */
+.write-page.focus .write-toolbar-row,
+.write-page.focus .write-status {
+  border-color: transparent;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.write-page.focus .write-toolbar-row:hover,
+.write-page.focus .write-toolbar-row:focus-within,
+.write-page.focus .write-status:hover,
+.write-page.focus .write-status:focus-within {
+  opacity: 1;
+}
+
+/* Room below the last line, so it too can come up to the middle. */
+.write-page.typewriter .write-scroll {
+  padding-bottom: 55vh;
+}
+
+.write-page.fade-others .manuscript .ProseMirror > * {
+  opacity: 0.28;
+  transition: opacity 0.2s;
+}
+
+.write-page.fade-others .manuscript .ProseMirror > .is-current,
+.write-page.fade-others .manuscript .ProseMirror:not(:focus) > * {
+  opacity: 1;
+}
+
+.focus-controls {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.focus-controls:hover,
+.focus-controls:focus-within {
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .focus-controls {
+    left: 8px;
+    border-radius: 9px;
+    background: var(--paper);
+    opacity: 0.85;
+  }
+}
+
+.focus-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.focus-toggle:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+.focus-toggle.on {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.focus-toggle.exit {
+  color: var(--ink-2);
+}
+
 .write-status {
   display: flex;
   align-items: center;

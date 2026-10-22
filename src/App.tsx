@@ -33,6 +33,8 @@ export default function App() {
   const saveFailed = useSaveStatus((s) => s.status === 'error')
   const progressOpen = useUi((s) => s.progressOpen)
   const searchOpen = useUi((s) => s.searchOpen)
+  // Focus mode (on the manuscript page) takes the top bar away too.
+  const focusMode = useUi((s) => s.focusMode)
   useEffect(() => {
     if (!loaded) return
     tidyPicturesSoon()
@@ -44,7 +46,7 @@ export default function App() {
   return (
     <HashRouter>
       <Trail />
-      <div className="app">
+      <div className={`app${focusMode ? ' focus-mode' : ''}`}>
         <TopBar />
         <Routes>
           <Route path="/" element={<BoardPage />} />

@@ -32,6 +32,12 @@ interface UiState {
   showArcColors: boolean
   /** Manuscript: the beats checklist is open. */
   beatsPanelOpen: boolean
+  /** Manuscript: focus mode, only the page on screen. */
+  focusMode: boolean
+  /** Focus mode: the line being written stays in the middle of the screen. */
+  typewriter: boolean
+  /** Focus mode: the paragraphs around the one being written fade. */
+  fadeOthers: boolean
   /** Chapter last opened in the manuscript. */
   lastChapterId: string | null
   /** Where each mind map was last scrolled and zoomed to, by map id. */
@@ -60,6 +66,9 @@ interface UiState {
   openBeat: (beatId: string | null) => void
   toggleArcColors: () => void
   toggleBeatsPanel: () => void
+  setFocusMode: (on: boolean) => void
+  toggleTypewriter: () => void
+  toggleFadeOthers: () => void
   setLastChapterId: (chapterId: string) => void
   setMapViewport: (mapId: string, viewport: MapViewport) => void
   setLastMapId: (mapId: string) => void
@@ -88,6 +97,9 @@ export const useUi = create<UiState>()(
       editingBeatId: null,
       showArcColors: true,
       beatsPanelOpen: typeof window === 'undefined' || window.innerWidth > 760,
+      focusMode: false,
+      typewriter: true,
+      fadeOthers: false,
       lastChapterId: null,
       mapViewports: {},
       lastMapId: null,
@@ -108,6 +120,9 @@ export const useUi = create<UiState>()(
       openBeat: (editingBeatId) => set({ editingBeatId }),
       toggleArcColors: () => set((s) => ({ showArcColors: !s.showArcColors })),
       toggleBeatsPanel: () => set((s) => ({ beatsPanelOpen: !s.beatsPanelOpen })),
+      setFocusMode: (focusMode) => set({ focusMode }),
+      toggleTypewriter: () => set((s) => ({ typewriter: !s.typewriter })),
+      toggleFadeOthers: () => set((s) => ({ fadeOthers: !s.fadeOthers })),
       setLastChapterId: (lastChapterId) => set({ lastChapterId }),
       setMapViewport: (mapId, viewport) => set((s) => ({ mapViewports: { ...s.mapViewports, [mapId]: viewport } })),
       setLastMapId: (lastMapId) => set({ lastMapId }),
@@ -142,6 +157,8 @@ export const useUi = create<UiState>()(
         lastArcId: s.lastArcId,
         showArcColors: s.showArcColors,
         beatsPanelOpen: s.beatsPanelOpen,
+        typewriter: s.typewriter,
+        fadeOthers: s.fadeOthers,
         lastChapterId: s.lastChapterId,
         mapViewports: s.mapViewports,
         lastMapId: s.lastMapId,

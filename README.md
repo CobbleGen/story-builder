@@ -80,6 +80,13 @@ assistant such as Claude read all of it and give you feedback (see
   first and tick it to colour that text in the beat's arc. A switch turns the
   arc colours on and off. Select text and choose **New beat** to make a beat
   from it. Arrows on either side move to the previous and next chapter.
+- **Focus mode** (the last button in the manuscript's toolbar, or Ctrl+Shift+F,
+  ⌘⇧F on a Mac): only the page on screen. The top bar, beats and arrows go
+  away; the toolbar and word count wait, faint, until the pointer comes
+  near. Its controls (top right) turn on **typewriter scrolling** (the line
+  you're writing stays in the middle of the screen), **fade others** (the
+  paragraphs around the one you're writing fade), and full screen. Esc, the
+  same keys or **Exit focus** leave it; the choices are remembered.
 - **Mind map** (third tab) is an endless board to think on. Drag chapters,
   arcs, characters and beats onto it from the panel on the left (or click
   one to drop it in the middle); the cards show the live item and open it on

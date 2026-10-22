@@ -12,6 +12,9 @@ import { BEAT_MARK, MENTION_NODE } from '../lib/richText'
 import { manuscriptExtensions } from '../editor/extensions'
 import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
+import { CurrentBlock } from '../editor/currentBlock'
+import { FocusControls } from '../editor/FocusControls'
+import { FOCUS_KEYS, leaveFocus } from '../lib/focus'
 import { countWords, wordChange } from '../editor/wordChanges'
 import { tally, type WordTally } from '../lib/progress'
 import { isShelved } from '../lib/chapterStatus'
@@ -40,12 +43,35 @@ function titleFrom(text: string): { title: string; description: string } {
   return { title: `${cut.trim()}…`, description: text }
 }
 
+/** Focus mode's keys: Ctrl+Shift+F (⌘⇧F) in and out, Esc out. Leaving the manuscript leaves it too. */
+function useFocusKeys() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        if (useUi.getState().focusMode) leaveFocus()
+        else useUi.getState().setFocusMode(true)
+      } else if (e.key === 'Escape' && useUi.getState().focusMode && !e.defaultPrevented) {
+        // Not while a dialog, menu or mention list is open: Esc is theirs.
+        if (document.querySelector('.modal, .mention-popup, [role="menu"]')) return
+        leaveFocus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      leaveFocus()
+    }
+  }, [])
+}
+
 export default function WritePage() {
   const { chapterId } = useParams()
   const chapters = useStory((s) => s.chapters)
   const lastChapterId = useUi((s) => s.lastChapterId)
   const epoch = useStoryEpoch((s) => s.epoch)
   const index = chapters.findIndex((c) => c.id === chapterId)
+  useFocusKeys()
 
   if (chapters.length === 0) return <NoChapters />
   if (index === -1) {
@@ -86,6 +112,10 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const setChapterText = useStory((s) => s.setChapterText)
   const addBeat = useStory((s) => s.addBeat)
   const showArcColors = useUi((s) => s.showArcColors)
+  const focusMode = useUi((s) => s.focusMode)
+  const typewriter = useUi((s) => s.focusMode && s.typewriter)
+  const fadeOthers = useUi((s) => s.focusMode && s.fadeOthers)
+  const setFocusMode = useUi((s) => s.setFocusMode)
   const beatsPanelOpen = useUi((s) => s.beatsPanelOpen)
   const toggleBeatsPanel = useUi((s) => s.toggleBeatsPanel)
   const setLastChapterId = useUi((s) => s.setLastChapterId)
@@ -117,7 +147,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     setChapterText(chapter.id, { doc: doc.toJSON(), words: countWords(doc), updatedAt: Date.now() }, dayKey(), change)
   }, [chapter.id, setChapterText])
 
-  const extensions = useMemo(() => manuscriptExtensions(`Start writing chapter ${index + 1}…`), [index])
+  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock], [index])
   const editor = useEditor({
     extensions,
     content: useStory.getState().texts[chapter.id]?.doc ?? '',
@@ -214,6 +244,37 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     navigate('.', { replace: true, state: null })
   }, [find, editor, lookup, navigate, location.key])
 
+  // Typewriter scrolling: the line being written stays near the middle, as you type or move with the keys.
+  const scroller = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!typewriter || !editor || editor.isDestroyed) return
+    let byKeys = true
+    const center = () => {
+      const el = scroller.current
+      const { selection } = editor.state
+      if (!el || !selection.empty || !editor.isFocused) return
+      const caret = editor.view.coordsAtPos(selection.head)
+      const box = el.getBoundingClientRect()
+      const off = (caret.top + caret.bottom) / 2 - (box.top + box.height * 0.45)
+      if (Math.abs(off) > 2) el.scrollBy({ top: off })
+    }
+    const onSelect = () => byKeys && center()
+    const keys = () => (byKeys = true)
+    const pointer = () => (byKeys = false)
+    const dom = editor.view.dom
+    dom.addEventListener('keydown', keys)
+    dom.addEventListener('pointerdown', pointer)
+    editor.on('update', center)
+    editor.on('selectionUpdate', onSelect)
+    center()
+    return () => {
+      dom.removeEventListener('keydown', keys)
+      dom.removeEventListener('pointerdown', pointer)
+      editor.off('update', center)
+      editor.off('selectionUpdate', onSelect)
+    }
+  }, [typewriter, editor])
+
   const words = useEditorState({
     editor,
     selector: ({ editor: e }) => (e ? countWords(e.state.doc) : 0),
@@ -270,9 +331,11 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const saveLabel = saveStatus === 'error' ? 'Not saved' : dirty || saveStatus === 'saving' ? 'Saving…' : 'Saved'
 
   return (
-    <div className={`write-page${showArcColors ? ' show-arcs' : ''}`}>
+    <div
+      className={`write-page${showArcColors ? ' show-arcs' : ''}${focusMode ? ' focus' : ''}${typewriter ? ' typewriter' : ''}${fadeOthers ? ' fade-others' : ''}`}
+    >
       <style>{beatCss}</style>
-      {beatsPanelOpen ? (
+      {focusMode ? null : beatsPanelOpen ? (
         <BeatsPanel chapter={chapter} editor={editor} onHover={setHovered} />
       ) : (
         <button className="beats-rail" onClick={toggleBeatsPanel} title="Show beats" aria-label="Show beats">
@@ -284,9 +347,9 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       )}
       <div className="write-stage">
         <div className="write-toolbar-row">
-          <Toolbar editor={editor} />
+          <Toolbar editor={editor} onFocusMode={focusMode ? undefined : () => setFocusMode(true)} focusKeys={FOCUS_KEYS} />
         </div>
-        <div className="write-scroll">
+        <div className="write-scroll" ref={scroller}>
           <article className={`write-paper${pov ? ' has-pov' : ''}`} style={{ '--pov': pov?.color } as React.CSSProperties}>
             <header className="write-head">
               <div className="write-meta">
@@ -352,6 +415,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
             </footer>
           </article>
         </div>
+        {focusMode && <FocusControls />}
         {prev && (
           <Link to={`/write/${prev.id}`} className="chapter-nav prev" title={`Previous: ${chapterLabel(prev, index - 1)}`} aria-label={`Previous chapter: ${chapterLabel(prev, index - 1)}`}>
             <ChevronLeft size={22} />
