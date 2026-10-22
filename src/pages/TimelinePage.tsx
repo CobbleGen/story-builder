@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/core'
 import { restrictToHorizontalAxis, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { Archive, Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
+import { Book, BookOpen, Check, Eye, FastForward, GripVertical, History, ListRestart, PenLine, Plus, Rewind, X } from 'lucide-react'
 import type { Arc, Beat, Chapter } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type TimelineMode } from '../store/uiStore'
@@ -44,8 +44,6 @@ import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ChapterTag } from '../components/ChapterTag'
 import { PovPicker } from '../components/PovPicker'
-import { isShelved } from '../lib/chapterStatus'
-import { StatusPicker } from '../components/StatusPicker'
 
 const MODES: { mode: TimelineMode; label: string }[] = [
   { mode: 'story', label: 'Story order' },
@@ -1368,7 +1366,7 @@ function ChapterHeading({
         </div>
       )}
       <div
-        className={`tl-span tl-chapter${open ? ' open' : ''}${isShelved(chapter) ? ' shelved' : ''}`}
+        className={`tl-span tl-chapter${open ? ' open' : ''}`}
         style={{ gridRow: 1, gridColumn: `${from + 2} / ${to + 2}` }}
       >
         <button
@@ -1376,20 +1374,14 @@ function ChapterHeading({
           onClick={onOpen}
           onDoubleClick={write}
           aria-expanded={open}
-          aria-label={`Chapter ${number}${title ? `: ${title}` : ''}${pov ? `, told by ${povName}` : ''}${isShelved(chapter) ? ', shelved' : ''}. Change its title, point of view or status`}
-          title="Click to change its title, point of view or status, double-click to write it"
+          aria-label={`Chapter ${number}${title ? `: ${title}` : ''}${pov ? `, told by ${povName}` : ''}. Change its title or point of view`}
+          title="Click to change its title or point of view, double-click to write it"
         >
           <span className={`tl-chapter-name${title ? '' : ' untitled'}`}>{title ? <MentionText text={chapter.title} /> : 'Untitled'}</span>
           {pov && (
             <span className="tl-chapter-pov" style={{ '--char': pov.color } as React.CSSProperties}>
               <Eye size={12} aria-hidden />
               {povName}
-            </span>
-          )}
-          {isShelved(chapter) && (
-            <span className="tl-chapter-shelved">
-              <Archive size={12} aria-hidden />
-              Shelved
             </span>
           )}
         </button>
@@ -1427,7 +1419,6 @@ function ChapterDetails({ chapter, number, onClose }: { chapter: Chapter; number
     <div ref={ref} className="tl-chapter-pop" role="dialog" aria-label={`Chapter ${number}`} onPointerDown={(e) => e.stopPropagation()}>
       <div className="tl-chapter-pop-head">
         <span className="tl-chapter-pop-number">Chapter {number}</span>
-        <StatusPicker chapter={chapter} />
         <Link to={`/write/${chapter.id}`} className="chapter-write tl-chapter-pop-write" title="Open this chapter in the manuscript">
           <PenLine size={13} />
           Write

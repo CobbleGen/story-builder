@@ -18,9 +18,19 @@ export const ARCHIVE_NOUNS: Record<ArchiveKind, string> = {
   map: 'map',
 }
 
-/** The archived item an id belongs to (the thing itself, or something that went with it, like a chapter's beats). */
-export function archivedWith(data: Pick<StoryData, 'archive'>, id: string): ArchivedItem | undefined {
-  return data.archive.find(
+/**
+ * Whether something archived is the open draft's: chapters, arcs and beats
+ * are their draft's (and brought back there); characters, places and maps
+ * are every draft's.
+ */
+export const inOpenDraft = (data: Pick<StoryData, 'draft'>) => (item: ArchivedItem) => !item.draft || item.draft === data.draft
+
+/** What's archived from the open draft, and from every draft. */
+export const archiveHere = (data: Pick<StoryData, 'archive' | 'draft'>) => data.archive.filter(inOpenDraft(data))
+
+/** The archived item an id belongs to (the thing itself, or something that went with it, like a chapter's beats), in the open draft. */
+export function archivedWith(data: Pick<StoryData, 'archive' | 'draft'>, id: string): ArchivedItem | undefined {
+  return archiveHere(data).find(
     (a) =>
       a.id === id ||
       a.beats.some((b) => b.id === id) ||
@@ -39,9 +49,9 @@ export function archivedBeatIds(data: Pick<StoryData, 'archive'>): string[] {
   return data.archive.flatMap((a) => a.beats.map((b) => b.id))
 }
 
-/** The archived text of a chapter, if it's archived. */
-export function archivedText(data: Pick<StoryData, 'archive'>, chapterId: string): ChapterText | undefined {
-  for (const a of data.archive) if (a.texts[chapterId]) return a.texts[chapterId]
+/** The archived text of a chapter, if it's archived from the open draft. */
+export function archivedText(data: Pick<StoryData, 'archive' | 'draft'>, chapterId: string): ChapterText | undefined {
+  for (const a of archiveHere(data)) if (a.texts[chapterId]) return a.texts[chapterId]
   return undefined
 }
 
@@ -114,7 +124,10 @@ export function archiveOf(value: unknown): ArchivedItem[] {
   for (const raw of Array.isArray(value) ? value.filter(isRecord) : []) {
     const kind = raw.kind as ArchiveKind
     const id = str(raw.id)
-    if (!ARCHIVE_KINDS.includes(kind) || !id || seen.has(id)) continue
+    // (A copied draft's chapters, arcs and beats are the same as the first one's: each may be archived from both.)
+    const from = typeof raw.draft === 'string' && raw.draft ? raw.draft : undefined
+    const key = `${from ?? ''}:${id}`
+    if (!ARCHIVE_KINDS.includes(kind) || !id || seen.has(key)) continue
     const texts: Record<string, ChapterText> = {}
     for (const [chapterId, t] of Object.entries(isRecord(raw.texts) ? raw.texts : {})) {
       if (!isRecord(t) || !isDoc(t.doc)) continue
@@ -132,7 +145,6 @@ export function archiveOf(value: unknown): ArchivedItem[] {
             summary: str(c.summary),
             beatIds: ids(c.beatIds),
             povCharacterId: typeof c.povCharacterId === 'string' ? c.povCharacterId : null,
-            status: str(c.status, 'outline'),
           }) as Chapter,
       ),
       arcs: list(raw.arcs).map((a) => ({
@@ -194,7 +206,8 @@ export function archiveOf(value: unknown): ArchivedItem[] {
       })),
     }
     if (!mainOf(item)) continue
-    seen.add(id)
+    if (from) item.draft = from
+    seen.add(key)
     out.push(item)
   }
   return out

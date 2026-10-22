@@ -195,7 +195,7 @@ export function buildSampleStory(): StoryData {
         ? 1
         : (node.content ?? []).reduce((n, c) => n + countWords(c), 0)
   data = setChapterText(data, ch3, { doc: logbook, words: countWords(logbook), updatedAt: Date.now() }, null)
-  data = updateChapter(data, ch3, { status: 'draft', targetWords: 3000 })
+  data = updateChapter(data, ch3, { targetWords: 3000 })
 
   // A small mind map: who's who, and an open question.
   data = renameMindMap(data, data.mindMaps[0].id, 'Who knows what')

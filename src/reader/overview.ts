@@ -24,16 +24,23 @@ const CARD_KINDS: Record<MapNode['kind'], [string, string]> = {
 export function overview(story: Story): string {
   const { data } = story
   const beats = Object.values(data.beats)
-  const { total: words, shelved } = manuscriptWords(data)
+  const words = manuscriptWords(data)
   const out = [
     `# ${data.title.trim() || 'Untitled story'}`,
     [
-      `${count(data.chapters.length, 'chapter')} · ${count(words, 'word')} written in the manuscript${shelved ? ` (and ${count(shelved, 'word')} in shelved chapters, set aside for now)` : ''}`,
+      `${count(data.chapters.length, 'chapter')} · ${count(words, 'word')} written in the manuscript`,
       `${count(beats.length, 'beat')} planned (${beats.filter((b) => b.done).length} ticked off as written) in ${count(data.arcs.length, 'arc')}`,
       `${count(data.characters.length, 'character')} · ${count(data.elements.length, 'place, object or group', 'places, objects or groups')} · ${count(data.mindMaps.length, 'mind map')}`,
       `${count(outlineWords(data).total, 'word')} of outline notes`,
     ].join('\n'),
   ]
+  // Each draft is a manuscript of its own (its chapters, arcs and beats); what's read here is the open one's.
+  if (data.drafts.length > 1) {
+    const open = data.drafts.find((d) => d.id === data.draft)
+    out.push(
+      `Drafts: ${data.drafts.map((d) => (d.id === data.draft ? `${d.name} (open)` : d.name)).join(', ')}. Everything here is ${open ? `“${open.name}”` : 'the open draft'}: its chapters, arcs, beats and story time; the characters, places and things and the mind maps are every draft's.`,
+    )
+  }
   const goals = [
     data.goals.draft ? `${count(data.goals.draft, 'word')} for the draft (${Math.round((words / data.goals.draft) * 100)}% there)` : '',
     data.goals.daily ? `${count(data.goals.daily, 'word')} a day` : '',

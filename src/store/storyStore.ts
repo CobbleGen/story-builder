@@ -4,7 +4,8 @@ import { persist } from 'zustand/middleware'
 import type { ArchiveKind, StoryData } from '../types'
 import type { FindQuery } from '../lib/replace'
 import * as ops from './storyOps'
-import { archiveItem, deleteArchived, restoreArchived, throughArchive } from './archive'
+import { archiveItem, deleteArchived, restoreArchived, throughArchive, upgradeStory } from './archive'
+import * as drafts from './drafts'
 import { archivedNamed } from '../lib/archived'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
@@ -86,6 +87,14 @@ interface StoryActions {
   addMindMap: (...args: Tail<Parameters<typeof ops.addMindMap>>) => string
   renameMindMap: (...args: Tail<Parameters<typeof ops.renameMindMap>>) => void
   deleteMindMap: (...args: Tail<Parameters<typeof ops.deleteMindMap>>) => void
+  /** Opens another draft (not a step to undo: like opening another book). */
+  switchDraft: (id: string) => void
+  /** Starts a draft, a copy of the open one or blank, and opens it; its id. */
+  newDraft: (options: { copy: boolean; name?: string }) => string
+  renameDraft: (...args: Tail<Parameters<typeof drafts.renameDraft>>) => void
+  /** Deletes a draft that isn't open. */
+  deleteDraft: (...args: Tail<Parameters<typeof drafts.deleteDraft>>) => void
+  moveDraft: (...args: Tail<Parameters<typeof drafts.moveDraft>>) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
   /** Swaps in a story from the writer's account: not a change made here, and not one to undo. */
@@ -114,6 +123,8 @@ export const STORY_KEYS = [
   'sprints',
   'archive',
   'style',
+  'drafts',
+  'draft',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -135,7 +146,23 @@ export const pickData = (s: StoryData): StoryData => ({
   sprints: s.sprints,
   archive: s.archive,
   style: s.style,
+  drafts: s.drafts,
+  draft: s.draft,
 })
+
+/**
+ * What's being written but not saved yet (the manuscript editor's text),
+ * saved before another draft or story is opened, so it lands where it was
+ * written.
+ */
+const flushers = new Set<() => void>()
+export function onBeforeSwitch(flush: () => void): () => void {
+  flushers.add(flush)
+  return () => flushers.delete(flush)
+}
+const flushAll = () => {
+  for (const flush of flushers) flush()
+}
 
 /**
  * Goes up whenever a whole other story (or another copy of it) is swapped
@@ -157,7 +184,14 @@ export const useStory = create<StoryStore>()(
         const before = data()
         if (next === before || STORY_KEYS.every((k) => next[k] === before[k])) return
         if (name) remember(before, name, target)
-        set(pickData(name === 'replaceStory' ? next : ops.logOutline(before, next)))
+        // (A whole story coming in, or a draft deleted, isn't writing or cutting.)
+        set(pickData(name === 'replaceStory' || name === 'deleteDraft' ? next : ops.logOutline(before, next)))
+      }
+      /** Another draft open: what was being written saved first, and undo starts afresh (its steps were the other draft's). */
+      const reopen = (next: StoryData) => {
+        set(pickData(next))
+        forget()
+        useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
       }
       /** Undo and redo change the outline's words as much as any other change (undoing takes back what was counted). */
       const step = (direction: 'undo' | 'redo') => {
@@ -249,12 +283,28 @@ export const useStory = create<StoryStore>()(
         archiveThing: (kind, id) => apply(archiveItem(data(), kind, id), 'archive', id),
         restoreArchived: (id) => apply(restoreArchived(data(), id), 'restoreArchived', id),
         deleteArchived: (id) => apply(deleteArchived(data(), id, ops), 'deleteArchived', id),
+        switchDraft: (id) => {
+          flushAll()
+          const next = drafts.switchDraft(data(), id)
+          if (next !== data()) reopen(next)
+        },
+        newDraft: (options) => {
+          flushAll()
+          const [next, id] = drafts.newDraft(data(), options)
+          reopen(next)
+          return id
+        },
+        renameDraft: (...a) => apply(drafts.renameDraft(data(), ...a), 'renameDraft', a[0]),
+        deleteDraft: (...a) => apply(drafts.deleteDraft(data(), ...a), 'deleteDraft', a[0]),
+        moveDraft: (...a) => apply(drafts.moveDraft(data(), ...a), 'moveDraft'),
         replaceStory: (input) => {
-          apply(ops.normalizeStory(input), 'replaceStory')
+          flushAll()
+          apply(upgradeStory(input), 'replaceStory')
           useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
         },
         loadStory: (input) => {
-          set(pickData(ops.normalizeStory(input)))
+          flushAll()
+          set(pickData(upgradeStory(input)))
           forget()
           useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
         },
@@ -271,7 +321,7 @@ export const useStory = create<StoryStore>()(
       migrate: (persisted) => persisted as StoryStore,
       // Saved data is repaired on load so a bad save can't break the board.
       merge: (persisted, current) =>
-        persisted ? { ...current, ...ops.normalizeStory(persisted) } : current,
+        persisted ? { ...current, ...upgradeStory(persisted) } : current,
     },
   ),
 )

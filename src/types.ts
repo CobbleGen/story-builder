@@ -22,12 +22,6 @@ export interface Beat {
   until?: string
 }
 
-/**
- * How far along a chapter is, or shelved: set aside for now, kept as it is
- * but left out of the book (its word count and export).
- */
-export type ChapterStatus = 'outline' | 'draft' | 'revised' | 'done' | 'shelved'
-
 export interface Chapter {
   id: string
   title: string
@@ -36,7 +30,6 @@ export interface Chapter {
   beatIds: string[]
   /** The character whose point of view the chapter is told from. */
   povCharacterId: string | null
-  status: ChapterStatus
   /** Words the writer is aiming for in this chapter, if they've set a target. */
   targetWords?: number
 }
@@ -258,6 +251,8 @@ export interface ArchivedItem {
   id: string
   /** When it was archived (ms since 1970). */
   at: number
+  /** The draft a chapter, arc or beat was archived from (it's brought back there). */
+  draft?: string
   /** It, and what went with it: a chapter's text and beats, an arc's beats. */
   chapters: Chapter[]
   arcs: Arc[]
@@ -313,6 +308,30 @@ export interface BookStyle {
   width: 'narrow' | 'medium' | 'wide'
 }
 
+/** A draft's own book: its chapters and their text, its arcs and beats, and story time. */
+export interface DraftBook {
+  chapters: Chapter[]
+  arcs: Arc[]
+  beats: Record<string, Beat>
+  texts: Record<string, ChapterText>
+  timeline: string[]
+}
+
+/**
+ * A draft of the book: a manuscript of its own, with its own chapters, arcs
+ * and beats (characters, places, mind maps and the rest are the story's, in
+ * every draft). The open draft's book is the story's own fields; the others
+ * keep theirs here.
+ */
+export interface Draft {
+  id: string
+  name: string
+  /** When it was started (ms since 1970). */
+  createdAt: number
+  /** Its book, while another draft is open. */
+  book?: DraftBook
+}
+
 /** Word targets for the whole draft and for each day's writing. */
 export interface StoryGoals {
   draft?: number
@@ -357,4 +376,8 @@ export interface StoryData {
   archive: ArchivedItem[]
   /** How the manuscript looks. */
   style: BookStyle
+  /** The book's drafts, in order (the open one's book is in the fields above). */
+  drafts: Draft[]
+  /** The open draft. */
+  draft: string
 }

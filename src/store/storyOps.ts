@@ -2,8 +2,9 @@ import type {
   Arc,
   Beat,
   BookStyle,
+  Draft,
+  DraftBook,
   Chapter,
-  ChapterStatus,
   ChapterText,
   Character,
   CharacterAttribute,
@@ -34,6 +35,7 @@ import { matcher, replaceInDoc, wordsInDoc, type FindQuery } from '../lib/replac
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { archiveOf, archivedOutlineWords } from '../lib/archived'
 import { DEFAULT_STYLE, bookStyleOf } from '../lib/bookStyle'
+import { DEFAULT_DRAFT_ID, bookOf, firstDraft, idsElsewhere } from '../lib/drafts'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
@@ -148,13 +150,21 @@ export function linkMentions(data: StoryData): StoryData {
   return mapStoryText(data, (text) => linkTyped(text, named, lookup).stored)
 }
 
-/** Turns every mention of a character or element into plain text with its name. */
+/** Turns every mention of a character or element into plain text with its name, in every draft. */
 function unmention(data: StoryData, id: string, name: string): StoryData {
   const token = mentionToken(id)
-  return mapTexts(
-    mapStoryText(data, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
-    (doc) => unlinkMentions(doc, id, name),
-  )
+  const plain = (d: StoryData) =>
+    mapTexts(
+      mapStoryText(d, (text) => (text.includes(token) ? text.replaceAll(token, name) : text)),
+      (doc) => unlinkMentions(doc, id, name),
+    )
+  const next = plain(data)
+  const drafts = next.drafts.map((d) => {
+    if (!d.book) return d
+    const book = bookOf(plain({ ...next, ...d.book }))
+    return (Object.keys(book) as (keyof DraftBook)[]).every((k) => book[k] === d.book![k]) ? d : { ...d, book }
+  })
+  return drafts.every((d, i) => d === next.drafts[i]) ? next : { ...next, drafts }
 }
 
 // ---------- Chapters ----------
@@ -169,16 +179,14 @@ export function addChapter(
     summary: init.summary ?? '',
     beatIds: [],
     povCharacterId: null,
-    status: 'outline',
   }
   return [{ ...data, chapters: insertAt(data.chapters, chapter, init.index) }, chapter.id]
 }
 
 /**
  * Chapters brought in from a manuscript written elsewhere, with their text,
- * after the last chapter (or before chapter `index`). Ones with words are
- * drafts. Bringing them in isn't writing, so the day's tallies stay as they
- * are.
+ * after the last chapter (or before chapter `index`). Bringing them in isn't
+ * writing, so the day's tallies stay as they are.
  */
 export function importChapters(
   data: StoryData,
@@ -196,7 +204,6 @@ export function importChapters(
       summary: '',
       beatIds: [],
       povCharacterId: null,
-      status: c.words ? 'draft' : 'outline',
     }
     chapters.push(chapter)
     if (c.doc.content?.length) texts[chapter.id] = { doc: c.doc, words: c.words, updatedAt: now }
@@ -208,10 +215,9 @@ export function importChapters(
 export function updateChapter(
   data: StoryData,
   id: string,
-  patch: Partial<Pick<Chapter, 'title' | 'summary' | 'povCharacterId' | 'status' | 'targetWords'>>,
+  patch: Partial<Pick<Chapter, 'title' | 'summary' | 'povCharacterId' | 'targetWords'>>,
 ): StoryData {
   if (patch.povCharacterId && !data.characters.some((c) => c.id === patch.povCharacterId)) return data
-  if (patch.status && !CHAPTER_STATUSES.includes(patch.status)) return data
   const target = 'targetWords' in patch ? cleanTarget(patch.targetWords) : undefined
   return mapChapters(data, (c) => {
     if (c.id !== id) return c
@@ -394,6 +400,8 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     sprints: [],
     archive: [],
     style: DEFAULT_STYLE,
+    drafts: [firstDraft()],
+    draft: DEFAULT_DRAFT_ID,
   }
 }
 
@@ -1602,8 +1610,11 @@ export function findMapNode(data: StoryData, nodeId: string): MapNode | undefine
   return undefined
 }
 
-/** Removes mind map cards for deleted story items, with their lines. */
-function dropMapRefs(data: StoryData, refIds: Set<string>): StoryData {
+/** Removes mind map cards for deleted story items, with their lines (not those still in another draft). */
+function dropMapRefs(data: StoryData, deleted: Set<string>): StoryData {
+  const elsewhere = idsElsewhere(data)
+  const refIds = new Set([...deleted].filter((id) => !elsewhere.has(id)))
+  if (!refIds.size) return data
   const gone = data.mindMaps.flatMap((m) => m.nodes.filter((n) => isEntity(n) && refIds.has(n.refId)).map((n) => n.id))
   const next = gone.length ? removeMapNodes(data, gone) : data
   // Lines drawn from a deleted beat, attribute, arc or chapter inside a card go too.
@@ -1894,7 +1905,6 @@ export function deleteMindMap(data: StoryData, id: string): StoryData {
 
 // ---------- Integrity ----------
 
-export const CHAPTER_STATUSES: ChapterStatus[] = ['outline', 'draft', 'revised', 'done', 'shelved']
 
 /** A word target: a whole number of words, or nothing. */
 export function cleanTarget(value: unknown): number | undefined {
@@ -1964,14 +1974,13 @@ export function normalizeStory(input: unknown): StoryData {
     characterIds: [...new Set(ids(a.characterIds).filter((id) => characterIds.has(id)))],
   }))
   const rawChapters = list(raw.chapters)
-  let chapters: Chapter[] = rawChapters.map((c) => {
+  const chapters: Chapter[] = rawChapters.map((c) => {
     const chapter: Chapter = {
       id: str(c.id) || makeId('ch'),
       title: str(c.title),
       summary: str(c.summary),
       beatIds: ids(c.beatIds),
       povCharacterId: characterIds.has(str(c.povCharacterId)) ? str(c.povCharacterId) : null,
-      status: CHAPTER_STATUSES.includes(c.status as ChapterStatus) ? (c.status as ChapterStatus) : 'outline',
     }
     const target = cleanTarget(c.targetWords)
     if (target) chapter.targetWords = target
@@ -2058,17 +2067,45 @@ export function normalizeStory(input: unknown): StoryData {
     }
   }
 
-  // Saves from before chapter status: a chapter with writing in it is a draft.
-  chapters = chapters.map((c, i) =>
-    !CHAPTER_STATUSES.includes(rawChapters[i].status as ChapterStatus) && texts[c.id]?.words ? { ...c, status: 'draft' } : c,
-  )
+  // The drafts: the open one's book is the one above; each other one's is checked the same way.
+  // (Saves from before drafts were one draft.)
+  const drafts: Draft[] = []
+  for (const d of list(raw.drafts)) {
+    const id = str(d.id)
+    if (!id || drafts.some((x) => x.id === id)) continue
+    drafts.push({
+      id,
+      name: str(d.name).trim().slice(0, 120) || 'Untitled draft',
+      createdAt: typeof d.createdAt === 'number' && Number.isFinite(d.createdAt) ? d.createdAt : 0,
+      ...(isRecord(d.book) ? { book: d.book as unknown as DraftBook } : {}),
+    })
+  }
+  let draft = str(raw.draft)
+  if (!drafts.some((d) => d.id === draft)) draft = drafts.find((d) => !d.book)?.id ?? ''
+  if (!draft) {
+    const first = drafts.length ? { id: makeId('draft'), name: 'Recovered draft', createdAt: 0 } : firstDraft()
+    drafts.unshift(first)
+    draft = first.id
+  }
+  for (const [i, d] of drafts.entries()) {
+    if (d.id === draft) {
+      const { book: _, ...open } = d
+      drafts[i] = open
+      continue
+    }
+    const b: Record<string, unknown> = isRecord(d.book) ? d.book : {}
+    const own = normalizeStory({ characters: raw.characters, elements: raw.elements, chapters: b.chapters, arcs: b.arcs, beats: b.beats, texts: b.texts, timeline: b.timeline })
+    drafts[i] = { ...d, book: bookOf(own) }
+  }
 
+  // (Cards on the mind maps for chapters, arcs and beats in other drafts stay, shown in those drafts.)
+  const elsewhere = idsElsewhere({ drafts, draft })
   const refs: Record<string, Set<string>> = {
-    arc: new Set(arcs.map((a) => a.id)),
-    chapter: chapterIds,
+    arc: new Set([...arcs.map((a) => a.id), ...elsewhere]),
+    chapter: new Set([...chapterIds, ...elsewhere]),
     character: characterIds,
     element: new Set(elements.map((e) => e.id)),
-    beat: new Set(Object.keys(beats)),
+    beat: new Set([...Object.keys(beats), ...elsewhere]),
   }
   const num = (v: unknown, fallback: number, min = -1e7, max = 1e7) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
@@ -2237,9 +2274,9 @@ export function normalizeStory(input: unknown): StoryData {
 
   const rawGoals = isRecord(raw.goals) ? raw.goals : {}
   const goals: StoryGoals = {}
-  const draft = cleanTarget(rawGoals.draft)
+  const draftGoal = cleanTarget(rawGoals.draft)
   const daily = cleanTarget(rawGoals.daily)
-  if (draft) goals.draft = draft
+  if (draftGoal) goals.draft = draftGoal
   if (daily) goals.daily = daily
   // The logs keep the last year or so of days.
   const logOf = (value: unknown): Record<string, number> =>
@@ -2282,7 +2319,10 @@ export function normalizeStory(input: unknown): StoryData {
     outlineLog,
     outlineCuts,
     sprints: sprintsOf(raw.sprints),
-    archive: archiveOf(raw.archive),
+    // (Chapters, arcs and beats archived before drafts were archived from the one draft there was.)
+    archive: archiveOf(raw.archive).map((a) => (a.draft || !['chapter', 'arc', 'beat'].includes(a.kind) ? a : { ...a, draft })),
     style: bookStyleOf(raw.style),
+    drafts,
+    draft,
   })
 }

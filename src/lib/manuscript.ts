@@ -22,8 +22,6 @@ export interface ExportOptions {
   author: string
   /** Leave out chapters with nothing written yet. */
   skipEmpty: boolean
-  /** Leave out shelved chapters (set aside for now). */
-  skipShelved: boolean
 }
 
 export const DEFAULT_EXPORT: ExportOptions = {
@@ -33,7 +31,6 @@ export const DEFAULT_EXPORT: ExportOptions = {
   titlePage: true,
   author: '',
   skipEmpty: true,
-  skipShelved: true,
 }
 
 /** A stretch of text in one style; `\n` is a line break. */
@@ -202,7 +199,6 @@ export function buildManuscript(
     const blocks = text ? blocksOf(text.doc, nameOf) : []
     const empty = !blocks.some((b) => b.type === 'break' || b.type === 'picture' || b.runs.some((r) => r.text.trim()))
     if (empty && options.skipEmpty) return
-    if (c.status === 'shelved' && options.skipShelved !== false) return
     words += text?.words ?? 0
     const title = plainText(c.title, lookup).trim()
     const label = style ? chapterNumber(style, i + 1) : `Chapter ${i + 1}`

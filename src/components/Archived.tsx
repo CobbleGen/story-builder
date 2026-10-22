@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
 import { Archive, ArchiveRestore, BookOpen, Network, Trash2 } from 'lucide-react'
-import type { ArchivedItem } from '../types'
+import type { ArchivedItem, Draft } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { askConfirm } from '../lib/confirm'
 import { plainText } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
-import { archivedName, archivedWith } from '../lib/archived'
+import { archivedName, archivedWith, inOpenDraft } from '../lib/archived'
+import { draftHaving } from '../lib/drafts'
 import { useRestore } from '../lib/useArchive'
 import { notify } from '../store/history'
 import { CharacterAvatar } from './CharacterAvatar'
@@ -131,24 +132,66 @@ function ArchivedRow({ item }: { item: ArchivedItem }) {
 /** The sidebar's Archived tab: newest first. */
 export function ArchivedPanel() {
   const archive = useStory((s) => s.archive)
-  if (!archive.length) {
-    return (
-      <div className="archived-empty">
-        <Archive size={22} aria-hidden />
-        <p>Nothing archived.</p>
-        <p className="muted">
-          Archive a chapter, arc, beat, character, place or map to put it away without deleting it. It waits here, out of your
-          story, until you bring it back where it was.
-        </p>
-      </div>
-    )
-  }
+  const draft = useStory((s) => s.draft)
+  const drafts = useStory((s) => s.drafts)
+  const here = archive.filter(inOpenDraft({ draft }))
+  // What was archived from other drafts, by draft: it comes back there.
+  const elsewhere = drafts.flatMap((d) => {
+    const items = archive.filter((a) => a.draft === d.id && d.id !== draft)
+    return items.length ? [{ draft: d, items }] : []
+  })
   return (
-    <ul className="archived-list" aria-label="Archived">
-      {[...archive].reverse().map((item) => (
-        <ArchivedRow key={item.id} item={item} />
+    <>
+      {here.length ? (
+        <ul className="archived-list" aria-label="Archived">
+          {[...here].reverse().map((item) => (
+            <ArchivedRow key={`${item.draft ?? ''}:${item.id}`} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <div className="archived-empty">
+          <Archive size={22} aria-hidden />
+          <p>Nothing archived.</p>
+          <p className="muted">
+            Archive a chapter, arc, beat, character, place or map to put it away without deleting it. It waits here, out of your
+            story, until you bring it back where it was.
+          </p>
+        </div>
+      )}
+      {elsewhere.map(({ draft: d, items }) => (
+        <OtherDraft key={d.id} draft={d} items={items} />
       ))}
-    </ul>
+    </>
+  )
+}
+
+/** What was archived from another draft: listed, to bring back there. */
+function OtherDraft({ draft, items }: { draft: Draft; items: ArchivedItem[] }) {
+  const lookup = useMentionLookup()
+  const switchDraft = useStory((s) => s.switchDraft)
+  return (
+    <section className="archived-other" aria-label={`Archived from ${draft.name}`}>
+      <h3 className="archived-other-head">
+        <span>From {draft.name}</span>
+        <button
+          className="btn ghost small"
+          onClick={() => {
+            switchDraft(draft.id)
+            notify(`Opened “${draft.name}”.`)
+          }}
+          title={`Open “${draft.name}” to bring these back there`}
+        >
+          Open draft
+        </button>
+      </h3>
+      <ul className="archived-other-list">
+        {[...items].reverse().map((item) => (
+          <li key={item.id}>
+            {archivedName(item, lookup)} <span className="muted">· {kindLabel(item)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -158,8 +201,33 @@ export function ArchivedPanel() {
  */
 export function NotInStory({ id, title, gone }: { id: string | undefined; title: string; gone: string }) {
   const item = useStory((s) => (id ? archivedWith(s, id) : undefined))
+  // In another draft (a chapter or arc that isn't in this one).
+  const other = useStory((s) => (id && !item ? draftHaving(s, id) : undefined))
+  const switchDraft = useStory((s) => s.switchDraft)
   const lookup = useMentionLookup()
   const restore = useRestore()
+  if (other) {
+    return (
+      <div className="not-found">
+        <h1>Not in this draft</h1>
+        <p>It’s in “{other.name}”: open that draft to see it.</p>
+        <div className="not-found-actions">
+          <button
+            className="btn primary"
+            onClick={() => {
+              switchDraft(other.id)
+              notify(`Opened “${other.name}”.`)
+            }}
+          >
+            Open “{other.name}”
+          </button>
+          <Link className="btn" to="/">
+            Back to the board
+          </Link>
+        </div>
+      </div>
+    )
+  }
   if (item) {
     const name = archivedName(item, lookup)
     return (

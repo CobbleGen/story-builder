@@ -1,7 +1,7 @@
 import { manuscriptWords, outlineWords, recentDays, writingStreak } from '../lib/progress'
 import { bestSprint, perMinute } from '../lib/sprints'
 import { chapterFacts } from './chapters'
-import { count, statusLabel, type Story } from './story'
+import { count, type Story } from './story'
 
 // How far along the writing is: words, goals, chapters, days.
 
@@ -10,12 +10,12 @@ const dayName = new Intl.DateTimeFormat('en', { weekday: 'short', day: 'numeric'
 /** `today` is a date (YYYY-MM-DD) in the writer's days, which the word log is kept in. */
 export function progress(story: Story, today: string): string {
   const { data } = story
-  const { total: words, shelved } = manuscriptWords(data)
+  const words = manuscriptWords(data)
   const outline = outlineWords(data)
   const beats = Object.values(data.beats)
   const out = [`# Writing progress: ${data.title.trim() || 'Untitled story'}`]
 
-  const lines = [`Manuscript: ${count(words, 'word')}${shelved ? ` (shelved chapters, set aside for now, have ${count(shelved, 'more word')} and aren’t counted)` : ''}.`]
+  const lines = [`Manuscript: ${count(words, 'word')}.`]
   if (data.goals.draft) lines.push(`Goal for the draft: ${count(data.goals.draft, 'word')} (${Math.round((words / data.goals.draft) * 100)}% there).`)
   if (data.goals.daily) lines.push(`Daily goal: ${count(data.goals.daily, 'word')}.`)
   lines.push(`Outline notes (beats, arcs, chapter titles and summaries): ${count(outline.total, 'word')}.`)
@@ -23,10 +23,8 @@ export function progress(story: Story, today: string): string {
   out.push(lines.join('\n'))
 
   if (data.chapters.length) {
-    const statuses = new Map<string, number>()
-    for (const c of data.chapters) statuses.set(statusLabel(c), (statuses.get(statusLabel(c)) ?? 0) + 1)
     out.push(
-      `## Chapters (${[...statuses].map(([s, n]) => `${n} ${s.toLowerCase()}`).join(', ')})\n${data.chapters
+      `## Chapters\n${data.chapters
         .map((c) => `${story.numberOf(c.id)}. ${story.plain(c.title) || '(untitled)'} — ${chapterFacts(story, c)}`)
         .join('\n')}`,
     )

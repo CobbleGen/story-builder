@@ -2,7 +2,7 @@ import type { Beat, Chapter } from '../types'
 import type { Jump } from '../lib/timeline'
 import { timeJumps } from '../lib/timeline'
 import { storyOrder } from '../store/storyOps'
-import { NotFound, chapterList, count, findChapter, statusLabel, type Story } from './story'
+import { NotFound, chapterList, count, findChapter, type Story } from './story'
 import { PART_CHARS, clip, linkedPassages, mentionCounts, splitParts, textParagraphs } from './text'
 
 // Chapters: one at a time with everything around it (its plan, who's in it),
@@ -21,11 +21,11 @@ export const jumpsOf = (story: Story) => timeJumps(storyOrder(story.data), story
 
 export const wordsIn = (story: Story, c: Chapter) => story.data.texts[c.id]?.words ?? 0
 
-/** A chapter's status, length (and target) and point of view, on one line. */
+/** A chapter's length (and target) and point of view, on one line. */
 export function chapterFacts(story: Story, c: Chapter): string {
   const words = wordsIn(story, c)
   const target = c.targetWords ? `${c.targetWords.toLocaleString('en')}-word target` : ''
-  const facts = [`status: ${statusLabel(c).toLowerCase()}`, words ? `${count(words, 'word')}${target ? ` (${target})` : ''}` : `nothing written yet${target ? ` (${target})` : ''}`]
+  const facts = [words ? `${count(words, 'word')}${target ? ` (${target})` : ''}` : `nothing written yet${target ? ` (${target})` : ''}`]
   if (c.povCharacterId) facts.push(`point of view: ${story.nameOf(c.povCharacterId)}`)
   return facts.join(' · ')
 }
@@ -114,14 +114,8 @@ export function readManuscript(story: Story, from = 1, to?: number, budget = MAN
   for (let n = from; n <= last; n++) {
     const c = chapters[n - 1]
     const doc = story.data.texts[c.id]?.doc
-    // Shelved chapters are set aside, not part of the book: named, but their text only from read_chapter.
-    const shelved = c.status === 'shelved'
-    const paragraphs = doc && !shelved ? textParagraphs(doc, story) : []
-    const text = shelved
-      ? `(Shelved: set aside for now and not part of the book${wordsIn(story, c) ? `; read_chapter ${n} has its ${count(wordsIn(story, c), 'word')}` : ''}.)`
-      : paragraphs.length
-        ? paragraphs.join('\n\n')
-        : '(Nothing written yet.)'
+    const paragraphs = doc ? textParagraphs(doc, story) : []
+    const text = paragraphs.length ? paragraphs.join('\n\n') : '(Nothing written yet.)'
     if (used > 0 && used + text.length > budget) {
       next = `To carry on: read_manuscript with from_chapter ${n}.`
       break

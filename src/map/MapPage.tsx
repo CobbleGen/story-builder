@@ -36,6 +36,7 @@ import { askConfirm } from '../lib/confirm'
 import { StoryEdge, type StoryFlowEdge } from './StoryEdge'
 import { MapPalette } from './MapPalette'
 import { MapSwitcher } from './MapSwitcher'
+import { mapInDraft, notInDraft } from './inDraft'
 import { useMapClipboard } from './useMapClipboard'
 import {
   DRAG_MIME,
@@ -179,9 +180,22 @@ export default function MapPage() {
   // Each map gets its own canvas, so switching maps starts from that map's view.
   return (
     <ReactFlowProvider key={current.id}>
-      <MapCanvas mindMap={current} />
+      <DraftMap map={current} />
     </ReactFlowProvider>
   )
+}
+
+/** The map as the open draft shows it: cards for chapters, arcs and beats in other drafts (only) left out. */
+function DraftMap({ map }: { map: MindMap }) {
+  const chapters = useStory((s) => s.chapters)
+  const arcs = useStory((s) => s.arcs)
+  const beats = useStory((s) => s.beats)
+  const hidden = notInDraft(map, { chapters, arcs, beats })
+  // (The same map for as long as the same cards are left out.)
+  const key = `${[...hidden.nodes].join()}|${[...hidden.edges].join()}`
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const shown = useMemo(() => mapInDraft(map, hidden), [map, key])
+  return <MapCanvas mindMap={shown} />
 }
 
 function MapCanvas({ mindMap }: { mindMap: MindMap }) {

@@ -541,28 +541,15 @@ describe('mind map', () => {
     expect(normalizeStory({ title: 'Old' }).outlineCuts).toEqual({})
   })
 
-  it('keeps each chapter’s status and word target', () => {
+  it('keeps each chapter’s word target', () => {
     let { data, ch1 } = setup()
-    expect(data.chapters[0].status).toBe('outline')
-    data = updateChapter(data, ch1, { status: 'revised', targetWords: 2500.4 })
-    expect(data.chapters[0]).toMatchObject({ status: 'revised', targetWords: 2500 })
-    expect(updateChapter(data, ch1, { status: 'nonsense' as never })).toBe(data)
-    // Shelved for now: kept as it is, and through a reload
-    const shelved = updateChapter(data, ch1, { status: 'shelved' })
-    expect(shelved.chapters[0].status).toBe('shelved')
-    expect(normalizeStory(shelved).chapters[0].status).toBe('shelved')
+    data = updateChapter(data, ch1, { targetWords: 2500.4 })
+    expect(data.chapters[0]).toMatchObject({ targetWords: 2500 })
     expect(updateChapter(data, ch1, { targetWords: 0 }).chapters[0]).not.toHaveProperty('targetWords')
-    // Saves from before statuses: written chapters count as drafts.
-    const old = normalizeStory({
-      chapters: [
-        { id: 'a', title: 'Written' },
-        { id: 'b', title: 'Not yet' },
-        { id: 'c', title: 'Done', status: 'done', targetWords: 'lots' },
-      ],
-      texts: { a: { doc: { type: 'doc', content: [] }, words: 120, updatedAt: 1 } },
-    })
-    expect(old.chapters.map((c) => c.status)).toEqual(['draft', 'outline', 'done'])
-    expect(old.chapters[2]).not.toHaveProperty('targetWords')
+    // Saves from when chapters had a status: it's let go.
+    const old = normalizeStory({ chapters: [{ id: 'c', title: 'Done', status: 'done', targetWords: 'lots' }] })
+    expect(old.chapters[0]).not.toHaveProperty('status')
+    expect(old.chapters[0]).not.toHaveProperty('targetWords')
   })
 
   it('keeps several mind maps, each with its own cards', () => {

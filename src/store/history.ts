@@ -48,6 +48,7 @@ const GROUPED = new Set([
   'setGoals',
   'renameMindMap',
   'setBookStyle',
+  'renameDraft',
 ])
 
 const LABELS: Record<string, string> = {
@@ -99,6 +100,9 @@ const LABELS: Record<string, string> = {
   moveAttribute: 'move attribute',
   setGoals: 'change goals',
   setBookStyle: 'change the book’s style',
+  renameDraft: 'rename draft',
+  deleteDraft: 'delete draft',
+  moveDraft: 'move draft',
   addMapNode: 'add to map',
   updateMapNode: 'edit map card',
   moveMapNodes: 'move map cards',

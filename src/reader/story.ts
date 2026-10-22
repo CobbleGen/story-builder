@@ -1,7 +1,6 @@
 import type { Arc, Beat, Chapter, Character, StoryData, StoryElement } from '../types'
 import { displayName, lookupOf, plainText, type Lookup } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
-import { STATUS_LABELS } from '../lib/chapterStatus'
 import { readingOrder } from '../store/storyOps'
 import { archivedNamed } from '../lib/archived'
 
@@ -58,8 +57,6 @@ export function storyOf(data: StoryData): Story {
 
 /** "1 beat", "3 beats". */
 export const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en')} ${n === 1 ? one : many}`
-
-export const statusLabel = (c: Chapter) => STATUS_LABELS[c.status] ?? c.status
 
 export const kindNoun = (e: StoryElement) => ELEMENT_KIND_NAMES[e.kind]?.noun ?? 'item'
 

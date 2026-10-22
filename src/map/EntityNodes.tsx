@@ -12,7 +12,6 @@ import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 import { BeatList, ChapterPages, Details } from './CardPanels'
 import { Anchor } from './Anchor'
 import { itemAnchor } from '../lib/anchors'
-import { STATUS_LABELS } from '../lib/chapterStatus'
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 
@@ -224,7 +223,6 @@ export function ChapterNode({ data, selected }: NodeProps<StoryFlowNode>) {
       <div className="map-card-foot">
         <span>
           {words ? `${words.toLocaleString()} words` : 'Not started'}
-          <span className={`map-status status-${chapter.status}`}> · {STATUS_LABELS[chapter.status]}</span>
         </span>
         <span className="map-views">
           <ViewButton

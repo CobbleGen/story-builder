@@ -68,17 +68,13 @@ describe('importing a manuscript', () => {
     expect(splitChapters(doc(h(1, 'One'), p('A.'), h(1, 'Two'), p('B.')), 'h1').map((c) => c.front)).toEqual([false, false])
   })
 
-  it('adds the chapters to a story, as drafts, as one change undo takes away', () => {
+  it('adds the chapters to a story, as one change undo takes away', () => {
     const [data] = addChapter(emptyStory(), { title: 'Mine' })
     const [next, ids] = importChapters(data, [
       { title: '  The   Storm ', doc: doc(p('Rain.')), words: 1 },
       { title: '', doc: doc(), words: 0 },
     ])
-    expect(next.chapters.map((c) => [c.title, c.status])).toEqual([
-      ['Mine', 'outline'],
-      ['The Storm', 'draft'],
-      ['', 'outline'],
-    ])
+    expect(next.chapters.map((c) => c.title)).toEqual(['Mine', 'The Storm', ''])
     expect(next.texts[ids[0]]).toMatchObject({ doc: doc(p('Rain.')), words: 1 })
     expect(next.texts).not.toHaveProperty(ids[1])
     // Not words written today

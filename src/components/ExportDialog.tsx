@@ -14,7 +14,7 @@ import {
   type HeadingStyle,
 } from '../lib/manuscript'
 import { chapterNumber, fontOf, pageSizeOf } from '../lib/bookStyle'
-import { isShelved } from '../lib/chapterStatus'
+import { openDraft } from '../lib/drafts'
 import { loadPictures } from '../lib/exportPictures'
 import { downloadBlob, printHtml, slug } from '../lib/download'
 import { plainText } from '../lib/mentions'
@@ -33,6 +33,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const chapters = useStory((s) => s.chapters)
   const texts = useStory((s) => s.texts)
   const style = useStory((s) => s.style)
+  const drafts = useStory((s) => s.drafts)
+  const draft = useStory((s) => s.draft)
   const lookup = useMentionLookup()
   const options = useUi((s) => s.exportOptions)
   const setOptions = useUi((s) => s.setExportOptions)
@@ -43,7 +45,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const book = options.layout === 'book'
   const number = book ? chapterNumber(style, 1) : 'Chapter 1'
   const unwritten = chapters.filter((c) => !texts[c.id]?.words).length
-  const shelved = chapters.filter(isShelved).length
   const format = FORMATS.find((f) => f.id === options.format) ?? FORMATS[0]
   const first = chapters[0]
   const firstTitle = first ? plainText(first.title, lookup).trim() : ''
@@ -65,7 +66,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     setBusy(true)
     setFailed(false)
     try {
-      const name = slug(manuscript.title)
+      // With more than one draft, the file says which.
+      const name = slug(drafts.length > 1 ? `${manuscript.title} ${openDraft({ drafts, draft }).name}` : manuscript.title)
       const pictures = options.format === 'txt' ? new Map() : await loadPictures(picturesOf(manuscript))
       if (options.format === 'docx') {
         const { manuscriptDocx } = await import('../lib/docxExport')
@@ -190,18 +192,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             )}
           </span>
         </label>
-        {shelved > 0 && (
-          <label className="export-check">
-            <input type="checkbox" checked={options.skipShelved} onChange={(e) => setOptions({ skipShelved: e.target.checked })} />
-            <span>
-              Leave out shelved chapters
-              <span className="muted">
-                {' '}
-                ({shelved} of {chapters.length})
-              </span>
-            </span>
-          </label>
-        )}
       </div>
       {failed && (
         <p className="export-error" role="alert">

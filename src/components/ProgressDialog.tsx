@@ -4,10 +4,8 @@ import { useStory } from '../store/storyStore'
 import { useUi, type ProgressTab } from '../store/uiStore'
 import { dayKey } from '../store/storyOps'
 import { manuscriptWords, outlineWords, progressTo, recentDays, writingStreak, type OutlineWords } from '../lib/progress'
-import { isShelved } from '../lib/chapterStatus'
 import { Modal } from './Modal'
 import { MentionText } from './MentionText'
-import { StatusPicker } from './StatusPicker'
 import { WordsChart } from './WordsChart'
 import { SprintHistory } from './Sprint'
 
@@ -86,9 +84,9 @@ export function ProgressDialog() {
   const beats = useStory((s) => s.beats)
   const outline = useMemo(() => outlineWords({ beats, arcs, chapters }), [beats, arcs, chapters])
   const close = () => setOpen(false)
-  const { total, shelved } = manuscriptWords({ chapters, texts })
-  // Until one is picked: the outline, while that's all there is (shelved chapters' words count as a manuscript).
-  const tab = picked ?? (!total && !shelved && outline.total ? 'outline' : 'manuscript')
+  const total = manuscriptWords({ chapters, texts })
+  // Until one is picked: the outline, while that's all there is.
+  const tab = picked ?? (!total && outline.total ? 'outline' : 'manuscript')
   const counts: Record<ProgressTab, number> = { manuscript: total, outline: outline.total }
 
   return (
@@ -111,7 +109,7 @@ export function ProgressDialog() {
         </div>
       </div>
       {tab === 'manuscript' ? (
-        <ManuscriptProgress total={total} shelved={shelved} close={close} />
+        <ManuscriptProgress total={total} close={close} />
       ) : (
         <OutlineProgress outline={outline} close={close} />
       )}
@@ -119,8 +117,8 @@ export function ProgressDialog() {
   )
 }
 
-/** The manuscript's words: today's and lately, goals, and each chapter's (shelved ones apart). */
-function ManuscriptProgress({ total, shelved, close }: { total: number; shelved: number; close: () => void }) {
+/** The manuscript's words: today's and lately, goals, and each chapter's. */
+function ManuscriptProgress({ total, close }: { total: number; close: () => void }) {
   const texts = useStory((s) => s.texts)
   const chapters = useStory((s) => s.chapters)
   const goals = useStory((s) => s.goals)
@@ -146,12 +144,7 @@ function ManuscriptProgress({ total, shelved, close }: { total: number; shelved:
         <Stat
           label="Manuscript"
           value={total.toLocaleString()}
-          note={[
-            goals.draft ? `${Math.round((draftProgress ?? 0) * 100)}% of ${goals.draft.toLocaleString()}` : 'words',
-            shelved ? `${shelved.toLocaleString()} shelved` : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          note={goals.draft ? `${Math.round((draftProgress ?? 0) * 100)}% of ${goals.draft.toLocaleString()}` : 'words'}
         />
         <Stat
           label="Today"
@@ -194,7 +187,6 @@ function ManuscriptProgress({ total, shelved, close }: { total: number; shelved:
           <thead>
             <tr>
               <th scope="col">Chapter</th>
-              <th scope="col">Status</th>
               <th scope="col" className="num">
                 Words
               </th>
@@ -210,7 +202,7 @@ function ManuscriptProgress({ total, shelved, close }: { total: number; shelved:
             {chapters.map((c, i) => {
               const words = texts[c.id]?.words ?? 0
               return (
-                <tr key={c.id} className={isShelved(c) ? 'shelved' : undefined}>
+                <tr key={c.id}>
                   <td>
                     <Link to={`/write/${c.id}`} className="progress-chapter" onClick={close}>
                       <span className="progress-num">{i + 1}</span>
@@ -218,9 +210,6 @@ function ManuscriptProgress({ total, shelved, close }: { total: number; shelved:
                         <MentionText text={c.title} fallback={<span className="muted">Untitled chapter</span>} />
                       </span>
                     </Link>
-                  </td>
-                  <td>
-                    <StatusPicker chapter={c} />
                   </td>
                   <td className="num">{words.toLocaleString()}</td>
                   <td className="num">

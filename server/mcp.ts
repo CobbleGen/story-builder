@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { z } from 'zod'
-import { normalizeStory } from '../src/store/storyOps'
+import { upgradeStory } from '../src/store/archive'
 import * as reader from '../src/reader'
 import { findByName } from '../src/reader/story'
 import { EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, looksLikeKey, type AccountStore, type StorySource } from './sources'
@@ -16,7 +16,8 @@ import { EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, looksLikeKey, ty
 export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change anything.
 
 How a story is organised:
-- Chapters, in reading order, hold the manuscript. Each has a status (outline, draft, revised or done, or shelved: set aside for now and left out of the book's word count and export), and may have a summary, a word target and a point-of-view character.
+- Chapters, in reading order, hold the manuscript. Each may have a summary, a word target and a point-of-view character.
+- A story can have several drafts, each a manuscript of its own (its chapters, arcs and beats). What you read is the draft the writer has open; the overview names the others. Characters, places and things and mind maps are every draft's.
 - Beats are the planned events of the story. Each belongs to an arc (a storyline, plot thread or relationship) and is placed in a chapter, in order, or not placed yet. The writer ticks a beat off when it's written, and can link it to the passage that tells it.
 - Story time is the order things happen in the story's world, which can differ from the reading order (flashbacks, flash-forwards). Beats in different arcs can share a moment, happening at once. Two lines mark where the book begins and ends in story time: beats before are backstory, beats after are aftermath. A beat's "when" is the writer's own note ("The next morning").
 - Characters, and places, objects and groups, have a description and details the writer defines (Age, Wants, Fears…). Names in any text can be links (@mentions) to them.
@@ -50,7 +51,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     const data = await source.load(row.id)
     if (!data) throw new reader.NotFound(`“${row.title || 'Untitled story'}” isn’t there any more.`)
     const note = rows.length > 1 && !ref?.trim() ? `(From “${row.title || 'Untitled story'}”, the most recently edited of ${rows.length} stories; name another with the story argument.)\n\n` : ''
-    return { story: reader.storyOf(normalizeStory(data)), note }
+    return { story: reader.storyOf(upgradeStory(data)), note }
   }
 
   /** A tool that reads one story: its reply is the text, or what couldn't be found. */
@@ -86,7 +87,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     {
       title: 'Story overview',
       description:
-        'Start here. The whole story at a glance: chapters in reading order (status, length, point of view, summary, planned beats), beats not placed yet, arcs, characters, places and things, story time in brief, mind maps, goals.',
+        'Start here. The whole story at a glance: chapters in reading order (length, point of view, summary, planned beats), beats not placed yet, arcs, characters, places and things, story time in brief, mind maps, goals.',
       inputSchema: { story: storyArg },
       annotations: READ_ONLY,
     },
@@ -98,7 +99,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     {
       title: 'Read a chapter',
       description:
-        'One chapter: its status, length and target, point of view, summary, the beats planned for it (with the passages the writer linked to them), who is named in it, and its full text. Long chapters come in parts.',
+        'One chapter: its length and target, point of view, summary, the beats planned for it (with the passages the writer linked to them), who is named in it, and its full text. Long chapters come in parts.',
       inputSchema: {
         chapter: z.string().describe('The chapter’s number (e.g. "3") or title.'),
         part: z.number().int().min(1).optional().describe('For long chapters, which part to read (1 first).'),
@@ -203,7 +204,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     'get_writing_progress',
     {
       title: 'Writing progress',
-      description: 'Words written, goals and how close they are, each chapter’s status and length against its target, beats written, and words written each day for the last two weeks.',
+      description: 'Words written, goals and how close they are, each chapter’s length against its target, beats written, and words written each day for the last two weeks.',
       inputSchema: { story: storyArg },
       annotations: READ_ONLY,
     },

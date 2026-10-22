@@ -8,8 +8,6 @@ import { Link } from 'react-router-dom'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { MentionText } from '../components/MentionText'
 import { PovPicker } from '../components/PovPicker'
-import { isShelved } from '../lib/chapterStatus'
-import { StatusPicker } from '../components/StatusPicker'
 import { plainText } from '../lib/mentions'
 import { BeatComposer } from '../components/BeatComposer'
 import { BeatCardView, DraggableBeatCard } from '../components/BeatCard'
@@ -79,7 +77,7 @@ export function ChapterColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}${isShelved(chapter) ? ' shelved' : ''}`}
+      className={`chapter${isDragging ? ' placeholder' : ''}${isDropTarget ? ' drop-target' : ''}${pov ? ' has-pov' : ''}`}
       style={{ transform: CSS.Translate.toString(transform), transition, '--pov': pov?.color } as React.CSSProperties}
       aria-label={`Chapter ${number}`}
       data-chapter={chapter.id}
@@ -134,7 +132,6 @@ export function ChapterColumn({
             {words ? `${words.toLocaleString()} word${words === 1 ? '' : 's'}` : 'Write'}
             {chapter.targetWords ? <span className="chapter-target"> / {chapter.targetWords.toLocaleString()}</span> : null}
           </Link>
-          <StatusPicker chapter={chapter} />
         </div>
       </header>
       <div className="chapter-beats" data-chapter-list={chapter.id}>

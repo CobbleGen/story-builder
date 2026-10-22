@@ -1,7 +1,7 @@
 import { useStore } from 'zustand'
 import type { StoryData } from '../types'
 import { STORY_KEYS, pickData, useStory } from '../store/storyStore'
-import { normalizeStory } from '../store/storyOps'
+import { upgradeStory } from '../store/archive'
 import { backupNow, flushStory } from '../store/persistence'
 import { saveBackup } from '../store/backups'
 import { getImage, imageIdsIn, retryMissingPictures, setRemotePictures } from '../store/images'
@@ -52,7 +52,7 @@ export const cloud: Cloud | null =
         backend: () => (testBackend ? Promise.resolve(testBackend()) : import('./supabaseBackend').then((m) => m.supabaseBackend(URL_!, KEY!))),
         story: {
           read: () => pickData(useStory.getState()),
-          prepare: (data) => normalizeStory(data),
+          prepare: (data) => upgradeStory(data),
           load: (data: StoryData) => {
             useStory.getState().loadStory(data)
             retryMissingPictures()

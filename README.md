@@ -11,17 +11,23 @@ assistant such as Claude read all of it and give you feedback (see
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
   chapter by its "Chapter N" label to reorder the book (numbers update
-  automatically). Each chapter has a **status** (outline, draft, revised,
-  done) shown as a coloured pill, and can have a word target.
-- **Shelved chapters**: set a chapter's status to **Shelved** to set it aside
-  for now. It keeps its place, text and beats, but looks set aside (a dashed,
-  hatched card; marked on the timeline strip and in the manuscript), and its
-  words are left out of the manuscript's count and the draft goal (shown
-  apart, as "shelved") and out of the export (unless you tick it back in).
-  Writing in it still counts toward the day's words. "Put it back" on its
-  manuscript page makes it a draft again. Chapter numbers stay as on the
-  board, so move a shelved chapter to the end to keep the export's numbers
-  in a row.
+  automatically). A chapter can have a word target.
+- **Drafts** (under the story's title): each draft is a book of its own, with
+  its own chapters and their text, arcs and beats (in their chapters), and
+  story time; the characters, places and things, mind maps, goals, word logs
+  and book style are the story's, in every draft. **New draft from this one**
+  copies the open draft to rework (the same chapters and beats to change,
+  delete or add to; the draft it came from stays as it was), and **New blank
+  draft** starts from nothing. Open another draft from the same menu; rename
+  one (double-click its name) or delete one (the bin by its name, one step to
+  undo). Whatever is open on the board, manuscript, timeline, search, word
+  counts and export is the open draft (an exported file's name says which
+  draft), and so is what an AI assistant reads. A mind map's cards for
+  chapters, arcs and beats show in the drafts they're in; things archived
+  from a draft come back in it (other drafts' are listed apart in the
+  Archived tab). Opening another draft starts undo afresh. (Drafts take the
+  place of the chapter status of before: chapters that were shelved are now
+  in the Archived tab.)
 - **Beats** are cards, colour-coded by the **arc** they belong to. Click a
   beat to edit its title and notes, or to change its arc or chapter.
 - **Archive** anything you want out of the way without deleting it: a
@@ -249,7 +255,7 @@ assistant such as Claude read all of it and give you feedback (see
 - **The chapter strip**: along the top in reading order, each chapter shows
   its number, title and point of view. Drag a chapter's number to move where
   it begins, as with the line below it. Click the number or the title to
-  give the chapter a title, point of view and status right there (Enter or
+  give the chapter a title and point of view right there (Enter or
   Esc closes it); double-click it, or **Write** in its details, to open it
   in the manuscript. Hover the strip for a + on its lower edge: between two
   of a chapter's beats it splits the chapter there, the new chapter taking
@@ -382,7 +388,7 @@ What the assistant can read, each as a tool:
 
 | Tool | What it gives |
 | --- | --- |
-| `get_story_overview` | The whole story at a glance, where it starts: chapters (status, length, point of view, summary, beats), arcs, characters, places and things, story time in brief, mind maps, goals |
+| `get_story_overview` | The whole story at a glance, where it starts: chapters (length, point of view, summary, beats), arcs, characters, places and things, story time in brief, mind maps, goals, and the drafts (the open one is read) |
 | `read_chapter` | One chapter with its plan: its beats and the passages linked to them, who's named in it, and its text (long chapters in parts) |
 | `read_manuscript` | The text straight through, as much as fits in one reply, and where to carry on |
 | `get_outline` | Every chapter's beats in order, beats not in a chapter yet, and each arc's beats in its own order |
@@ -449,7 +455,7 @@ any static host or sub-folder.
 
 - `src/types.ts`: the data model (story → chapters, arcs, beats, characters,
   places and things, chapter texts, story time, mind maps, goals, archive,
-  the book's style)
+  the book's style, drafts)
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
@@ -485,6 +491,10 @@ any static host or sub-folder.
 - `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
   (the Word library loads only when exporting)
 - `src/store/history.ts`: undo and redo
+- `src/store/drafts.ts` and `src/lib/drafts.ts`: drafts (the open one's book
+  is the story's own fields; opening another puts it away and takes that
+  one's out), tested in `drafts.test.ts`; `src/components/DraftSwitcher.tsx`
+  is the menu under the title
 - `src/store/archive.ts`: archiving (what goes with a thing, and where it
   all was) and bringing back; restoring or deleting one is done with
   everything archived back in the story, then the rest archived again, so

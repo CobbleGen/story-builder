@@ -68,7 +68,7 @@ describe('archiving', () => {
     expect(archived.archive[0]).toMatchObject({ kind: 'chapter', id: chapter.id, at: AT })
     expect(archived.archive[0].beats.map((b) => b.id)).toEqual(beats)
     // Out of the word count, but not the outline's tally.
-    expect(manuscriptWords(archived).total).toBe(manuscriptWords(data).total - (data.texts[chapter.id]?.words ?? 0))
+    expect(manuscriptWords(archived)).toBe(manuscriptWords(data) - (data.texts[chapter.id]?.words ?? 0))
     expect(ops.logOutline(data, archived, '2026-01-01')).toBe(archived)
 
     const back = restoreArchived(archived, chapter.id)

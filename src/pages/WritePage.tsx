@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { Archive, ChevronDown, ChevronLeft, ChevronRight, FileUp, ListChecks, Plus } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, FileUp, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
+import { onBeforeSwitch, useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
 import { archivedBeatIds } from '../lib/archived'
 import { useUi } from '../store/uiStore'
 import { flushStory, useSaveStatus } from '../store/persistence'
@@ -26,7 +26,6 @@ import { SprintButton } from '../components/Sprint'
 import { FOCUS_KEYS, leaveFocus } from '../lib/focus'
 import { countWords, wordChange } from '../editor/wordChanges'
 import { tally, type WordTally } from '../lib/progress'
-import { isShelved } from '../lib/chapterStatus'
 import type { TextFind } from '../lib/search'
 import { Toolbar } from '../editor/Toolbar'
 import { SelectionMenu } from '../editor/SelectionMenu'
@@ -35,7 +34,6 @@ import { NewBeatDialog } from '../editor/NewBeatDialog'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { dayKey } from '../store/storyOps'
 import { PovPicker } from '../components/PovPicker'
-import { StatusPicker } from '../components/StatusPicker'
 
 const SAVE_DELAY_MS = 400
 const SAFE_COLOR = /^#[0-9a-f]{3,8}$/i
@@ -200,6 +198,9 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     },
   })
 
+  // What's written is saved before another draft (or story) opens, so it stays in this one.
+  useEffect(() => onBeforeSwitch(saveNow), [saveNow])
+
   // Save when leaving the chapter, and before the page is hidden or closed.
   useEffect(() => {
     const onHide = () => {
@@ -349,11 +350,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     editor,
     selector: ({ editor: e }) => (e ? countWords(e.state.doc) : 0),
   })
-  // The book's words, this chapter's as they are now (shelved chapters are left out).
-  const totalWords = chapters.reduce(
-    (sum, c) => (isShelved(c) ? sum : sum + (c.id === chapter.id ? (words ?? 0) : (texts[c.id]?.words ?? 0))),
-    0,
-  )
+  // The book's words, this chapter's as they are now.
+  const totalWords = chapters.reduce((sum, c) => sum + (c.id === chapter.id ? (words ?? 0) : (texts[c.id]?.words ?? 0)), 0)
   const todayWords = useStory((s) => s.wordLog[dayKey()] ?? 0)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
 
@@ -375,7 +373,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const prev = chapters[index - 1]
   const next = chapters[index + 1]
   const chapterLabel = (c: Chapter, i: number) =>
-    `Chapter ${i + 1}${c.title ? `: ${plainText(c.title, lookup)}` : ''}${isShelved(c) ? ' (shelved)' : ''}`
+    `Chapter ${i + 1}${c.title ? `: ${plainText(c.title, lookup)}` : ''}`
 
   const openNewBeat = () => {
     const { from, to, empty } = editor.state.selection
@@ -416,7 +414,6 @@ function ChapterWriter({ chapter, index }: WriterProps) {
         </select>
       </label>
       <span className="write-head-pickers">
-        <StatusPicker chapter={chapter} />
         <PovPicker chapter={chapter} />
       </span>
     </div>
@@ -432,15 +429,6 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   )
   const notes = (
     <>
-      {isShelved(chapter) && (
-        <div className="write-shelved" role="note">
-          <Archive size={16} aria-hidden />
-          <span>Shelved for now: its words aren’t counted in the manuscript, and it’s left out when you export.</span>
-          <button className="btn ghost small" onClick={() => updateChapter(chapter.id, { status: words ? 'draft' : 'outline' })}>
-            Put it back
-          </button>
-        </div>
-      )}
       {contentError && (
         <div className="write-error" role="alert">
           This chapter’s text couldn’t be opened, so editing is paused to keep it safe. You can restore an

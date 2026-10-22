@@ -30,6 +30,7 @@ import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
 import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
+import { DraftSwitcher } from './DraftSwitcher'
 import { AccountButton, AssistantDialog } from './Account'
 import { cloud, useCloud } from '../cloud'
 import { useUi } from '../store/uiStore'
@@ -47,9 +48,8 @@ export function TopBar() {
   const setTheme = useUi((s) => s.setTheme)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
   const setSearchOpen = useUi((s) => s.setSearchOpen)
-  // Shelved chapters are left out of the book's count.
-  const total = useStory((s) => manuscriptWords(s).total)
-  const shelved = useStory((s) => manuscriptWords(s).shelved)
+  // The open draft's words.
+  const total = useStory((s) => manuscriptWords(s))
   const outline = useStory((s) => outlineWords(s).total)
   const goal = useStory((s) => s.goals.draft)
 
@@ -114,14 +114,18 @@ export function TopBar() {
       <span className="topbar-sep" aria-hidden>
         /
       </span>
-      <input
-        className="story-title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Untitled story"
-        aria-label="Story title"
-        size={Math.max(12, title.length + 1)}
-      />
+      {/* The story's title, and under it the draft that's open. */}
+      <div className="title-stack">
+        <input
+          className="story-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Untitled story"
+          aria-label="Story title"
+          size={Math.max(12, title.length + 1)}
+        />
+        <DraftSwitcher />
+      </div>
       {/* On narrow phones the pages are icons, with their names as labels. */}
       <nav className="topnav">
         <NavLink to="/" end aria-label="Chapter board" title="Chapter board">
@@ -157,12 +161,12 @@ export function TopBar() {
         <button
           className="topbar-progress"
           onClick={() => setProgressOpen(true)}
-          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript${shelved ? ` (${shelved.toLocaleString()} more in shelved chapters)` : ''}, ${outline.toLocaleString()} in the outline: word counts and goals`}
+          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript, ${outline.toLocaleString()} in the outline: word counts and goals`}
           aria-label="Word counts and goals"
         >
           <Target size={16} />
           {/* While there's only an outline, its count; then the manuscript's, with the outline's beside it where there's room. */}
-          {!total && !shelved && outline ? (
+          {!total && outline ? (
             <span className="topbar-words">{outline.toLocaleString()} outline words</span>
           ) : (
             <>

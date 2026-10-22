@@ -32,8 +32,6 @@
   /* Chart marks: validated against both surfaces (dataviz checks), words added and words cut as a pair. */
   --chart-accent: #3e63dd;
   --chart-cut: #eb6834;
-  /* Shelved chapters: set aside for now. */
-  --shelved: #8e6c88;
   /* Search matches, like a highlighter pen. */
   --mark: rgba(245, 190, 50, 0.42);
 
@@ -485,6 +483,154 @@ a {
 
 .menu {
   position: relative;
+}
+
+/* ---------- Drafts (by the story's title) ---------- */
+
+.title-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.title-stack .story-title {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.draft-switcher {
+  position: relative;
+  flex: none;
+  max-width: 100%;
+}
+
+.draft-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 19px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.draft-switcher-btn:hover,
+.draft-switcher-btn[aria-expanded='true'] {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.draft-switcher-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-switcher-count {
+  padding: 0 5px;
+  line-height: 15px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-switcher-name {
+  width: 180px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--focus);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.draft-menu {
+  width: 300px;
+}
+
+.draft-menu-head {
+  padding: 6px 10px 4px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.draft-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.draft-row .menu-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.draft-item-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.draft-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-item-size {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.draft-delete {
+  opacity: 0;
+}
+
+.draft-row:hover .draft-delete,
+.draft-delete:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .draft-delete {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .draft-switcher .draft-menu {
+    position: fixed;
+    top: 54px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+}
+
+/* On a phone the open draft is named in the menu; here, just its sign. */
+@media (max-width: 520px) {
+  .draft-switcher-label {
+    display: none;
+  }
 }
 
 .menu-list {
@@ -2741,6 +2887,41 @@ a {
   height: 26px;
 }
 
+.archived-other {
+  margin: 14px 4px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.archived-other-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 4px 4px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.archived-other-head .btn {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.archived-other-list {
+  margin: 0;
+  padding: 0 4px 0 22px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.archived-other-list li {
+  padding: 2px 0;
+}
+
 .archived-empty {
   margin: 18px 12px;
   color: var(--ink-2);
@@ -3353,118 +3534,6 @@ a {
   font-weight: 400;
 }
 
-/* ---------- Chapter status ---------- */
-
-.status-outline {
-  --status: var(--ink-3);
-}
-
-.status-draft {
-  --status: #3e63dd;
-}
-
-.status-revised {
-  --status: #c4861a;
-}
-
-.status-done {
-  --status: var(--success);
-}
-
-.status-shelved {
-  --status: var(--shelved);
-}
-
-/* A shelved chapter: set aside for now, kept but out of the book. */
-.chapter.shelved {
-  background:
-    repeating-linear-gradient(-45deg, transparent 0 9px, color-mix(in srgb, var(--ink-3) 6%, transparent) 9px 18px),
-    var(--column);
-  border-style: dashed;
-  border-color: var(--line-strong);
-  box-shadow: none;
-}
-
-.chapter.shelved.has-pov {
-  box-shadow: inset 0 4px 0 color-mix(in srgb, var(--pov) 40%, transparent);
-}
-
-.chapter.shelved .chapter-title,
-.chapter.shelved .chapter-summary {
-  color: var(--ink-2);
-}
-
-.chapter.shelved .chapter-beats {
-  opacity: 0.72;
-}
-
-.tl-chapter.shelved .tl-chapter-name {
-  color: var(--ink-3);
-}
-
-.tl-chapter-shelved {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  color: color-mix(in srgb, var(--shelved) 80%, var(--shade));
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.progress-table tr.shelved .progress-chapter,
-.progress-table tr.shelved td.num {
-  color: var(--ink-3);
-}
-
-.status-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  height: 22px;
-  padding-left: 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--status) 13%, var(--tint));
-  color: color-mix(in srgb, var(--status) 78%, var(--shade));
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.status-pill:hover {
-  background: color-mix(in srgb, var(--status) 20%, var(--tint));
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--status);
-}
-
-.status-pill select {
-  height: 100%;
-  padding: 0 22px 0 5px;
-  border: 0;
-  outline: none;
-  appearance: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.status-pill:focus-within {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 50%, transparent);
-}
-
-.status-chevron {
-  position: absolute;
-  right: 7px;
-  pointer-events: none;
-}
-
 .chapter-write {
   display: inline-flex;
   align-items: center;
@@ -3917,24 +3986,6 @@ a {
   box-shadow: 0 0 0 2px var(--focus);
 }
 
-.write-shelved {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 8px 8px 8px 14px;
-  border: 1px dashed color-mix(in srgb, var(--shelved) 45%, var(--line));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--shelved) 8%, var(--surface));
-  color: color-mix(in srgb, var(--shelved) 70%, var(--shade));
-  font-family: var(--sans);
-  font-size: 13.5px;
-}
-
-.write-shelved span {
-  flex: 1;
-}
-
 .write-error {
   margin-bottom: 20px;
   padding: 12px 14px;
@@ -4257,7 +4308,6 @@ a {
   margin-top: 4px;
 }
 
-.write-above .write-shelved,
 .write-above .write-error {
   margin: 10px 0 0;
 }

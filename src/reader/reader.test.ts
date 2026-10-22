@@ -92,7 +92,7 @@ describe('the overview', () => {
   it('starts with the story in numbers and tells backstory from the book', () => {
     const text = overview(storyOf(buildSampleStory()))
     expect(text).toMatch(/^# The Lighthouse at Gull Point\n\n4 chapters · 274 words written in the manuscript\n14 beats planned \(2 ticked off as written\) in 4 arcs/)
-    expect(text).toMatch(/3\. The Logbook — status: draft · 274 words \(3,000-word target\) · point of view: Mara/)
+    expect(text).toMatch(/3\. The Logbook — 274 words \(3,000-word target\) · point of view: Mara/)
     expect(text).toMatch(/Backstory, before the book begins: Elias’s first run\./)
     expect(text).toMatch(/Who knows what — 1 text box, 4 characters, 1 place or thing, 1 arc, 1 chapter, 1 note; 6 lines/)
   })
@@ -133,17 +133,3 @@ describe('writing progress', () => {
   })
 })
 
-describe('shelved chapters', () => {
-  it('leaves them out of the book’s words and reads them only on their own', () => {
-    let data = buildSampleStory()
-    const logbook = data.chapters[2]
-    const words = data.texts[logbook.id].words
-    data = { ...data, chapters: data.chapters.map((c) => (c.id === logbook.id ? { ...c, status: 'shelved' as const } : c)) }
-    const story = storyOf(data)
-    expect(overview(story)).toMatch(new RegExp(`0 words written in the manuscript \\(and ${words} words in shelved chapters, set aside for now\\)`))
-    expect(readChapter(story, 3)).toMatch(/status: shelved/)
-    const manuscript = readManuscript(story)
-    expect(manuscript).toMatch(new RegExp(`## Chapter 3: The Logbook\\n\\n\\(Shelved: set aside for now and not part of the book; read_chapter 3 has its ${words} words\\.\\)`))
-    expect(readChapter(story, 3)).toMatch(/She started with the desk/)
-  })
-})

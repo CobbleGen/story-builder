@@ -1,6 +1,7 @@
 import type { Arc, ArchiveKind, ArchivedItem, Beat, Chapter, MapEdge, MapNode, StoryData } from '../types'
 import { anchorItemId } from '../lib/anchors'
-import { mainOf } from '../lib/archived'
+import { inOpenDraft, mainOf } from '../lib/archived'
+import { idsElsewhere } from '../lib/drafts'
 import { makeId } from '../lib/id'
 import { defaultMindMap, isContainer, normalizeStory } from './storyOps'
 
@@ -42,6 +43,8 @@ function takeOut(data: StoryData, kind: ArchiveKind, id: string, at: number, onl
     untils: {},
     steps: {},
     cards: [],
+    // (A chapter, arc or beat is its draft's.)
+    ...(kind === 'chapter' || kind === 'arc' || kind === 'beat' ? { draft: data.draft } : {}),
   }
   let next = data
   let beatIds: string[] = []
@@ -153,6 +156,9 @@ function takeOut(data: StoryData, kind: ArchiveKind, id: string, at: number, onl
   }
 
   // Its cards on the maps, with their lines (and lines from it inside other cards).
+  // (Not cards for chapters, arcs and beats also in another draft: they're its cards too.)
+  const elsewhere = idsElsewhere(data)
+  for (const ref of refs) if (elsewhere.has(ref)) refs.delete(ref)
   const anchored = (anchor?: string) => {
     const at = anchor ? anchorItemId(anchor) : null
     return !!at && refs.has(at)
@@ -307,17 +313,24 @@ export function archiveItem(data: StoryData, kind: ArchiveKind, id: string, at: 
  * `keep`: archived items not to archive again (brought back).
  */
 export function throughArchive(data: StoryData, change: (all: StoryData) => StoryData, keep: Set<ArchivedItem> = new Set()): StoryData {
-  if (!data.archive.length) return change(data)
+  // (What's archived from other drafts stays as it is: it's theirs.)
+  const here = data.archive.filter(inOpenDraft(data))
+  if (!here.length) return change(data)
   let all: StoryData = { ...data, archive: [] }
-  for (let i = data.archive.length - 1; i >= 0; i--) all = putBack(all, data.archive[i])
+  for (let i = here.length - 1; i >= 0; i--) all = putBack(all, here[i])
   let next = change(normalizeStory(all))
-  for (const item of data.archive) {
+  const again = new Map<ArchivedItem, ArchivedItem>()
+  for (const item of here) {
     if (keep.has(item)) continue
     const beats = item.kind === 'chapter' ? new Set(item.beats.map((b) => b.id)) : undefined
     const taken = takeOut(next, item.kind, item.id, item.at, beats)
-    if (taken) next = { ...taken[0], archive: [...next.archive, taken[1]] }
+    if (!taken) continue
+    next = taken[0]
+    again.set(item, taken[1])
   }
-  return keepUnchanged(data, { ...next, archive: next.archive })
+  const mine = new Set(here)
+  const archive = data.archive.flatMap((a) => (!mine.has(a) ? [a] : again.has(a) ? [again.get(a)!] : []))
+  return keepUnchanged(data, { ...next, archive })
 }
 
 /**
@@ -326,12 +339,13 @@ export function throughArchive(data: StoryData, change: (all: StoryData) => Stor
  * is archived comes back in no chapter.
  */
 export function restoreArchived(data: StoryData, id: string): StoryData {
-  const item = data.archive.find((a) => a.id === id)
+  const here = data.archive.filter(inOpenDraft(data))
+  const item = here.find((a) => a.id === id)
   if (!item) return data
   const keep = new Set([item])
   if (item.kind === 'beat') {
     const arcId = item.beats[0]?.arcId
-    const arc = data.archive.find((a) => a.kind === 'arc' && a.arcs.some((r) => r.id === arcId))
+    const arc = here.find((a) => a.kind === 'arc' && a.arcs.some((r) => r.id === arcId))
     if (arc) keep.add(arc)
   }
   return throughArchive(data, (all) => all, keep)
@@ -353,7 +367,7 @@ export function deleteArchived(
     deleteMindMap: (d: StoryData, id: string) => StoryData
   },
 ): StoryData {
-  const item = data.archive.find((a) => a.id === id)
+  const item = data.archive.filter(inOpenDraft(data)).find((a) => a.id === id)
   if (!item || !mainOf(item)) return data
   return throughArchive(
     data,
@@ -425,4 +439,21 @@ function keepUnchanged(was: StoryData, now: StoryData): StoryData {
     timeline: same(was.timeline, now.timeline) ? was.timeline : now.timeline,
     archive: now.archive.length === was.archive.length && now.archive.every((a, i) => same(a, was.archive[i])) ? was.archive : now.archive,
   }
+}
+
+// ---------- Saves from before ----------
+
+/**
+ * A story as saved, made right (see normalizeStory). Chapters shelved
+ * before drafts and archiving replaced chapter status are archived.
+ */
+export function upgradeStory(input: unknown, at: number = Date.now()): StoryData {
+  const data = normalizeStory(input)
+  const raw = typeof input === 'object' && input !== null ? (input as { chapters?: unknown }) : {}
+  const shelved = (Array.isArray(raw.chapters) ? raw.chapters : []).flatMap((c) =>
+    typeof c === 'object' && c !== null && (c as { status?: unknown }).status === 'shelved' && typeof (c as { id?: unknown }).id === 'string'
+      ? [(c as { id: string }).id]
+      : [],
+  )
+  return shelved.reduce((d, id) => archiveItem(d, 'chapter', id, at), data)
 }
