@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { StoryData } from '../types'
+import type { FindQuery } from '../lib/replace'
 import * as ops from './storyOps'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
@@ -55,6 +56,8 @@ interface StoryActions {
   moveAttribute: (...args: Tail<Parameters<typeof ops.moveAttribute>>) => void
   setChapterText: (...args: Tail<Parameters<typeof ops.setChapterText>>) => void
   setGoals: (...args: Tail<Parameters<typeof ops.setGoals>>) => void
+  /** Every match replaced in the chapters' text: one undo step. How many, in how many chapters. */
+  replaceText: (query: FindQuery, replacement: string) => { count: number; chapters: number }
   /** A finished sprint, kept with the story (not an undo step). */
   addSprint: (...args: Tail<Parameters<typeof ops.addSprint>>) => void
   addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
@@ -197,6 +200,12 @@ export const useStory = create<StoryStore>()(
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
         setGoals: (...a) => apply(ops.setGoals(data(), ...a), 'setGoals', a[0]),
         addSprint: (...a) => apply(ops.addSprint(data(), ...a)),
+        replaceText: (query, replacement) => {
+          // Stamped before the history notes it, so undo brings the texts back.
+          const [next, done] = ops.replaceInText(data(), query, replacement, Date.now())
+          apply(next, 'replaceText', query.text)
+          return done
+        },
         addMapNode: (...a) => withId(ops.addMapNode(data(), ...a), 'addMapNode', a[0]),
         updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0]),
         moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a), 'moveMapNodes', a[0]),

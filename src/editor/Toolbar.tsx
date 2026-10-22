@@ -5,6 +5,7 @@ import { insertPictures } from './picture'
 import {
   Bold,
   Focus,
+  Search,
   ImagePlus,
   Italic,
   List,
@@ -52,11 +53,14 @@ export function Toolbar({
   editor,
   onFocusMode,
   focusKeys,
+  onFind,
   children,
 }: {
   editor: Editor
   onFocusMode?: () => void
   focusKeys?: string
+  /** Opens find and replace. */
+  onFind?: () => void
   /** More tools at the end (the writing sprint). */
   children?: ReactNode
 }) {
@@ -156,9 +160,14 @@ export function Toolbar({
       >
         <RemoveFormatting size={17} />
       </ToolButton>
+      {(onFind || onFocusMode) && <span className="tool-sep" />}
+      {onFind && (
+        <ToolButton label="Find and replace" shortcut={`${mod}F`} onClick={onFind}>
+          <Search size={17} />
+        </ToolButton>
+      )}
       {onFocusMode && (
         <>
-          <span className="tool-sep" />
           <ToolButton label="Focus mode: only the page on screen" shortcut={focusKeys} onClick={onFocusMode}>
             <Focus size={17} />
           </ToolButton>

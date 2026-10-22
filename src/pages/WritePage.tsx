@@ -13,6 +13,9 @@ import { manuscriptExtensions } from '../editor/extensions'
 import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
 import { CurrentBlock } from '../editor/currentBlock'
+import { FindHighlight } from '../editor/findHighlight'
+import { FindPanel } from '../editor/FindPanel'
+import { useFind } from '../store/findStore'
 import { FocusControls } from '../editor/FocusControls'
 import { SprintButton } from '../components/Sprint'
 import { FOCUS_KEYS, leaveFocus } from '../lib/focus'
@@ -73,6 +76,8 @@ export default function WritePage() {
   const epoch = useStoryEpoch((s) => s.epoch)
   const index = chapters.findIndex((c) => c.id === chapterId)
   useFocusKeys()
+  // Find and replace stays open from chapter to chapter, but not beyond the manuscript.
+  useEffect(() => () => useFind.getState().close(), [])
 
   if (chapters.length === 0) return <NoChapters />
   if (index === -1) {
@@ -137,6 +142,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
 
   useEffect(() => setLastChapterId(chapter.id), [chapter.id, setLastChapterId])
 
+  // The saved text the editor holds: what it opened with, or last saved. Any other is a change from outside.
+  const known = useRef(useStory.getState().texts[chapter.id])
   const saveNow = useCallback(() => {
     clearTimeout(timer.current)
     const doc = unsaved.current
@@ -146,9 +153,10 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     setDirty(false)
     if (!doc || blocked.current) return
     setChapterText(chapter.id, { doc: doc.toJSON(), words: countWords(doc), updatedAt: Date.now() }, dayKey(), change)
+    known.current = useStory.getState().texts[chapter.id]
   }, [chapter.id, setChapterText])
 
-  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock], [index])
+  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock, FindHighlight], [index])
   const editor = useEditor({
     extensions,
     content: useStory.getState().texts[chapter.id]?.doc ?? '',
@@ -244,6 +252,47 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     }
     navigate('.', { replace: true, state: null })
   }, [find, editor, lookup, navigate, location.key])
+
+  // The chapter's text changed from outside the editor (replaced in every chapter, or that undone):
+  // show it, in place, without counting it as writing or making it an editor undo step.
+  const stored = useStory((s) => s.texts[chapter.id])
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || stored === known.current) return
+    known.current = stored
+    // The editor's own typing, not yet saved, is newer: it's saved over this next.
+    if (unsaved.current) return
+    try {
+      const doc = stored ? editor.schema.nodeFromJSON(stored.doc) : editor.schema.topNodeType.createAndFill()
+      if (!doc || doc.eq(editor.state.doc)) return
+      editor.view.dispatch(
+        editor.state.tr.replaceWith(0, editor.state.doc.content.size, doc.content).setMeta('addToHistory', false).setMeta('preventUpdate', true),
+      )
+    } catch {
+      // Text that can't be read stays as the editor has it.
+    }
+  }, [stored, editor])
+
+  // Find and replace: Ctrl+F (⌘F) to find, Ctrl+H or Ctrl+Alt+F (⌘⌥F) to replace; what's selected is what's found.
+  const findOpen = useFind((s) => s.open)
+  const openFind = useCallback(
+    (field: 'find' | 'replace') => {
+      const { from, to, empty } = editor.state.selection
+      const picked = empty ? '' : editor.state.doc.textBetween(from, to, '\n')
+      useFind.getState().show(field, picked && picked.length <= 80 && !picked.includes('\n') ? picked : undefined)
+    },
+    [editor],
+  )
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || document.querySelector('.modal')) return
+      const replace = e.code === 'KeyH' || (e.code === 'KeyF' && e.altKey)
+      if (e.code !== 'KeyF' && !replace) return
+      e.preventDefault()
+      openFind(replace ? 'replace' : 'find')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openFind])
 
   // Typewriter scrolling: the line being written stays near the middle, as you type or move with the keys.
   const scroller = useRef<HTMLDivElement>(null)
@@ -348,7 +397,12 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       )}
       <div className="write-stage">
         <div className="write-toolbar-row">
-          <Toolbar editor={editor} onFocusMode={focusMode ? undefined : () => setFocusMode(true)} focusKeys={FOCUS_KEYS}>
+          <Toolbar
+            editor={editor}
+            onFocusMode={focusMode ? undefined : () => setFocusMode(true)}
+            focusKeys={FOCUS_KEYS}
+            onFind={() => openFind('find')}
+          >
             <SprintButton />
           </Toolbar>
         </div>
@@ -418,7 +472,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
             </footer>
           </article>
         </div>
-        {focusMode && <FocusControls />}
+        {focusMode && !findOpen && <FocusControls />}
+        {findOpen && <FindPanel editor={editor} chapterId={chapter.id} flush={saveNow} />}
         {prev && (
           <Link to={`/write/${prev.id}`} className="chapter-nav prev" title={`Previous: ${chapterLabel(prev, index - 1)}`} aria-label={`Previous chapter: ${chapterLabel(prev, index - 1)}`}>
             <ChevronLeft size={22} />

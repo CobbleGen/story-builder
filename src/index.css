@@ -4114,6 +4114,219 @@ a {
   right: 16px;
 }
 
+/* ---------- Find and replace in the manuscript ---------- */
+
+.find-match {
+  border-radius: 2px;
+  background: var(--mark);
+}
+
+.find-match.current {
+  background: color-mix(in srgb, var(--chart-cut) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--chart-cut) 70%, transparent);
+}
+
+.find-panel {
+  position: absolute;
+  top: 52px;
+  right: 14px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(460px, calc(100% - 28px));
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.find-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.find-field:focus-within {
+  border-color: color-mix(in srgb, var(--focus) 60%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 18%, transparent);
+}
+
+.find-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+}
+
+.find-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.find-toggle:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.find-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.find-toggle.on {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--ink);
+}
+
+.find-count {
+  flex: none;
+  min-width: 64px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.find-scope-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.find-scope {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--column);
+}
+
+.find-scope-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.find-scope-btn.on {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+}
+
+.find-elsewhere {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.find-chapters {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.find-chapters li.muted {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.find-chapters button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.find-chapters button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.find-chapter-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-chapter-count {
+  flex: none;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.find-notice,
+.find-hint {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.find-hint {
+  color: var(--ink-3);
+}
+
+.find-undo {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--focus);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.find-undo:hover {
+  text-decoration: underline;
+}
+
 /* ---------- Writing sprints ---------- */
 
 .sprint-anchor {

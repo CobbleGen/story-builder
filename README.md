@@ -80,6 +80,17 @@ assistant such as Claude read all of it and give you feedback (see
   first and tick it to colour that text in the beat's arc. A switch turns the
   arc colours on and off. Select text and choose **New beat** to make a beat
   from it. Arrows on either side move to the previous and next chapter.
+- **Find and replace** (the magnifier in the manuscript's toolbar, Ctrl+F, or
+  Ctrl+H / Ctrl+Alt+F to start on Replace; ⌘F and ⌘⌥F on a Mac): matches
+  in the chapter are highlighted; Enter and Shift+Enter go through them.
+  **Match case** and **whole words** narrow it. **Replace** changes the one
+  picked out and moves on; **Replace all** changes every one in **this
+  chapter** (Ctrl+Z undoes it, in the text) or in **all chapters** (one
+  step: **Undo** right there, or from the chapter board's top bar). Looking
+  in all chapters, going past the last match carries on into the next
+  chapter that has one, and the panel lists how many each holds. Names
+  linked with @ aren't text to it: they change when the character or place
+  is renamed (it says so when what you're looking for is one).
 - **Focus mode** (the last button in the manuscript's toolbar, or Ctrl+Shift+F,
   ⌘⇧F on a Mac): only the page on screen. The top bar, beats and arrows go
   away; the toolbar and word count wait, faint, until the pointer comes

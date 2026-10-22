@@ -25,7 +25,7 @@ const sameMarks = (a: Mark[] | undefined, b: Mark[] | undefined) =>
   JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
 
 /** Joins neighbouring text nodes that carry the same marks. */
-function mergeText(nodes: RichNode[]): RichNode[] {
+export function mergeText(nodes: RichNode[]): RichNode[] {
   const out: RichNode[] = []
   for (const node of nodes) {
     const prev = out[out.length - 1]

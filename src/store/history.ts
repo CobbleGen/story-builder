@@ -111,6 +111,8 @@ const LABELS: Record<string, string> = {
   renameMindMap: 'rename map',
   deleteMindMap: 'delete map',
   replaceStory: 'replace story',
+  // "replace “Theo”"; see labelOf.
+  replaceText: 'replace text',
 }
 
 export const labelFor = (name: string) => LABELS[name] ?? 'change'
@@ -126,6 +128,7 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
   if (name === 'insertChapter' && target === 'split') return 'split chapter'
+  if (name === 'replaceText' && typeof target === 'string' && target) return `replace “${target.length > 24 ? `${target.slice(0, 23)}…` : target}”`
   if (name === 'setArcOutline' && target === null) return 'remove arc outline'
   if (name === 'moveBookMarker') return `${LABELS[name]} ${target === 'end' ? 'ends' : 'begins'}`
   // Several beats moved at once.

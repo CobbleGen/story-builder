@@ -29,6 +29,7 @@ import { anchorItemId, cleanAnchor } from '../lib/anchors'
 import { timeJumps } from '../lib/timeline'
 import { outlineKind, spreadSteps } from '../lib/outlines'
 import { netChange, outlineWords, tally, type WordChange } from '../lib/progress'
+import { matcher, replaceInDoc, wordsInDoc, type FindQuery } from '../lib/replace'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
@@ -245,6 +246,40 @@ export function setChapterText(
     change ?? netChange(text.words - (data.texts[chapterId]?.words ?? 0)),
   )
   return wordLog === data.wordLog && wordCuts === data.wordCuts ? next : { ...next, wordLog, wordCuts }
+}
+
+/**
+ * Every match of the query replaced in the chapters' text, as one change.
+ * The texts it changes are stamped `at`, from before the undo history notes
+ * the change, so undoing it brings them back (unless written in since); their
+ * words are counted in the day's tallies. With how many were replaced, in how
+ * many chapters.
+ */
+export function replaceInText(
+  data: StoryData,
+  query: FindQuery,
+  replacement: string,
+  at: number,
+  day: string = dayKey(),
+): [StoryData, { count: number; chapters: number }] {
+  const re = matcher(query)
+  const none: [StoryData, { count: number; chapters: number }] = [data, { count: 0, chapters: 0 }]
+  if (!re) return none
+  let { texts, wordLog, wordCuts } = data
+  let count = 0
+  let chapters = 0
+  for (const c of data.chapters) {
+    const text = data.texts[c.id]
+    if (!text) continue
+    const done = replaceInDoc(text.doc, re, replacement)
+    if (!done.count) continue
+    const words = wordsInDoc(done.doc)
+    texts = { ...texts, [c.id]: { doc: done.doc, words, updatedAt: at } }
+    ;[wordLog, wordCuts] = logWords(wordLog, wordCuts, day, netChange(words - text.words))
+    count += done.count
+    chapters++
+  }
+  return count ? [{ ...data, texts, wordLog, wordCuts }, { count, chapters }] : none
 }
 
 /**
