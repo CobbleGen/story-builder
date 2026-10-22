@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ChevronDown, Trash2 } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Archive, ChevronDown, Trash2 } from 'lucide-react'
 import { BackLink } from '../components/BackLink'
 import { useBack } from '../lib/trail'
 import type { ElementKind, StoryElement } from '../types'
@@ -11,6 +11,8 @@ import { displayName } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { placeCount } from '../lib/mentionedIn'
 import { useMentionPlaces } from '../lib/useMentionPlaces'
+import { NotInStory } from '../components/Archived'
+import { useArchive } from '../lib/useArchive'
 import { Sidebar } from '../components/Sidebar'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ElementIcon } from '../components/ElementIcon'
@@ -55,13 +57,7 @@ export function ElementPage() {
         {element ? (
           <ElementView key={element.id} element={element} />
         ) : (
-          <div className="not-found">
-            <h1>Not found</h1>
-            <p>It may have been deleted.</p>
-            <Link className="btn primary" to="/">
-              Back to the board
-            </Link>
-          </div>
+<NotInStory id={elementId} title="Not found" gone="It may have been deleted." />
         )}
       </main>
     </div>
@@ -71,6 +67,7 @@ export function ElementPage() {
 function ElementView({ element }: { element: StoryElement }) {
   const updateElement = useStory((s) => s.updateElement)
   const deleteElement = useStory((s) => s.deleteElement)
+  const archive = useArchive()
   const setPortrait = useStory((s) => s.setPortrait)
   const { back } = useBack()
   const [showColors, setShowColors] = useState(false)
@@ -124,6 +121,14 @@ function ElementView({ element }: { element: StoryElement }) {
             submitOnEnter
             onChange={(value) => updateElement(element.id, { name: value })}
           />
+          <button
+            className="icon-btn"
+            onClick={() => back(() => archive('element', element.id, name))}
+            title={`Archive ${names.noun}: put it away, to bring back later`}
+            aria-label={`Archive ${names.noun}`}
+          >
+            <Archive size={18} />
+          </button>
           <button className="icon-btn danger" onClick={remove} title={`Delete ${names.noun}`} aria-label={`Delete ${names.noun}`}>
             <Trash2 size={18} />
           </button>

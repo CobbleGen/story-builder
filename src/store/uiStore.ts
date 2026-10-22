@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { DEFAULT_EXPORT, type ExportOptions } from '../lib/manuscript'
 
-export type SidebarMode = 'arcs' | 'characters' | 'world'
+export type SidebarMode = 'arcs' | 'characters' | 'world' | 'archived'
 /** The timeline in the order things happen, or in the order they're read. */
 export type TimelineMode = 'story' | 'reading'
 /** The word counts shown in the progress dialog: the manuscript's, or the outline's. */

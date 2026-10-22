@@ -3,6 +3,7 @@ import { displayName, lookupOf, plainText, type Lookup } from '../lib/mentions'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
 import { STATUS_LABELS } from '../lib/chapterStatus'
 import { readingOrder } from '../store/storyOps'
+import { archivedNamed } from '../lib/archived'
 
 // A story ready to be described in words, for an AI assistant reading it (see
 // server/mcp.ts): everything by its name, and found again by what a writer
@@ -28,7 +29,8 @@ export interface Story {
 }
 
 export function storyOf(data: StoryData): Story {
-  const lookup = lookupOf([...data.characters, ...data.elements])
+  // (Mentions of archived characters and places still read as their names.)
+  const lookup = lookupOf([...data.characters, ...data.elements, ...archivedNamed(data)])
   const plain = (stored: string) => plainText(stored ?? '', lookup).trim()
   const chapterIndex = new Map(data.chapters.map((c, i) => [c.id, i]))
   const arcs = new Map(data.arcs.map((a) => [a.id, a]))

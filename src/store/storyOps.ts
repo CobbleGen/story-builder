@@ -31,6 +31,7 @@ import { outlineKind, spreadSteps } from '../lib/outlines'
 import { netChange, outlineWords, tally, type WordChange } from '../lib/progress'
 import { matcher, replaceInDoc, wordsInDoc, type FindQuery } from '../lib/replace'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
+import { archiveOf, archivedOutlineWords } from '../lib/archived'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
@@ -318,7 +319,9 @@ export function replaceInText(
  * day's tallies (undoing, it takes back what was counted).
  */
 export function logOutline(before: StoryData, after: StoryData, day: string = dayKey(), undo = false): StoryData {
-  const change = outlineWords(after).total - outlineWords(before).total
+  // What's archived counts too: archiving isn't cutting (deleting it for good is).
+  const words = (d: StoryData) => outlineWords(d).total + archivedOutlineWords(d)
+  const change = words(after) - words(before)
   if (!change) return after
   const [outlineLog, outlineCuts] = logWords(after.outlineLog, after.outlineCuts, day, netChange(change, undo))
   return { ...after, outlineLog, outlineCuts }
@@ -381,6 +384,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     outlineLog: {},
     outlineCuts: {},
     sprints: [],
+    archive: [],
   }
 }
 
@@ -2269,5 +2273,6 @@ export function normalizeStory(input: unknown): StoryData {
     outlineLog,
     outlineCuts,
     sprints: sprintsOf(raw.sprints),
+    archive: archiveOf(raw.archive),
   })
 }

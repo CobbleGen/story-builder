@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import type { ElementKind, StoryData } from '../types'
+import type { ChapterText, ElementKind, StoryData } from '../types'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
+import { ARCHIVE_NOUNS, archivedText } from '../lib/archived'
 
 // Undo and redo for the story (the board, arcs, characters, the mind map…).
 // Each change keeps a copy of the story from just before it; the copies share
@@ -110,6 +111,10 @@ const LABELS: Record<string, string> = {
   addMindMap: 'new map',
   renameMindMap: 'rename map',
   deleteMindMap: 'delete map',
+  // "archive chapter", "bring back place", "delete arc for good"; see labelOf.
+  archive: 'archive',
+  restoreArchived: 'bring back',
+  deleteArchived: 'delete',
   replaceStory: 'replace story',
   importChapters: 'import chapters',
   // "replace “Theo”"; see labelOf.
@@ -126,6 +131,25 @@ function labelOf(name: string, before: StoryData, target: unknown): string {
         ? before.elements.find((e) => e.id === target)?.kind
         : (target as { kind?: ElementKind } | undefined)?.kind
     return `${LABELS[name]} ${kind ? ELEMENT_KIND_NAMES[kind].noun : 'item'}`
+  }
+  if (name === 'archive' || name === 'restoreArchived' || name === 'deleteArchived') {
+    const id = String(target)
+    const item = before.archive.find((a) => a.id === id)
+    const element = item ? item.elements[0] : before.elements.find((e) => e.id === id)
+    const noun = element
+      ? ELEMENT_KIND_NAMES[element.kind].noun
+      : item
+        ? ARCHIVE_NOUNS[item.kind]
+        : before.chapters.some((c) => c.id === id)
+          ? 'chapter'
+          : before.arcs.some((a) => a.id === id)
+            ? 'arc'
+            : before.beats[id]
+              ? 'beat'
+              : before.characters.some((c) => c.id === id)
+                ? 'character'
+                : 'map'
+    return `${LABELS[name]} ${noun}${name === 'deleteArchived' ? ' for good' : ''}`
   }
   if (name === 'setPortrait') return `${LABELS[name]} ${String(target).startsWith('elm_') ? 'picture' : 'portrait'}`
   if (name === 'insertChapter' && target === 'split') return 'split chapter'
@@ -165,16 +189,25 @@ export function remember(before: StoryData, name: string, target?: unknown) {
  * alone.
  */
 export function restore(copy: StoryData, now: StoryData, takenAt: number): StoryData {
+  // (A chapter's text may be in the archive, then or now.)
+  const newer = (id: string, then: ChapterText | undefined) => {
+    const current = now.texts[id] ?? archivedText(now, id)
+    return current && (!then || current.updatedAt > takenAt) ? current : then
+  }
   const texts: StoryData['texts'] = {}
   for (const chapter of copy.chapters) {
-    const current = now.texts[chapter.id]
-    const then = copy.texts[chapter.id]
-    const text = current && (!then || current.updatedAt > takenAt) ? current : then
+    const text = newer(chapter.id, copy.texts[chapter.id])
     if (text) texts[chapter.id] = text
   }
+  const archive = copy.archive.map((item) => {
+    const kept = item.chapters.map((c) => [c.id, newer(c.id, item.texts[c.id])] as const)
+    if (kept.every(([id, text]) => text === item.texts[id])) return item
+    return { ...item, texts: Object.fromEntries(kept.filter((k): k is readonly [string, ChapterText] => !!k[1])) }
+  })
   return {
     ...copy,
     texts,
+    archive,
     wordLog: now.wordLog,
     wordCuts: now.wordCuts,
     outlineLog: now.outlineLog,
@@ -184,6 +217,11 @@ export function restore(copy: StoryData, now: StoryData, takenAt: number): Story
 }
 
 let noticeId = 0
+
+/** A brief note of something done, where undo notes go ("Archived chapter 3…"). */
+export function notify(text: string) {
+  useHistory.setState({ notice: { text, id: ++noticeId } })
+}
 
 /** Steps back (or forward) through the history, handing the story to `apply`. */
 export function travel(direction: 'undo' | 'redo', current: StoryData, apply: (data: StoryData) => void) {

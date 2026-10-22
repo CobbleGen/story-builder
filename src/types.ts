@@ -244,6 +244,43 @@ export interface SprintRecord {
   goal?: number
 }
 
+/** What can be archived. */
+export type ArchiveKind = 'chapter' | 'arc' | 'beat' | 'character' | 'element' | 'map'
+
+/**
+ * Something archived: taken out of the story (its views, word counts and
+ * export) but kept, with what went with it and where everything was, so it
+ * can be put back as it was.
+ */
+export interface ArchivedItem {
+  kind: ArchiveKind
+  /** The archived thing's id. */
+  id: string
+  /** When it was archived (ms since 1970). */
+  at: number
+  /** It, and what went with it: a chapter's text and beats, an arc's beats. */
+  chapters: Chapter[]
+  arcs: Arc[]
+  beats: Beat[]
+  characters: Character[]
+  elements: StoryElement[]
+  mindMaps: MindMap[]
+  texts: Record<string, ChapterText>
+  /**
+   * The lists it was taken out of, as they were ('chapters', 'timeline',
+   * 'arc-beats:<arc id>', 'map:<map id>'…): to put it back in its place.
+   */
+  places: Record<string, string[]>
+  /** Chapters told from this character's point of view. */
+  povs: string[]
+  /** Beats that lasted until a beat taken: beat id → the beat taken. */
+  untils: Record<string, string>
+  /** Outline steps that were on beats taken: arc id → step id → beat. */
+  steps: Record<string, Record<string, string>>
+  /** Its cards on mind maps, with the lines to them, by map. */
+  cards: { mapId: string; nodes: MapNode[]; edges: MapEdge[] }[]
+}
+
 /** Word targets for the whole draft and for each day's writing. */
 export interface StoryGoals {
   draft?: number
@@ -284,4 +321,6 @@ export interface StoryData {
   outlineCuts: Record<string, number>
   /** Writing sprints, oldest first (the last 200). */
   sprints: SprintRecord[]
+  /** Things archived, oldest first. */
+  archive: ArchivedItem[]
 }

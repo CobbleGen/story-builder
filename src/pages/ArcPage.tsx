@@ -17,8 +17,10 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { Archive, BookOpen, ChevronDown, CircleDashed, GripVertical, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { BackLink } from '../components/BackLink'
+import { NotInStory } from '../components/Archived'
+import { useArchive } from '../lib/useArchive'
 import { useBack } from '../lib/trail'
 import type { Arc, Beat } from '../types'
 import { chapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
@@ -62,13 +64,7 @@ export function ArcPage() {
         {arc ? (
           <ArcView key={arc.id} arc={arc} />
         ) : (
-          <div className="not-found">
-            <h1>Arc not found</h1>
-            <p>It may have been deleted.</p>
-            <Link className="btn primary" to="/">
-              Back to the board
-            </Link>
-          </div>
+<NotInStory id={arcId} title="Arc not found" gone="It may have been deleted." />
         )}
       </main>
     </div>
@@ -79,6 +75,7 @@ function ArcView({ arc }: { arc: Arc }) {
   const beats = useStory((s) => s.beats)
   const updateArc = useStory((s) => s.updateArc)
   const deleteArc = useStory((s) => s.deleteArc)
+  const archive = useArchive()
   const moveArcBeat = useStory((s) => s.moveArcBeat)
   const placeOutlineStep = useStory((s) => s.placeOutlineStep)
   const { back } = useBack()
@@ -143,6 +140,14 @@ function ArcView({ arc }: { arc: Arc }) {
             submitOnEnter
             onChange={(name) => updateArc(arc.id, { name })}
           />
+          <button
+            className="icon-btn"
+            onClick={() => back(() => archive('arc', arc.id, `the arc “${plainText(arc.name, lookup) || 'Untitled arc'}”`))}
+            title="Archive arc: put it away with its beats, to bring back later"
+            aria-label="Archive arc"
+          >
+            <Archive size={18} />
+          </button>
           <button className="icon-btn danger" onClick={remove} title="Delete arc" aria-label="Delete arc">
             <Trash2 size={18} />
           </button>

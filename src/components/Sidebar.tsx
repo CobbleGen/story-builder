@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { ArrowUpRight, ChevronRight, CircleDashed, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
+import { Archive, ArrowUpRight, ChevronRight, CircleDashed, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
 import type { Arc, Beat, Character, ElementKind, StoryElement } from '../types'
 import { useChapterNumbers, useMentionLookup, useStory } from '../store/storyStore'
 import { useUi, type SidebarMode } from '../store/uiStore'
@@ -18,6 +18,7 @@ import { MentionTextarea } from './MentionTextarea'
 import { CharacterAvatar } from './CharacterAvatar'
 import { ElementIcon } from './ElementIcon'
 import { KindPicker } from './KindPicker'
+import { ArchivedPanel } from './Archived'
 
 interface Props {
   /** Beats can be dragged from the sidebar onto the chapter board. */
@@ -32,12 +33,14 @@ const MODES: { mode: SidebarMode; label: string; title: string }[] = [
   { mode: 'arcs', label: 'Arcs', title: 'Arcs and their beats' },
   { mode: 'characters', label: 'Characters', title: 'Characters' },
   { mode: 'world', label: 'World', title: 'Places, objects, groups and more' },
+  { mode: 'archived', label: 'Archived', title: 'Archived: put away, to bring back' },
 ]
 
 export function Sidebar({ dragEnabled = false, unassignActive = false, movingArcId = null }: Props) {
   const arcs = useStory((s) => s.arcs)
   const characters = useStory((s) => s.characters)
   const elements = useStory((s) => s.elements)
+  const archived = useStory((s) => s.archive.length)
   const open = useUi((s) => s.sidebarOpen)
   const mode = useUi((s) => s.sidebarMode)
   const setMode = useUi((s) => s.setSidebarMode)
@@ -116,13 +119,20 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
               key={m.mode}
               role="tab"
               aria-selected={mode === m.mode}
-              className={`mode-tab${mode === m.mode ? ' active' : ''}`}
+              aria-label={m.mode === 'archived' ? `Archived (${archived})` : undefined}
+              className={`mode-tab${mode === m.mode ? ' active' : ''}${m.mode === 'archived' ? ' archived-tab' : ''}`}
               title={m.title}
               onClick={() => setMode(m.mode)}
             >
-              {m.label}
+              {m.mode === 'archived' ? <Archive size={14} aria-hidden /> : m.label}
               <span className="mode-count">
-                {m.mode === 'arcs' ? arcs.length : m.mode === 'characters' ? characters.length : elements.length}
+                {m.mode === 'arcs'
+                  ? arcs.length
+                  : m.mode === 'characters'
+                    ? characters.length
+                    : m.mode === 'world'
+                      ? elements.length
+                      : archived || ''}
               </span>
             </button>
           ))}
@@ -140,6 +150,8 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
             ))}
             <NewArcForm />
           </>
+        ) : mode === 'archived' ? (
+          <ArchivedPanel />
         ) : mode === 'characters' ? (
           <>
             {characters.length === 0 && (

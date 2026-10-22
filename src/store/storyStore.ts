@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { StoryData } from '../types'
+import type { ArchiveKind, StoryData } from '../types'
 import type { FindQuery } from '../lib/replace'
 import * as ops from './storyOps'
+import { archiveItem, deleteArchived, restoreArchived, throughArchive } from './archive'
+import { archivedNamed } from '../lib/archived'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
@@ -62,6 +64,12 @@ interface StoryActions {
   importChapters: (...args: Tail<Parameters<typeof ops.importChapters>>) => string[]
   /** A finished sprint, kept with the story (not an undo step). */
   addSprint: (...args: Tail<Parameters<typeof ops.addSprint>>) => void
+  /** Archives a chapter, arc, beat, character, element or map, with what goes with it (a chapter's beats, say). */
+  archiveThing: (kind: ArchiveKind, id: string) => void
+  /** Brings an archived thing back where it was. */
+  restoreArchived: (id: string) => void
+  /** Deletes an archived thing for good. */
+  deleteArchived: (id: string) => void
   addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
   updateMapNode: (...args: Tail<Parameters<typeof ops.updateMapNode>>) => void
   moveMapNodes: (...args: Tail<Parameters<typeof ops.moveMapNodes>>) => void
@@ -102,6 +110,7 @@ export const STORY_KEYS = [
   'outlineLog',
   'outlineCuts',
   'sprints',
+  'archive',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -121,6 +130,7 @@ export const pickData = (s: StoryData): StoryData => ({
   outlineLog: s.outlineLog,
   outlineCuts: s.outlineCuts,
   sprints: s.sprints,
+  archive: s.archive,
 })
 
 /**
@@ -159,11 +169,11 @@ export const useStory = create<StoryStore>()(
         setTitle: (title) => apply({ ...data(), title }, 'setTitle'),
         addChapter: (...a) => withId(ops.addChapter(data(), ...a), 'addChapter', a[0]),
         updateChapter: (...a) => apply(ops.updateChapter(data(), ...a), 'updateChapter', a[0]),
-        deleteChapter: (...a) => apply(ops.deleteChapter(data(), ...a), 'deleteChapter', a[0]),
+        deleteChapter: (...a) => apply(throughArchive(data(), (d) => ops.deleteChapter(d, ...a)), 'deleteChapter', a[0]),
         moveChapter: (...a) => apply(ops.moveChapter(data(), ...a), 'moveChapter', a[0]),
         addArc: (...a) => withId(ops.addArc(data(), ...a), 'addArc', a[0]),
         updateArc: (...a) => apply(ops.updateArc(data(), ...a), 'updateArc', a[0]),
-        deleteArc: (...a) => apply(ops.deleteArc(data(), ...a), 'deleteArc', a[0]),
+        deleteArc: (...a) => apply(throughArchive(data(), (d) => ops.deleteArc(d, ...a)), 'deleteArc', a[0]),
         moveArc: (...a) => apply(ops.moveArc(data(), ...a), 'moveArc', a[0]),
         setBeatUntil: (...a) => apply(ops.setBeatUntil(data(), ...a), 'setBeatUntil', a[0]),
         setArcOutline: (...a) => apply(ops.setArcOutline(data(), ...a), 'setArcOutline', a[1]),
@@ -184,15 +194,15 @@ export const useStory = create<StoryStore>()(
         matchStoryOrder: () => apply(ops.matchStoryOrder(data()), 'matchStoryOrder'),
         moveChapterEdge: (...a) => apply(ops.moveChapterEdge(data(), ...a), 'moveChapterEdge', a[0]),
         insertChapter: (...a) => withId(ops.insertChapter(data(), ...a), 'insertChapter', a[1] === undefined ? 'empty' : 'split'),
-        deleteBeat: (...a) => apply(ops.deleteBeat(data(), ...a), 'deleteBeat', a[0]),
+        deleteBeat: (...a) => apply(throughArchive(data(), (d) => ops.deleteBeat(d, ...a)), 'deleteBeat', a[0]),
         setArcCharacter: (...a) => apply(ops.setArcCharacter(data(), ...a), 'setArcCharacter', a[0]),
         addCharacter: (...a) => withId(ops.addCharacter(data(), ...a), 'addCharacter', a[0]),
         updateCharacter: (...a) => apply(ops.updateCharacter(data(), ...a), 'updateCharacter', a[0]),
-        deleteCharacter: (...a) => apply(ops.deleteCharacter(data(), ...a), 'deleteCharacter', a[0]),
+        deleteCharacter: (...a) => apply(throughArchive(data(), (d) => ops.deleteCharacter(d, ...a)), 'deleteCharacter', a[0]),
         moveCharacter: (...a) => apply(ops.moveCharacter(data(), ...a), 'moveCharacter', a[0]),
         addElement: (...a) => withId(ops.addElement(data(), ...a), 'addElement', a[0]),
         updateElement: (...a) => apply(ops.updateElement(data(), ...a), 'updateElement', a[0]),
-        deleteElement: (...a) => apply(ops.deleteElement(data(), ...a), 'deleteElement', a[0]),
+        deleteElement: (...a) => apply(throughArchive(data(), (d) => ops.deleteElement(d, ...a)), 'deleteElement', a[0]),
         setPortrait: (...a) => apply(ops.setPortrait(data(), ...a), 'setPortrait', a[0]),
         addAttribute: (...a) => withId(ops.addAttribute(data(), ...a), 'addAttribute', a[0]),
         updateAttribute: (...a) => apply(ops.updateAttribute(data(), ...a), 'updateAttribute', a[0]),
@@ -230,7 +240,10 @@ export const useStory = create<StoryStore>()(
         removeMapEdges: (...a) => apply(ops.removeMapEdges(data(), ...a), 'removeMapEdges', a[0]),
         addMindMap: (...a) => withId(ops.addMindMap(data(), ...a), 'addMindMap'),
         renameMindMap: (...a) => apply(ops.renameMindMap(data(), ...a), 'renameMindMap', a[0]),
-        deleteMindMap: (...a) => apply(ops.deleteMindMap(data(), ...a), 'deleteMindMap', a[0]),
+        deleteMindMap: (...a) => apply(throughArchive(data(), (d) => ops.deleteMindMap(d, ...a)), 'deleteMindMap', a[0]),
+        archiveThing: (kind, id) => apply(archiveItem(data(), kind, id), 'archive', id),
+        restoreArchived: (id) => apply(restoreArchived(data(), id), 'restoreArchived', id),
+        deleteArchived: (id) => apply(deleteArchived(data(), id, ops), 'deleteArchived', id),
         replaceStory: (input) => {
           apply(ops.normalizeStory(input), 'replaceStory')
           useStoryEpoch.setState((e) => ({ epoch: e.epoch + 1 }))
@@ -277,29 +290,35 @@ export function chapterNumbers(chapters: StoryData['chapters']): Record<string, 
 }
 
 // The last lists worked out, so every text field shares one copy.
-let named: { characters: StoryData['characters']; elements: StoryData['elements']; list: Mentionable[]; lookup: Lookup } | null =
-  null
+let named: { characters: StoryData['characters']; elements: StoryData['elements']; list: Mentionable[] } | null = null
+let looked: { list: Mentionable[]; archive: StoryData['archive']; lookup: Lookup } | null = null
 
 function namedFor(characters: StoryData['characters'], elements: StoryData['elements']) {
   if (!named || named.characters !== characters || named.elements !== elements) {
-    const list = ops.mentionables({ characters, elements })
-    named = { characters, elements, list, lookup: lookupOf(list) }
+    named = { characters, elements, list: ops.mentionables({ characters, elements }) }
   }
-  return named
+  return named.list
+}
+
+function lookupFor(list: Mentionable[], archive: StoryData['archive']) {
+  if (!looked || looked.list !== list || looked.archive !== archive) {
+    looked = { list, archive, lookup: lookupOf([...list, ...archivedNamed({ archive })]) }
+  }
+  return looked.lookup
 }
 
 /** Everything that can be @mentioned (characters, then elements). */
 export function useMentionables(): Mentionable[] {
   const characters = useStory((s) => s.characters)
   const elements = useStory((s) => s.elements)
-  return namedFor(characters, elements).list
+  return namedFor(characters, elements)
 }
 
-/** Id -> character or element, for rendering mentions. */
+/** Id -> character or element, for rendering mentions (archived ones too: their mentions still read as their names). */
 export function useMentionLookup(): Lookup {
-  const characters = useStory((s) => s.characters)
-  const elements = useStory((s) => s.elements)
-  return namedFor(characters, elements).lookup
+  const list = useMentionables()
+  const archive = useStory((s) => s.archive)
+  return lookupFor(list, archive)
 }
 
 /** Whether the saved story has been loaded (it loads asynchronously). */

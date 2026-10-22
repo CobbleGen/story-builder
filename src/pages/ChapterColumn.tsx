@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeftToLine, ArrowRightToLine, GripHorizontal, PenLine, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeftToLine, ArrowRightToLine, GripHorizontal, PenLine, Trash2 } from 'lucide-react'
 import type { Chapter } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { Link } from 'react-router-dom'
@@ -14,6 +14,7 @@ import { plainText } from '../lib/mentions'
 import { BeatComposer } from '../components/BeatComposer'
 import { BeatCardView, DraggableBeatCard } from '../components/BeatCard'
 import { Menu } from '../components/Menu'
+import { useArchive } from '../lib/useArchive'
 import { askConfirm } from '../lib/confirm'
 import { chapterSortId, type ChapterDragData } from '../lib/dnd'
 
@@ -44,6 +45,7 @@ export function ChapterColumn({
 }: Props) {
   const updateChapter = useStory((s) => s.updateChapter)
   const deleteChapter = useStory((s) => s.deleteChapter)
+  const archive = useArchive()
   const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
   const words = useStory((s) => s.texts[chapter.id]?.words ?? 0)
   const lookup = useMentionLookup()
@@ -101,6 +103,11 @@ export function ChapterColumn({
             items={[
               { label: 'Insert chapter before', icon: <ArrowLeftToLine size={16} />, onSelect: () => onInsertChapter(index) },
               { label: 'Insert chapter after', icon: <ArrowRightToLine size={16} />, onSelect: () => onInsertChapter(index + 1) },
+              {
+                label: 'Archive chapter',
+                icon: <Archive size={16} />,
+                onSelect: () => archive('chapter', chapter.id, `chapter ${number}${chapter.title ? `, “${plainText(chapter.title, lookup)}”` : ''}`),
+              },
               { label: 'Delete chapter', icon: <Trash2 size={16} />, onSelect: remove, danger: true },
             ]}
           />

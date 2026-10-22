@@ -4,7 +4,8 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { Archive, ChevronDown, ChevronLeft, ChevronRight, FileUp, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
-import { useMentionables, useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
+import { useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
+import { archivedBeatIds } from '../lib/archived'
 import { useUi } from '../store/uiStore'
 import { flushStory, useSaveStatus } from '../store/persistence'
 import { displayName, mentionToken, plainText } from '../lib/mentions'
@@ -117,7 +118,6 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const beats = useStory((s) => s.beats)
   const arcs = useStory((s) => s.arcs)
   const texts = useStory((s) => s.texts)
-  const named = useMentionables()
   const pov = useStory((s) => s.characters.find((c) => c.id === chapter.povCharacterId))
   const updateChapter = useStory((s) => s.updateChapter)
   const setChapterText = useStory((s) => s.setChapterText)
@@ -213,14 +213,16 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   }, [saveNow])
 
   // Deleting a beat, character or element elsewhere cleans up saved texts; do the same
-  // in the open editor so it doesn't save the old links back.
+  // in the open editor so it doesn't save the old links back. (Archived ones stay:
+  // they're still in the story, put away.)
   const knownNames = useRef(new Map<string, string>())
+  const archive = useStory((s) => s.archive)
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
-    const beatIds = new Set(Object.keys(beats))
+    const beatIds = new Set([...Object.keys(beats), ...archivedBeatIds({ archive })])
     const names = knownNames.current
-    for (const c of named) names.set(c.id, displayName(c))
-    const liveIds = new Set(named.map((c) => c.id))
+    for (const c of lookup.values()) names.set(c.id, displayName(c))
+    const liveIds = new Set(lookup.keys())
     const { state } = editor
     const tr = state.tr
     const gone: { pos: number; node: PmNode }[] = []
@@ -238,7 +240,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       tr.replaceWith(tr.mapping.map(pos), tr.mapping.map(pos + node.nodeSize), state.schema.text(name, node.marks))
     }
     if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false))
-  }, [editor, beats, named])
+  }, [editor, beats, lookup, archive])
 
   // Opened from a search result: select what was found, in the middle of the page.
   const find = (location.state as { find?: TextFind } | null)?.find

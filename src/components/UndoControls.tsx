@@ -46,7 +46,8 @@ export function UndoNotice() {
   const notice = useHistory((s) => s.notice)
   useEffect(() => {
     if (!notice) return
-    const timer = setTimeout(() => useHistory.setState({ notice: null }), 2600)
+    // Longer notes stay longer.
+    const timer = setTimeout(() => useHistory.setState({ notice: null }), Math.max(2600, notice.text.length * 55))
     return () => clearTimeout(timer)
   }, [notice])
   if (!notice) return null

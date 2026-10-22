@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronDown, Network, PenLine, Plus, Trash2 } from 'lucide-react'
+import { Archive, Check, ChevronDown, Network, PenLine, Plus, Trash2 } from 'lucide-react'
 import type { MindMap } from '../types'
 import { useStory } from '../store/storyStore'
 import { askConfirm } from '../lib/confirm'
+import { useArchive } from '../lib/useArchive'
 
 /** The map's name, with a menu to switch maps, start a new one, rename or delete this one. */
 export function MapSwitcher({ map }: { map: MindMap }) {
@@ -11,6 +12,7 @@ export function MapSwitcher({ map }: { map: MindMap }) {
   const addMindMap = useStory((s) => s.addMindMap)
   const renameMindMap = useStory((s) => s.renameMindMap)
   const deleteMindMap = useStory((s) => s.deleteMindMap)
+  const archive = useArchive()
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
@@ -122,6 +124,18 @@ export function MapSwitcher({ map }: { map: MindMap }) {
             }}
           >
             <PenLine size={16} /> Rename this map
+          </button>
+          <button
+            role="menuitem"
+            className="menu-item"
+            onClick={() => {
+              setOpen(false)
+              const next = maps.find((m) => m.id !== map.id)
+              archive('map', map.id, `the map “${map.name}”`)
+              navigate(next ? `/map/${next.id}` : '/map', { replace: true })
+            }}
+          >
+            <Archive size={16} /> Archive this map
           </button>
           <button role="menuitem" className="menu-item danger" onClick={remove}>
             <Trash2 size={16} /> Delete this map

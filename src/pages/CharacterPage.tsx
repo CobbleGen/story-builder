@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowUpRight, ChevronDown, Plus, Trash2, X } from 'lucide-react'
+import { Archive, ArrowUpRight, ChevronDown, Plus, Trash2, X } from 'lucide-react'
 import { BackLink } from '../components/BackLink'
 import { useBack } from '../lib/trail'
 import type { Character } from '../types'
@@ -19,6 +19,8 @@ import { ChapterTag } from '../components/ChapterTag'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
 import { PortraitPicker } from '../components/PortraitPicker'
+import { NotInStory } from '../components/Archived'
+import { useArchive } from '../lib/useArchive'
 
 const SUGGESTED_ATTRIBUTES = ['Age', 'Role', 'Appearance', 'Personality', 'Wants', 'Fears', 'Secret', 'Backstory']
 
@@ -35,13 +37,7 @@ export function CharacterPage() {
         {character ? (
           <CharacterView key={character.id} character={character} />
         ) : (
-          <div className="not-found">
-            <h1>Character not found</h1>
-            <p>They may have been deleted.</p>
-            <Link className="btn primary" to="/">
-              Back to the board
-            </Link>
-          </div>
+<NotInStory id={characterId} title="Character not found" gone="They may have been deleted." />
         )}
       </main>
     </div>
@@ -53,6 +49,7 @@ function CharacterView({ character }: { character: Character }) {
   const arcs = useStory((s) => s.arcs)
   const updateCharacter = useStory((s) => s.updateCharacter)
   const deleteCharacter = useStory((s) => s.deleteCharacter)
+  const archive = useArchive()
   const setPortrait = useStory((s) => s.setPortrait)
   const { back } = useBack()
   const [showColors, setShowColors] = useState(false)
@@ -111,6 +108,14 @@ function CharacterView({ character }: { character: Character }) {
             submitOnEnter
             onChange={(value) => updateCharacter(character.id, { name: value })}
           />
+          <button
+            className="icon-btn"
+            onClick={() => back(() => archive('character', character.id, name))}
+            title="Archive character: put them away, to bring back later"
+            aria-label="Archive character"
+          >
+            <Archive size={18} />
+          </button>
           <button className="icon-btn danger" onClick={remove} title="Delete character" aria-label="Delete character">
             <Trash2 size={18} />
           </button>

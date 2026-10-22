@@ -24,6 +24,20 @@ assistant such as Claude read all of it and give you feedback (see
   in a row.
 - **Beats** are cards, colour-coded by the **arc** they belong to. Click a
   beat to edit its title and notes, or to change its arc or chapter.
+- **Archive** anything you want out of the way without deleting it: a
+  chapter (from its ⋯ menu on the board), an arc, character, place or other
+  item (the archive button at the top of its page), a beat (in its editor) or
+  a mind map (in the map switcher). It leaves the story, with what goes with
+  it (a chapter's text and beats, an arc's beats, its cards on the mind maps),
+  so it's out of every view, the word counts, search and export; mentions of
+  an archived character or place still read as their name, and links from the
+  text to an archived beat stay. The sidebar's **Archived** tab (the box icon)
+  lists what's archived: **Restore** puts it back where it was (its place in
+  the chapters and arcs, its point-of-view chapters and casts, its place in
+  story time, its cards and lines), or delete it for good. A beat whose arc is
+  archived comes back with its arc; one whose chapter is archived comes back
+  in no chapter. Archiving, restoring and deleting are each one step to undo,
+  and archiving isn't counted as cutting outline words.
 - **Arcs sidebar** (left, collapsible) lists every arc. Click an arc to
   expand its beats in order: a number shows the chapter a beat is in, and a
   dashed circle means it isn't in a chapter yet. Drag beats from here onto
@@ -410,7 +424,7 @@ any static host or sub-folder.
 ### Layout
 
 - `src/types.ts`: the data model (story → chapters, arcs, beats, characters,
-  places and things, chapter texts, story time, mind maps, goals)
+  places and things, chapter texts, story time, mind maps, goals, archive)
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
@@ -433,13 +447,19 @@ any static host or sub-folder.
   the add-to-map panel)
 - `src/store/persistence.ts`: saving to IndexedDB (batched writes, migration
   from older saves); `src/store/backups.ts`: automatic backups
-- `src/components/Sidebar.tsx`: the arcs / characters / world sidebar
+- `src/components/Sidebar.tsx`: the arcs / characters / world / archived sidebar
 - `src/lib/mentions.ts` and `src/components/MentionTextarea.tsx`: how
   `@mentions` are stored (as ids) and edited
 - `src/lib/search.ts` and `src/components/SearchDialog.tsx`: search
 - `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
   (the Word library loads only when exporting)
 - `src/store/history.ts`: undo and redo
+- `src/store/archive.ts`: archiving (what goes with a thing, and where it
+  all was) and bringing back; restoring or deleting one is done with
+  everything archived back in the story, then the rest archived again, so
+  archived things that depend on each other stay right (tested in
+  `archive.test.ts`); `src/lib/archived.ts` reads the archive (names,
+  checking a save) and `src/components/Archived.tsx` is the sidebar tab
 - `src/cloud/`: accounts and sync. `engine.ts` keeps the browser's story in
   step with the account (tested against an in-memory backend in
   `engine.test.ts`), `supabaseBackend.ts` talks to Supabase (loaded only

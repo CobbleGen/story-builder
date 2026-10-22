@@ -6,6 +6,7 @@ import { mentionables, parentOf, type CopiedMapItems } from '../store/storyOps'
 import { displayName, lookupOf, plainText } from '../lib/mentions'
 import { makeId } from '../lib/id'
 import { picturesIn } from '../lib/pictures'
+import { archivedNamed } from '../lib/archived'
 import type { StoryFlowEdge } from './StoryEdge'
 import type { StoryFlowNode } from './mapShared'
 
@@ -24,7 +25,7 @@ let lastCopy: { items: CopiedMapItems; text: string } | null = null
 
 /** The words on copied cards. */
 function textOf(data: StoryData, nodes: MapNode[]): string {
-  const lookup = lookupOf(mentionables(data))
+  const lookup = lookupOf([...mentionables(data), ...archivedNamed(data)])
   const words = nodes.map((n) => {
     switch (n.kind) {
       case 'note':

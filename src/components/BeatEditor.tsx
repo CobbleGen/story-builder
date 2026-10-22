@@ -1,6 +1,6 @@
 import { useCallback, useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, Trash2 } from 'lucide-react'
+import { Archive, ArrowUpRight, Trash2 } from 'lucide-react'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
 import { askConfirm } from '../lib/confirm'
@@ -8,6 +8,7 @@ import { plainText } from '../lib/mentions'
 import { Modal } from './Modal'
 import { ArcPicker } from './ArcPicker'
 import { MentionTextarea } from './MentionTextarea'
+import { useArchive } from '../lib/useArchive'
 
 /** Dialog for editing the beat selected in the UI store. Changes save as you type. */
 export function BeatEditor() {
@@ -20,6 +21,7 @@ export function BeatEditor() {
   const setBeatArc = useStory((s) => s.setBeatArc)
   const placeBeat = useStory((s) => s.placeBeat)
   const deleteBeat = useStory((s) => s.deleteBeat)
+  const archive = useArchive()
   const lookup = useMentionLookup()
   const close = useCallback(() => openBeat(null), [openBeat])
   const beats = useStory((s) => s.beats)
@@ -55,6 +57,16 @@ export function BeatEditor() {
         <>
           <button className="btn ghost danger" onClick={remove}>
             <Trash2 size={16} /> Delete
+          </button>
+          <button
+            className="btn ghost"
+            onClick={() => {
+              close()
+              archive('beat', beat.id, `“${plainText(beat.title, lookup) || 'Untitled beat'}”`)
+            }}
+            title="Put it away, out of the story, to bring back later"
+          >
+            <Archive size={16} /> Archive
           </button>
           {arc && (
             <Link className="btn ghost" to={`/arcs/${arc.id}`} onClick={close}>
