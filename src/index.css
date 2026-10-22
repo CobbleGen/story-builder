@@ -4114,6 +4114,117 @@ a {
   right: 16px;
 }
 
+/* ---------- Importing a manuscript ---------- */
+
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 28px 16px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.import-drop.over {
+  border-color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 6%, transparent);
+  color: var(--ink-2);
+}
+
+.import-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 6px 0 14px;
+  color: var(--ink-2);
+}
+
+.import-file .btn {
+  margin-left: auto;
+}
+
+.import-chapters {
+  max-height: 300px;
+  margin: 12px 0 16px;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.import-chapters li + li {
+  border-top: 1px solid var(--line);
+}
+
+.import-chapters label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.import-chapters li.skipped .import-chapter-text,
+.import-chapters li.skipped .import-chapter-words {
+  opacity: 0.5;
+}
+
+.import-chapter-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.import-chapter-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-chapter-opening {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-chapter-words {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-target .plain-input {
+  margin-left: 26px;
+}
+
+.write-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* ---------- Find and replace in the manuscript ---------- */
 
 .find-match {

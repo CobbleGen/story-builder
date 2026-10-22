@@ -58,6 +58,8 @@ interface StoryActions {
   setGoals: (...args: Tail<Parameters<typeof ops.setGoals>>) => void
   /** Every match replaced in the chapters' text: one undo step. How many, in how many chapters. */
   replaceText: (query: FindQuery, replacement: string) => { count: number; chapters: number }
+  /** Chapters brought in from a manuscript (one undo step); their ids. */
+  importChapters: (...args: Tail<Parameters<typeof ops.importChapters>>) => string[]
   /** A finished sprint, kept with the story (not an undo step). */
   addSprint: (...args: Tail<Parameters<typeof ops.addSprint>>) => void
   addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
@@ -200,6 +202,11 @@ export const useStory = create<StoryStore>()(
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
         setGoals: (...a) => apply(ops.setGoals(data(), ...a), 'setGoals', a[0]),
         addSprint: (...a) => apply(ops.addSprint(data(), ...a)),
+        importChapters: (...a) => {
+          const [next, ids] = ops.importChapters(data(), ...a)
+          apply(next, 'importChapters', ids.length)
+          return ids
+        },
         replaceText: (query, replacement) => {
           // Stamped before the history notes it, so undo brings the texts back.
           const [next, done] = ops.replaceInText(data(), query, replacement, Date.now())

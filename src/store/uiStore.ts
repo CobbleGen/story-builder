@@ -53,6 +53,8 @@ interface UiState {
   progressTab: ProgressTab | null
   /** The search dialog is open. */
   searchOpen: boolean
+  /** The dialog for bringing in a manuscript is open. */
+  importOpen: boolean
   /** How the manuscript was last exported. */
   exportOptions: ExportOptions
   timelineMode: TimelineMode
@@ -77,6 +79,7 @@ interface UiState {
   setProgressOpen: (open: boolean) => void
   setProgressTab: (tab: ProgressTab) => void
   setSearchOpen: (open: boolean) => void
+  setImportOpen: (open: boolean) => void
   setExportOptions: (patch: Partial<ExportOptions>) => void
   setTimelineMode: (mode: TimelineMode) => void
   /** Puts a picked colour first among the recent ones; `shown` are the ones on show until any is picked. */
@@ -108,6 +111,7 @@ export const useUi = create<UiState>()(
       progressOpen: false,
       progressTab: null,
       searchOpen: false,
+      importOpen: false,
       exportOptions: DEFAULT_EXPORT,
       timelineMode: 'story',
       recentColors: [],
@@ -131,6 +135,7 @@ export const useUi = create<UiState>()(
       setProgressOpen: (progressOpen) => set({ progressOpen }),
       setProgressTab: (progressTab) => set({ progressTab }),
       setSearchOpen: (searchOpen) => set({ searchOpen }),
+      setImportOpen: (importOpen) => set({ importOpen }),
       setExportOptions: (patch) => set((s) => ({ exportOptions: { ...s.exportOptions, ...patch } })),
       setTimelineMode: (timelineMode) => set({ timelineMode }),
       rememberColor: (color, shown) =>

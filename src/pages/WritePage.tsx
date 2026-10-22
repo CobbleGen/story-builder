@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { Archive, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Plus } from 'lucide-react'
+import { Archive, ChevronDown, ChevronLeft, ChevronRight, FileUp, ListChecks, Plus } from 'lucide-react'
 import type { Chapter } from '../types'
 import { useMentionables, useMentionLookup, useStory, useStoryEpoch } from '../store/storyStore'
 import { useUi } from '../store/uiStore'
@@ -94,10 +94,15 @@ function NoChapters() {
   return (
     <main className="write-empty">
       <h1>No chapters yet</h1>
-      <p>Chapters are where you write. Add the first one to start.</p>
-      <button className="btn primary" onClick={() => navigate(`/write/${addChapter()}`)}>
-        <Plus size={16} /> Add a chapter
-      </button>
+      <p>Chapters are where you write. Add the first one to start, or bring in a manuscript written elsewhere.</p>
+      <div className="write-empty-actions">
+        <button className="btn primary" onClick={() => navigate(`/write/${addChapter()}`)}>
+          <Plus size={16} /> Add a chapter
+        </button>
+        <button className="btn" onClick={() => useUi.getState().setImportOpen(true)}>
+          <FileUp size={16} /> Import a manuscript
+        </button>
+      </div>
     </main>
   )
 }

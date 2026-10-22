@@ -263,6 +263,19 @@ assistant such as Claude read all of it and give you feedback (see
   words, a streak, a 30-day chart, and the words in each arc. An arc's page
   shows its words too. Here too, words cut are counted apart from words
   added, and undoing takes back what was counted.
+- **Import a manuscript** (⋯ → Import manuscript…, or from the empty
+  manuscript page): bring in a book or chapters written elsewhere, as a Word
+  document (.docx), Markdown or plain text. It's split into chapters at its
+  headings (the level used most), or at lines like "Chapter 3", "CHAPTER
+  THREE" or "Prologue", and a heading like "Chapter 3: The Logbook" names the
+  chapter "The Logbook". You see the chapters first, each with its opening
+  words and length: choose where they start, untick any (a title page before
+  the first chapter starts unticked), then add them after the last chapter
+  (one step to undo) or start a new story with them (signed in, it's added to
+  your account; otherwise it replaces this one, with a backup kept).
+  Formatting, lists, quotes, headings and pictures come with them; "***"
+  lines become scene breaks, and empty paragraphs and footnotes are left out.
+  Bringing text in doesn't count as words written that day.
 - **Export the manuscript** (⋯ → Export manuscript…) as a Word document, a
   PDF (through the print window), plain text or Markdown, laid out as a
   manuscript: double spaced, each chapter on a new page, with an optional

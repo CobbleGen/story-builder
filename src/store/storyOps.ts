@@ -171,6 +171,37 @@ export function addChapter(
   return [{ ...data, chapters: insertAt(data.chapters, chapter, init.index) }, chapter.id]
 }
 
+/**
+ * Chapters brought in from a manuscript written elsewhere, with their text,
+ * after the last chapter (or before chapter `index`). Ones with words are
+ * drafts. Bringing them in isn't writing, so the day's tallies stay as they
+ * are.
+ */
+export function importChapters(
+  data: StoryData,
+  imported: { title: string; doc: RichNode; words: number }[],
+  index = data.chapters.length,
+): [StoryData, string[]] {
+  if (!imported.length) return [data, []]
+  const now = Date.now()
+  const chapters: Chapter[] = []
+  const texts = { ...data.texts }
+  for (const c of imported) {
+    const chapter: Chapter = {
+      id: makeId('ch'),
+      title: c.title.replace(/\s+/g, ' ').trim(),
+      summary: '',
+      beatIds: [],
+      povCharacterId: null,
+      status: c.words ? 'draft' : 'outline',
+    }
+    chapters.push(chapter)
+    if (c.doc.content?.length) texts[chapter.id] = { doc: c.doc, words: c.words, updatedAt: now }
+  }
+  const at = Math.max(0, Math.min(index, data.chapters.length))
+  return [{ ...data, chapters: [...data.chapters.slice(0, at), ...chapters, ...data.chapters.slice(at)], texts }, chapters.map((c) => c.id)]
+}
+
 export function updateChapter(
   data: StoryData,
   id: string,

@@ -7,6 +7,7 @@ import { ProgressDialog } from './components/ProgressDialog'
 import { UndoNotice } from './components/UndoControls'
 import { SearchDialog } from './components/SearchDialog'
 import { SprintDone, SprintPill } from './components/Sprint'
+import { ImportDialog } from './components/ImportDialog'
 import { useUndoShortcuts } from './lib/undoShortcuts'
 import { useSearchShortcut } from './lib/searchShortcut'
 import { useUi } from './store/uiStore'
@@ -34,6 +35,7 @@ export default function App() {
   const saveFailed = useSaveStatus((s) => s.status === 'error')
   const progressOpen = useUi((s) => s.progressOpen)
   const searchOpen = useUi((s) => s.searchOpen)
+  const importOpen = useUi((s) => s.importOpen)
   // Focus mode (on the manuscript page) takes the top bar away too.
   const focusMode = useUi((s) => s.focusMode)
   useEffect(() => {
@@ -76,6 +78,7 @@ export default function App() {
         <BeatEditor />
         {progressOpen && <ProgressDialog />}
         {searchOpen && <SearchDialog />}
+        {importOpen && <ImportDialog />}
         <UndoNotice />
         <SprintPill />
         <SprintDone />

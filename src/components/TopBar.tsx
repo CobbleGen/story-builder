@@ -18,12 +18,13 @@ import {
   SunMoon,
   Target,
   Upload,
+  FileInput,
 } from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
 import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
-import { backupNow } from '../store/persistence'
+import { swapInStory } from '../store/swapIn'
 import { BackupsDialog } from './BackupsDialog'
 import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
@@ -38,7 +39,6 @@ import { SEARCH_KEYS } from '../lib/searchShortcut'
 export function TopBar() {
   const title = useStory((s) => s.title)
   const setTitle = useStory((s) => s.setTitle)
-  const replaceStory = useStory((s) => s.replaceStory)
   const fileRef = useRef<HTMLInputElement>(null)
   const [showBackups, setShowBackups] = useState(false)
   const [showAssistants, setShowAssistants] = useState(false)
@@ -90,18 +90,7 @@ export function TopBar() {
 
   /** Signed in, a story swapped in (blank, the example, an import) is a new story in the account; the one open stays there. */
   const signedIn = useCloud((s) => !!s.user)
-  const swapIn = async (data: unknown) => {
-    if (cloud && cloud.store.getState().user) {
-      try {
-        await cloud.newStory(data)
-      } catch (error) {
-        await askConfirm({ title: 'Couldn’t start the new story', message: error instanceof Error ? error.message : String(error), notice: true })
-      }
-      return
-    }
-    await backupNow()
-    replaceStory(data)
-  }
+  const swapIn = swapInStory
 
   const replaceWith = async (build: () => unknown, title: string, confirmLabel: string) => {
     const ok = await askConfirm({
@@ -193,6 +182,7 @@ export function TopBar() {
           items={[
             { label: 'Word counts and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
             { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
+            { label: 'Import manuscript…', icon: <FileInput size={16} />, onSelect: () => useUi.getState().setImportOpen(true) },
             { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
             { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
             { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },

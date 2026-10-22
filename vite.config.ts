@@ -9,7 +9,8 @@ export default defineConfig({
     __BUILD_ID__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || `local-${Date.now()}`),
   },
   plugins: [react()],
-  // The Word exporter is only imported when exporting; bundle it up front so
-  // the dev server doesn't reload the page the first time it's used.
-  optimizeDeps: { include: ['docx', '@tiptap/pm/state', '@tiptap/pm/view'] },
+  // The Word exporter, and the Word and Markdown readers, are only imported
+  // when used; bundle them up front so the dev server doesn't reload the page
+  // the first time one is.
+  optimizeDeps: { include: ['docx', 'mammoth', 'marked', '@tiptap/pm/state', '@tiptap/pm/view'] },
 })
