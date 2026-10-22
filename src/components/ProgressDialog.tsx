@@ -9,6 +9,7 @@ import { Modal } from './Modal'
 import { MentionText } from './MentionText'
 import { StatusPicker } from './StatusPicker'
 import { WordsChart } from './WordsChart'
+import { SprintHistory } from './Sprint'
 
 const plus = (n: number) => (n > 0 ? `+${n.toLocaleString()}` : '0')
 /** What a day's (or week's) words added say beside them: the goal, and what was cut, counted apart. */
@@ -185,6 +186,7 @@ function ManuscriptProgress({ total, shelved, close }: { total: number; shelved:
       </div>
 
       <WordsChart days={days} goal={goals.daily} />
+      <SprintHistory />
 
       <h3 className="progress-heading">Chapters</h3>
       <div className="progress-table-wrap">

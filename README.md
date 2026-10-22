@@ -87,6 +87,14 @@ assistant such as Claude read all of it and give you feedback (see
   you're writing stays in the middle of the screen), **fade others** (the
   paragraphs around the one you're writing fade), and full screen. Esc, the
   same keys or **Exit focus** leave it; the choices are remembered.
+- **Writing sprints** (the timer at the end of the manuscript's toolbar):
+  write for a set time (10, 15, 25, 30, 45 or 60 minutes, or your own) with
+  an optional word goal. A pill at the bottom shows the time left and the
+  words added so far, with pause and stop; it stays in focus mode, on other
+  pages and through a reload. When the time's up, a soft chime (if you like)
+  and the result: words added, words a minute, and the goal. Sprints are kept
+  with the story (those of a minute or more), and the progress page lists
+  the latest, the average pace and the best.
 - **Mind map** (third tab) is an endless board to think on. Drag chapters,
   arcs, characters and beats onto it from the panel on the left (or click
   one to drop it in the middle); the cards show the live item and open it on

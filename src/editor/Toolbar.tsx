@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { Editor } from '@tiptap/react'
 import { useEditorState } from '@tiptap/react'
 import { insertPictures } from './picture'
@@ -48,7 +48,18 @@ const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator
 
 type Block = 'paragraph' | 'h1' | 'h2' | 'h3'
 
-export function Toolbar({ editor, onFocusMode, focusKeys }: { editor: Editor; onFocusMode?: () => void; focusKeys?: string }) {
+export function Toolbar({
+  editor,
+  onFocusMode,
+  focusKeys,
+  children,
+}: {
+  editor: Editor
+  onFocusMode?: () => void
+  focusKeys?: string
+  /** More tools at the end (the writing sprint). */
+  children?: ReactNode
+}) {
   const fileInput = useRef<HTMLInputElement>(null)
   const state = useEditorState({
     editor,
@@ -153,6 +164,7 @@ export function Toolbar({ editor, onFocusMode, focusKeys }: { editor: Editor; on
           </ToolButton>
         </>
       )}
+      {children}
     </div>
   )
 }

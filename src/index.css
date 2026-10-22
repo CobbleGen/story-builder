@@ -4114,6 +4114,241 @@ a {
   right: 16px;
 }
 
+/* ---------- Writing sprints ---------- */
+
+.sprint-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.tool-btn.sprint-btn.running {
+  width: auto;
+  gap: 5px;
+  padding: 0 8px;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sprint-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 300px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  text-align: left;
+}
+
+.sprint-pop-title {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.sprint-pop-note,
+.sprint-pop-last {
+  margin: -4px 0 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.sprint-pop-last {
+  margin: 0;
+}
+
+.sprint-pop-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sprint-lengths {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.sprint-length {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.sprint-length:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.sprint-length.chosen {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sprint-minutes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  color: var(--ink-3);
+}
+
+.sprint-minutes input,
+.sprint-goal input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sprint-minutes input {
+  width: 58px;
+}
+
+.sprint-goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-2);
+}
+
+.sprint-goal input {
+  width: 120px;
+}
+
+.sprint-sound {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+
+.sprint-start {
+  justify-content: center;
+}
+
+/* The sprint under way: a pill at the bottom, above the manuscript's status line. */
+.sprint-pill {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+.sprint-pill.on-write {
+  bottom: 46px;
+}
+
+.sprint-clock {
+  min-width: 42px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sprint-pill.paused .sprint-clock {
+  color: var(--ink-3);
+}
+
+.sprint-words {
+  white-space: nowrap;
+}
+
+.sprint-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.sprint-pill-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.sprint-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--chart-accent);
+  transition: width 1s linear;
+}
+
+.sprint-result {
+  text-align: center;
+}
+
+.sprint-result-words {
+  margin: 14px 0 2px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.sprint-result-words strong {
+  display: block;
+  color: var(--ink);
+  font-size: 44px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.sprint-result-note {
+  margin: 0 0 6px;
+  color: var(--ink-3);
+}
+
+.sprint-history {
+  margin-bottom: 20px;
+}
+
+.sprint-history .progress-note {
+  margin: 0 0 8px;
+}
+
+.sprint-goal-met {
+  color: var(--success);
+}
+
 /* ---------- Focus mode: only the page ---------- */
 
 .focus-mode .topbar,
@@ -4168,7 +4403,8 @@ a {
 
 .focus-controls {
   position: absolute;
-  top: 8px;
+  /* Below the (hidden) toolbar, so the two never meet. */
+  top: 52px;
   right: 14px;
   z-index: 6;
   display: flex;

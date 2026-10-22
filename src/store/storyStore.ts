@@ -55,6 +55,8 @@ interface StoryActions {
   moveAttribute: (...args: Tail<Parameters<typeof ops.moveAttribute>>) => void
   setChapterText: (...args: Tail<Parameters<typeof ops.setChapterText>>) => void
   setGoals: (...args: Tail<Parameters<typeof ops.setGoals>>) => void
+  /** A finished sprint, kept with the story (not an undo step). */
+  addSprint: (...args: Tail<Parameters<typeof ops.addSprint>>) => void
   addMapNode: (...args: Tail<Parameters<typeof ops.addMapNode>>) => string | null
   updateMapNode: (...args: Tail<Parameters<typeof ops.updateMapNode>>) => void
   moveMapNodes: (...args: Tail<Parameters<typeof ops.moveMapNodes>>) => void
@@ -94,6 +96,7 @@ export const STORY_KEYS = [
   'wordCuts',
   'outlineLog',
   'outlineCuts',
+  'sprints',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -112,6 +115,7 @@ export const pickData = (s: StoryData): StoryData => ({
   wordCuts: s.wordCuts,
   outlineLog: s.outlineLog,
   outlineCuts: s.outlineCuts,
+  sprints: s.sprints,
 })
 
 /**
@@ -192,6 +196,7 @@ export const useStory = create<StoryStore>()(
         // Not in the undo history: the manuscript editor has its own undo.
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
         setGoals: (...a) => apply(ops.setGoals(data(), ...a), 'setGoals', a[0]),
+        addSprint: (...a) => apply(ops.addSprint(data(), ...a)),
         addMapNode: (...a) => withId(ops.addMapNode(data(), ...a), 'addMapNode', a[0]),
         updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0]),
         moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a), 'moveMapNodes', a[0]),

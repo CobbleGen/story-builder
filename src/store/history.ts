@@ -156,7 +156,8 @@ export function remember(before: StoryData, name: string, target?: unknown) {
 
 /**
  * The story as copied, but with chapter texts written since the copy was
- * taken kept as they are now, and the day-by-day word logs left alone.
+ * taken kept as they are now, and the day-by-day word logs and sprints left
+ * alone.
  */
 export function restore(copy: StoryData, now: StoryData, takenAt: number): StoryData {
   const texts: StoryData['texts'] = {}
@@ -166,7 +167,15 @@ export function restore(copy: StoryData, now: StoryData, takenAt: number): Story
     const text = current && (!then || current.updatedAt > takenAt) ? current : then
     if (text) texts[chapter.id] = text
   }
-  return { ...copy, texts, wordLog: now.wordLog, wordCuts: now.wordCuts, outlineLog: now.outlineLog, outlineCuts: now.outlineCuts }
+  return {
+    ...copy,
+    texts,
+    wordLog: now.wordLog,
+    wordCuts: now.wordCuts,
+    outlineLog: now.outlineLog,
+    outlineCuts: now.outlineCuts,
+    sprints: now.sprints,
+  }
 }
 
 let noticeId = 0

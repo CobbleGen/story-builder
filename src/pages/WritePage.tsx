@@ -14,6 +14,7 @@ import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
 import { CurrentBlock } from '../editor/currentBlock'
 import { FocusControls } from '../editor/FocusControls'
+import { SprintButton } from '../components/Sprint'
 import { FOCUS_KEYS, leaveFocus } from '../lib/focus'
 import { countWords, wordChange } from '../editor/wordChanges'
 import { tally, type WordTally } from '../lib/progress'
@@ -347,7 +348,9 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       )}
       <div className="write-stage">
         <div className="write-toolbar-row">
-          <Toolbar editor={editor} onFocusMode={focusMode ? undefined : () => setFocusMode(true)} focusKeys={FOCUS_KEYS} />
+          <Toolbar editor={editor} onFocusMode={focusMode ? undefined : () => setFocusMode(true)} focusKeys={FOCUS_KEYS}>
+            <SprintButton />
+          </Toolbar>
         </div>
         <div className="write-scroll" ref={scroller}>
           <article className={`write-paper${pov ? ' has-pov' : ''}`} style={{ '--pov': pov?.color } as React.CSSProperties}>

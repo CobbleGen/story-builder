@@ -6,6 +6,7 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import { ProgressDialog } from './components/ProgressDialog'
 import { UndoNotice } from './components/UndoControls'
 import { SearchDialog } from './components/SearchDialog'
+import { SprintDone, SprintPill } from './components/Sprint'
 import { useUndoShortcuts } from './lib/undoShortcuts'
 import { useSearchShortcut } from './lib/searchShortcut'
 import { useUi } from './store/uiStore'
@@ -76,6 +77,8 @@ export default function App() {
         {progressOpen && <ProgressDialog />}
         {searchOpen && <SearchDialog />}
         <UndoNotice />
+        <SprintPill />
+        <SprintDone />
         <ConfirmDialog />
         {saveFailed && (
           <div className="save-banner" role="alert">

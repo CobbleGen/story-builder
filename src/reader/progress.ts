@@ -1,4 +1,5 @@
 import { manuscriptWords, outlineWords, recentDays, writingStreak } from '../lib/progress'
+import { bestSprint, perMinute } from '../lib/sprints'
 import { chapterFacts } from './chapters'
 import { count, statusLabel, type Story } from './story'
 
@@ -41,6 +42,14 @@ export function progress(story: Story, today: string): string {
     )
   } else {
     out.push('## The last two weeks\nNo words written in the manuscript in the last two weeks.')
+  }
+  if (data.sprints.length) {
+    const best = bestSprint(data.sprints)!
+    const words = data.sprints.reduce((n, s) => n + s.words, 0)
+    const seconds = data.sprints.reduce((n, s) => n + s.seconds, 0)
+    out.push(
+      `## Writing sprints\n${count(data.sprints.length, 'timed sprint')}, ${perMinute(words, seconds)} words a minute on average; the best: ${count(best.words, 'word')} in ${count(Math.max(1, Math.round(best.seconds / 60)), 'minute')}.`,
+    )
   }
   return out.join('\n\n')
 }

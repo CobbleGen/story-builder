@@ -230,6 +230,20 @@ export interface MindMap {
   edges: MapEdge[]
 }
 
+/** A writing sprint, once it's over: a timed burst of writing. */
+export interface SprintRecord {
+  /** When it started (ms since 1970). */
+  at: number
+  /** How long it was set for. */
+  minutes: number
+  /** How long it ran (less, if stopped early). */
+  seconds: number
+  /** Words added to the manuscript during it. */
+  words: number
+  /** The words it aimed for, if any. */
+  goal?: number
+}
+
 /** Word targets for the whole draft and for each day's writing. */
 export interface StoryGoals {
   draft?: number
@@ -268,4 +282,6 @@ export interface StoryData {
   /** The same for the outline (beats, arcs, chapter titles and summaries), kept apart. */
   outlineLog: Record<string, number>
   outlineCuts: Record<string, number>
+  /** Writing sprints, oldest first (the last 200). */
+  sprints: SprintRecord[]
 }

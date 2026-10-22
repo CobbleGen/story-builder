@@ -20,6 +20,7 @@ import type {
   StoryData,
   StoryElement,
   StoryGoals,
+  SprintRecord,
 } from '../types'
 import { IMAGE_ID, makeId } from '../lib/id'
 import { displayName, linkTyped, lookupOf, mentionToken } from '../lib/mentions'
@@ -257,6 +258,34 @@ export function logOutline(before: StoryData, after: StoryData, day: string = da
   return { ...after, outlineLog, outlineCuts }
 }
 
+/** The sprints kept: the last 200. */
+const SPRINTS_KEPT = 200
+
+/** A sprint, once it's over, kept with the story. */
+export function addSprint(data: StoryData, sprint: SprintRecord): StoryData {
+  const clean = sprintsOf([sprint])
+  if (!clean.length) return data
+  return { ...data, sprints: [...data.sprints, ...clean].slice(-SPRINTS_KEPT) }
+}
+
+/** Sprints as saved, checked: whole numbers, nothing negative, in order. */
+function sprintsOf(value: unknown): SprintRecord[] {
+  if (!Array.isArray(value)) return []
+  const whole = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : null)
+  const out: SprintRecord[] = []
+  for (const raw of value) {
+    if (!isRecord(raw)) continue
+    const at = whole(raw.at)
+    const minutes = whole(raw.minutes)
+    const seconds = whole(raw.seconds)
+    const words = whole(raw.words)
+    if (at === null || !minutes || seconds === null || words === null) continue
+    const goal = whole(raw.goal)
+    out.push(goal ? { at, minutes, seconds, words, goal } : { at, minutes, seconds, words })
+  }
+  return out.sort((a, b) => a.at - b.at).slice(-SPRINTS_KEPT)
+}
+
 export function setGoals(data: StoryData, patch: StoryGoals): StoryData {
   const goals: StoryGoals = { ...data.goals }
   for (const key of ['draft', 'daily'] as const) {
@@ -285,6 +314,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     wordCuts: {},
     outlineLog: {},
     outlineCuts: {},
+    sprints: [],
   }
 }
 
@@ -2172,5 +2202,6 @@ export function normalizeStory(input: unknown): StoryData {
     wordCuts,
     outlineLog,
     outlineCuts,
+    sprints: sprintsOf(raw.sprints),
   })
 }
