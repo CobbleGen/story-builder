@@ -15,6 +15,10 @@ import { chapterIndexFor, linkedRanges } from '../editor/beatLinks'
 import { findInDoc } from '../editor/findInDoc'
 import { CurrentBlock } from '../editor/currentBlock'
 import { FindHighlight } from '../editor/findHighlight'
+import { Pages, pageCount, setPageGeometry } from '../editor/pages'
+import { useBookStyle } from '../editor/useBookStyle'
+import { StylePanel } from '../editor/StylePanel'
+import { chapterNumber } from '../lib/bookStyle'
 import { FindPanel } from '../editor/FindPanel'
 import { useFind } from '../store/findStore'
 import { FocusControls } from '../editor/FocusControls'
@@ -161,7 +165,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     known.current = useStory.getState().texts[chapter.id]
   }, [chapter.id, setChapterText])
 
-  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock, FindHighlight], [index])
+  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock, FindHighlight, Pages], [index])
   const editor = useEditor({
     extensions,
     content: useStory.getState().texts[chapter.id]?.doc ?? '',
@@ -303,6 +307,15 @@ function ChapterWriter({ chapter, index }: WriterProps) {
 
   // Typewriter scrolling: the line being written stays near the middle, as you type or move with the keys.
   const scroller = useRef<HTMLDivElement>(null)
+
+  // The book's style: how every chapter looks, and pages if it's shown as pages.
+  const look = useBookStyle(scroller)
+  const [styleOpen, setStyleOpen] = useState(false)
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) setPageGeometry(editor.view, look.geometry)
+  }, [editor, look.geometry])
+  const pagesNow = useEditorState({ editor, selector: ({ editor: e }) => (e ? pageCount(e.state) : null) })
+  const pages = !!look.geometry
   useEffect(() => {
     if (!typewriter || !editor || editor.isDestroyed) return
     let byKeys = true
@@ -387,9 +400,71 @@ function ChapterWriter({ chapter, index }: WriterProps) {
 
   const saveLabel = saveStatus === 'error' ? 'Not saved' : dirty || saveStatus === 'saving' ? 'Saving…' : 'Saved'
 
+  const meta = (
+    <div className="write-meta">
+      <label className="chapter-jump" title="Go to another chapter">
+        <span>
+          Chapter {index + 1} <span className="muted">of {chapters.length}</span>
+        </span>
+        <ChevronDown size={14} />
+        <select value={chapter.id} onChange={(e) => navigate(`/write/${e.target.value}`)} aria-label="Chapter">
+          {chapters.map((c, i) => (
+            <option key={c.id} value={c.id}>
+              {chapterLabel(c, i)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="write-head-pickers">
+        <StatusPicker chapter={chapter} />
+        <PovPicker chapter={chapter} />
+      </span>
+    </div>
+  )
+  const summary = (
+    <MentionTextarea
+      className="write-summary"
+      value={chapter.summary}
+      placeholder="What happens in this chapter?"
+      aria-label="Chapter summary"
+      onChange={(summary) => updateChapter(chapter.id, { summary })}
+    />
+  )
+  const notes = (
+    <>
+      {isShelved(chapter) && (
+        <div className="write-shelved" role="note">
+          <Archive size={16} aria-hidden />
+          <span>Shelved for now: its words aren’t counted in the manuscript, and it’s left out when you export.</span>
+          <button className="btn ghost small" onClick={() => updateChapter(chapter.id, { status: words ? 'draft' : 'outline' })}>
+            Put it back
+          </button>
+        </div>
+      )}
+      {contentError && (
+        <div className="write-error" role="alert">
+          This chapter’s text couldn’t be opened, so editing is paused to keep it safe. You can restore an
+          earlier copy from ⋯ → Backups.
+        </div>
+      )}
+    </>
+  )
+  const foot = (
+    <footer className={`write-foot${pages ? ' outside' : ''}`}>
+      {next ? (
+        <Link to={`/write/${next.id}`} className="next-chapter">
+          Next: {chapterLabel(next, index + 1)} <ChevronRight size={16} />
+        </Link>
+      ) : (
+        <span className="muted">End of the manuscript</span>
+      )}
+    </footer>
+  )
+
   return (
     <div
-      className={`write-page${showArcColors ? ' show-arcs' : ''}${focusMode ? ' focus' : ''}${typewriter ? ' typewriter' : ''}${fadeOthers ? ' fade-others' : ''}`}
+      className={`write-page${showArcColors ? ' show-arcs' : ''}${focusMode ? ' focus' : ''}${typewriter ? ' typewriter' : ''}${fadeOthers ? ' fade-others' : ''}${look.className ? ` ${look.className}` : ''}`}
+      style={look.vars as React.CSSProperties}
     >
       <style>{beatCss}</style>
       {focusMode ? null : beatsPanelOpen ? (
@@ -402,39 +477,36 @@ function ChapterWriter({ chapter, index }: WriterProps) {
           </span>
         </button>
       )}
-      <div className="write-stage">
+      <div className={`write-stage${styleOpen && !findOpen ? ' style-open' : ''}`}>
         <div className="write-toolbar-row">
           <Toolbar
             editor={editor}
             onFocusMode={focusMode ? undefined : () => setFocusMode(true)}
             focusKeys={FOCUS_KEYS}
-            onFind={() => openFind('find')}
+            onFind={() => {
+              setStyleOpen(false)
+              openFind('find')
+            }}
+            onStyle={() => {
+              useFind.getState().close()
+              setStyleOpen((open) => !open)
+            }}
+            styleOpen={styleOpen}
           >
             <SprintButton />
           </Toolbar>
         </div>
         <div className="write-scroll" ref={scroller}>
+          {pages && (
+            <div className="write-above">
+              {meta}
+              {summary}
+              {notes}
+            </div>
+          )}
           <article className={`write-paper${pov ? ' has-pov' : ''}`} style={{ '--pov': pov?.color } as React.CSSProperties}>
             <header className="write-head">
-              <div className="write-meta">
-                <label className="chapter-jump" title="Go to another chapter">
-                  <span>
-                    Chapter {index + 1} <span className="muted">of {chapters.length}</span>
-                  </span>
-                  <ChevronDown size={14} />
-                  <select value={chapter.id} onChange={(e) => navigate(`/write/${e.target.value}`)} aria-label="Chapter">
-                    {chapters.map((c, i) => (
-                      <option key={c.id} value={c.id}>
-                        {chapterLabel(c, i)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="write-head-pickers">
-                  <StatusPicker chapter={chapter} />
-                  <PovPicker chapter={chapter} />
-                </span>
-              </div>
+              {pages ? <span className="write-chapter-label">{chapterNumber(look.style, index + 1)}</span> : meta}
               <MentionTextarea
                 className="write-title"
                 value={chapter.title}
@@ -444,41 +516,15 @@ function ChapterWriter({ chapter, index }: WriterProps) {
                 onSubmit={() => editor.commands.focus('start')}
                 onChange={(title) => updateChapter(chapter.id, { title })}
               />
-              <MentionTextarea
-                className="write-summary"
-                value={chapter.summary}
-                placeholder="What happens in this chapter?"
-                aria-label="Chapter summary"
-                onChange={(summary) => updateChapter(chapter.id, { summary })}
-              />
+              {!pages && summary}
             </header>
-            {isShelved(chapter) && (
-              <div className="write-shelved" role="note">
-                <Archive size={16} aria-hidden />
-                <span>Shelved for now: its words aren’t counted in the manuscript, and it’s left out when you export.</span>
-                <button className="btn ghost small" onClick={() => updateChapter(chapter.id, { status: words ? 'draft' : 'outline' })}>
-                  Put it back
-                </button>
-              </div>
-            )}
-            {contentError && (
-              <div className="write-error" role="alert">
-                This chapter’s text couldn’t be opened, so editing is paused to keep it safe. You can restore an
-                earlier copy from ⋯ → Backups.
-              </div>
-            )}
+            {!pages && notes}
             <EditorContent editor={editor} className="manuscript" />
-            <footer className="write-foot">
-              {next ? (
-                <Link to={`/write/${next.id}`} className="next-chapter">
-                  Next: {chapterLabel(next, index + 1)} <ChevronRight size={16} />
-                </Link>
-              ) : (
-                <span className="muted">End of the manuscript</span>
-              )}
-            </footer>
+            {!pages && foot}
           </article>
+          {pages && foot}
         </div>
+        {styleOpen && !findOpen && <StylePanel onClose={() => setStyleOpen(false)} tooNarrow={look.tooNarrow} />}
         {focusMode && !findOpen && <FocusControls />}
         {findOpen && <FindPanel editor={editor} chapterId={chapter.id} flush={saveNow} />}
         {prev && (
@@ -496,6 +542,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
             {(words ?? 0).toLocaleString()}
             {chapter.targetWords ? ` / ${chapter.targetWords.toLocaleString()}` : ''} word{(chapter.targetWords ?? words) === 1 ? '' : 's'}
           </span>
+          {pages && pagesNow ? <span>· {pagesNow} page{pagesNow === 1 ? '' : 's'}</span> : null}
           <button className="write-status-link" onClick={() => setProgressOpen(true)} title="Word count and goals">
             · {totalWords.toLocaleString()} in the manuscript
             {todayWords ? ` · +${todayWords.toLocaleString()} today` : ''}

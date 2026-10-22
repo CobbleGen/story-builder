@@ -1,6 +1,7 @@
-import type { RichNode, StoryData } from '../types'
+import type { BookStyle, RichNode, StoryData } from '../types'
 import { displayName, plainText, type Lookup } from './mentions'
 import { MENTION_NODE, PICTURE_NODE, PICTURE_WIDTH, pictureSizeOf, type PictureSize } from './richText'
+import { chapterNumber, fontOf, fontUrl, pageSizeOf, sceneBreakOf } from './bookStyle'
 
 // The manuscript as a document to hand to someone: every chapter's text in
 // order, with headings, as Word, PDF (by printing), plain text or Markdown.
@@ -10,8 +11,12 @@ export type ExportFormat = 'docx' | 'pdf' | 'txt' | 'md'
 /** How chapter headings read: "Chapter 1" and the title, the title alone, or the number alone. */
 export type HeadingStyle = 'number-title' | 'title' | 'number'
 
+/** Laid out as a manuscript to send (double spaced, Times), or as the book's own style. */
+export type ExportLayout = 'manuscript' | 'book'
+
 export interface ExportOptions {
   format: ExportFormat
+  layout: ExportLayout
   headings: HeadingStyle
   titlePage: boolean
   author: string
@@ -23,6 +28,7 @@ export interface ExportOptions {
 
 export const DEFAULT_EXPORT: ExportOptions = {
   format: 'docx',
+  layout: 'manuscript',
   headings: 'number-title',
   titlePage: true,
   author: '',
@@ -80,9 +86,14 @@ export interface Manuscript {
   words: number
   titlePage: boolean
   chapters: ManuscriptChapter[]
+  /** The book's style, when it's laid out in it. */
+  style?: BookStyle
 }
 
 export const SCENE_BREAK = '*  *  *'
+
+/** The mark between scenes: the book's own, laid out in its style. */
+export const sceneMark = (m: Manuscript) => (m.style ? sceneBreakOf(m.style.sceneBreak).mark : SCENE_BREAK)
 
 type NameOf = (id: string, label: unknown) => string
 
@@ -174,7 +185,12 @@ export function blocksOf(doc: RichNode, nameOf: NameOf): Block[] {
 }
 
 /** The chapters to export, as the options ask. */
-export function buildManuscript(data: Pick<StoryData, 'title' | 'chapters' | 'texts'>, lookup: Lookup, options: ExportOptions): Manuscript {
+export function buildManuscript(
+  data: Pick<StoryData, 'title' | 'chapters' | 'texts'> & Partial<Pick<StoryData, 'style'>>,
+  lookup: Lookup,
+  options: ExportOptions,
+): Manuscript {
+  const style = options.layout === 'book' ? data.style : undefined
   const nameOf: NameOf = (id, label) => {
     const named = lookup.get(id)
     return named ? displayName(named) : String(label ?? '')
@@ -189,7 +205,7 @@ export function buildManuscript(data: Pick<StoryData, 'title' | 'chapters' | 'te
     if (c.status === 'shelved' && options.skipShelved !== false) return
     words += text?.words ?? 0
     const title = plainText(c.title, lookup).trim()
-    const label = `Chapter ${i + 1}`
+    const label = style ? chapterNumber(style, i + 1) : `Chapter ${i + 1}`
     chapters.push({
       label: options.headings === 'title' && title ? null : label,
       title: options.headings === 'number' ? null : title || null,
@@ -202,6 +218,7 @@ export function buildManuscript(data: Pick<StoryData, 'title' | 'chapters' | 'te
     words,
     titlePage: options.titlePage,
     chapters,
+    ...(style ? { style } : {}),
   }
 }
 
@@ -226,7 +243,7 @@ export function toPlainText(m: Manuscript): string {
   for (const c of m.chapters) {
     const lines: string[] = [headingLine(c)]
     for (const b of c.blocks) {
-      if (b.type === 'break') lines.push(SCENE_BREAK)
+      if (b.type === 'break') lines.push(sceneMark(m))
       else if (b.type === 'picture') lines.push(b.alt ? `[Picture: ${b.alt}]` : '[Picture]')
       else if (b.type === 'item') {
         const pad = '    '.repeat(b.depth)
@@ -283,7 +300,7 @@ export function toMarkdown(m: Manuscript, pictures: ExportPictures = new Map()):
     let prevItem = false
     for (const b of c.blocks) {
       let text: string
-      if (b.type === 'break') text = '* * *'
+      if (b.type === 'break') text = guardStart(escapeMd(sceneMark(m).replace(/\s+/g, ' '))) || '* * *'
       else if (b.type === 'picture') {
         const picture = pictures.get(b.imageId)
         text = picture ? `![${escapeMd(b.alt)}](${picture.dataUrl})` : '*[Picture]*'
@@ -326,23 +343,26 @@ function htmlRuns(runs: Run[]): string {
     .join('')
 }
 
-/** A standalone page laid out like a manuscript, for printing or saving as PDF. */
+/** A standalone page laid out like a manuscript (or in the book's style), for printing or saving as PDF. */
 export function toPrintHtml(m: Manuscript, pictures: ExportPictures = new Map()): string {
   const body: string[] = []
   if (m.titlePage) {
     body.push(
-      `<section class="title-page"><h1>${escapeHtml(m.title)}</h1>${m.author ? `<p class="by">by ${escapeHtml(m.author)}</p>` : ''}<p class="count">${escapeHtml(aboutWords(m.words))}</p></section>`,
+      `<section class="title-page"><h1>${escapeHtml(m.title)}</h1>${m.author ? `<p class="by">by ${escapeHtml(m.author)}</p>` : ''}${m.style ? '' : `<p class="count">${escapeHtml(aboutWords(m.words))}</p>`}</section>`,
     )
   }
+  const mark = sceneMark(m)
   m.chapters.forEach((c, i) => {
     const head = [c.label ? `<span class="label">${escapeHtml(c.label)}</span>` : '', c.title ? `<span class="name">${escapeHtml(c.title)}</span>` : '']
       .filter(Boolean)
       .join('')
     const html: string[] = [`<h2 class="chapter${i === 0 && !m.titlePage ? ' first' : ''}">${head}</h2>`]
     let flush = true
+    // The chapter's first paragraph opens it (a drop cap, small capitals).
+    let opened = false
     for (const b of c.blocks) {
       if (b.type === 'break') {
-        html.push(`<p class="scene">${SCENE_BREAK}</p>`)
+        html.push(`<p class="scene">${mark ? escapeHtml(mark) : '&nbsp;'}</p>`)
         flush = true
         continue
       }
@@ -367,19 +387,31 @@ export function toPrintHtml(m: Manuscript, pictures: ExportPictures = new Map())
         flush = true
         continue
       }
-      const classes = [b.quote ? 'quote' : '', flush ? 'flush' : ''].filter(Boolean).join(' ')
+      const opening = !!m.style && !b.quote && !opened && b.runs.some((r) => r.text.trim())
+      if (opening) opened = true
+      const classes = [b.quote ? 'quote' : '', flush ? 'flush' : '', opening ? 'opening' : ''].filter(Boolean).join(' ')
       html.push(`<p${classes ? ` class="${classes}"` : ''}>${htmlRuns(b.runs) || '&nbsp;'}</p>`)
       flush = !!b.quote
     }
     body.push(`<section class="chapter-text">${html.join('\n')}</section>`)
   })
+  const font = m.style ? fontOf(m.style.font) : null
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(m.title)}</title>
-<style>
-@page { margin: 1in; }
+${font ? `<link rel="stylesheet" href="${escapeHtml(fontUrl(font))}">\n` : ''}<style>
+${m.style ? bookCss(m.style) : MANUSCRIPT_CSS}
+</style>
+</head>
+<body>
+${body.join('\n')}
+</body>
+</html>`
+}
+
+const MANUSCRIPT_CSS = `@page { margin: 1in; }
 html { background: #fff; }
 body { margin: 0; color: #000; font: 12pt/2 'Times New Roman', Times, 'Source Serif 4', Georgia, serif; }
 p { margin: 0; text-indent: 0.5in; orphans: 2; widows: 2; }
@@ -400,11 +432,42 @@ h3 { text-align: center; }
 .title-page h1 { margin: 0; font-size: 20pt; font-weight: normal; line-height: 1.3; }
 .title-page .by { margin-top: 0.6em; text-indent: 0; }
 .title-page .count { margin-top: 2em; text-indent: 0; font-size: 11pt; }
-@media screen { body { max-width: 6.5in; margin: 0.5in auto; } }
-</style>
-</head>
-<body>
-${body.join('\n')}
-</body>
-</html>`
+@media screen { body { max-width: 6.5in; margin: 0.5in auto; } }`
+
+/** The page laid out in the book's style: its typeface, size, spacing, pages and chapter openings. */
+function bookCss(style: BookStyle): string {
+  const page = pageSizeOf(style.pageSize)
+  const font = fontOf(style.font)
+  const { top, bottom, side } = page.margin
+  const justify = style.align === 'justify'
+  const indent = style.paragraphs === 'indent'
+  const opening = 'p.opening:not(.quote)'
+  const initial =
+    style.initial === 'none'
+      ? ''
+      : `${opening}::first-letter { -webkit-initial-letter: ${style.initial === 'drop' ? '3' : '3 1'}; initial-letter: ${style.initial === 'drop' ? '3' : '3 1'}; margin-right: 0.06em; }`
+  return `@page { size: ${page.width}in ${page.height}in; margin: ${top}in ${side}in ${bottom}in; @bottom-center { content: counter(page); font-family: ${font.stack}; font-size: ${Math.round(style.size * 0.75 * 10) / 10}pt; } }
+@page cover { @bottom-center { content: none; } }
+html { background: #fff; }
+body { margin: 0; color: #000; font-family: ${font.stack}; font-size: ${style.size}pt; line-height: ${style.leading}; font-variant-numeric: oldstyle-nums; }
+p { margin: 0; text-indent: ${indent ? '1.5em' : '0'}; orphans: 2; widows: 2;${justify ? ` text-align: justify;${style.hyphenate ? ' -webkit-hyphens: auto; hyphens: auto;' : ''}` : ''} }
+${indent ? '' : `p + p { margin-top: ${style.leading * 0.5}em; }\n`}p.flush, p.quote, p.item, p.scene { text-indent: 0; }
+p.quote { margin: 0 2em; font-style: italic; }
+p.item { padding-left: 1.5em; text-indent: -1.5em; text-align: left; }
+p.item .marker { display: inline-block; width: 1.5em; text-indent: 0; }
+p.scene { margin: ${style.leading * 0.5}em 0; text-align: center; text-indent: 0; }
+${initial}
+${style.smallCaps ? `${opening}::first-line { font-variant-caps: small-caps; letter-spacing: 0.04em; }` : ''}
+figure.picture { margin: 0.6em auto; break-inside: avoid; }
+figure.picture img { display: block; width: 100%; max-height: ${Math.round((page.height - top - bottom) * 0.9 * 100) / 100}in; object-fit: contain; }
+h2.chapter { ${style.chapterPage ? 'break-before: page; ' : ''}margin: ${style.chapterPage ? `${Math.round(page.height * 0.1 * 100) / 100}in` : '3em'} 0 2.2em; text-align: ${style.headingAlign}; font-weight: normal; line-height: 1.3; break-after: avoid; }
+h2.chapter.first { break-before: auto; margin-top: ${Math.round(page.height * 0.1 * 100) / 100}in; }
+h2.chapter .label { display: block; font-size: 0.8em; letter-spacing: 0.12em; text-transform: uppercase; }
+h2.chapter .name { display: block; margin-top: 0.25em; font-size: 1.45em; }
+h3, h4, h5 { margin: 1.2em 0 0.4em; font-size: 1em; break-after: avoid; }
+h3 { text-align: center; font-size: 1.15em; }
+.title-page { page: cover; display: flex; flex-direction: column; justify-content: center; height: ${Math.round((page.height - top - bottom) * 0.95 * 100) / 100}in; text-align: center; break-after: page; }
+.title-page h1 { margin: 0; font-size: 2em; font-weight: normal; line-height: 1.2; }
+.title-page .by { margin-top: 1em; text-indent: 0; text-align: center; font-size: 1.1em; }
+@media screen { body { max-width: ${page.width - 2 * side}in; margin: 0.5in auto; } }`
 }

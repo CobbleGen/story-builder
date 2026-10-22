@@ -3496,6 +3496,12 @@ a {
 }
 
 .write-page {
+  /* The book's style (set from the story's; see lib/bookStyle) */
+  --book-font: var(--serif);
+  --book-size: 19px;
+  --book-leading: 1.75;
+  --book-break: '⁂';
+  --book-width: 740px;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -3816,7 +3822,7 @@ a {
 }
 
 .write-paper {
-  max-width: 740px;
+  max-width: var(--book-width);
   margin: 0 auto;
   padding: 44px 64px 56px;
   background: var(--surface);
@@ -3880,8 +3886,8 @@ a {
   --pad: 2px 6px;
   margin: 8px -6px 0;
   width: calc(100% + 12px);
-  font-family: var(--serif);
-  font-size: 32px;
+  font-family: var(--book-font);
+  font-size: calc(var(--book-size) * 1.68);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -3938,13 +3944,13 @@ a {
   font-size: 14px;
 }
 
-/* The text itself: book-style paragraphs in a comfortable serif */
+/* The text itself: book-style paragraphs, in the book's style */
 .manuscript .ProseMirror {
   min-height: 50vh;
   outline: none;
-  font-family: var(--serif);
-  font-size: 19px;
-  line-height: 1.75;
+  font-family: var(--book-font);
+  font-size: var(--book-size);
+  line-height: var(--book-leading);
   color: var(--ink);
   caret-color: var(--ink);
   overflow-wrap: break-word;
@@ -3962,7 +3968,7 @@ a {
 .manuscript .ProseMirror h2,
 .manuscript .ProseMirror h3 {
   margin: 1.4em 0 0.5em;
-  font-family: var(--serif);
+  font-family: var(--book-font);
   font-weight: 600;
   line-height: 1.25;
   text-wrap: balance;
@@ -4156,13 +4162,193 @@ a {
 }
 
 .manuscript .ProseMirror hr::after {
-  content: '⁂';
+  content: var(--book-break);
+  white-space: pre;
   color: var(--ink-3);
   font-size: 1.1em;
 }
 
 .manuscript .ProseMirror hr.ProseMirror-selectednode::after {
   color: var(--focus);
+}
+
+/* ---------- The book's style ---------- */
+
+.book-spaced .manuscript .ProseMirror p + p {
+  margin-top: calc(var(--book-leading) * 0.5em);
+  text-indent: 0;
+}
+
+.book-justify .manuscript .ProseMirror p,
+.book-justify .manuscript .ProseMirror li {
+  text-align: justify;
+}
+
+.book-justify.book-hyphenate .manuscript .ProseMirror p,
+.book-justify.book-hyphenate .manuscript .ProseMirror li {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
+
+.book-center .write-title .mention-backdrop,
+.book-center .write-title .mention-input,
+.book-center .write-chapter-label {
+  text-align: center;
+}
+
+/* A chapter's opening: its first letter dropped into the first lines, or raised; its first line in small capitals. */
+.book-drop .manuscript .ProseMirror > p:first-of-type:not(.is-editor-empty)::first-letter {
+  -webkit-initial-letter: 3;
+  initial-letter: 3;
+  margin-right: 0.08em;
+}
+
+.book-raised .manuscript .ProseMirror > p:first-of-type:not(.is-editor-empty)::first-letter {
+  -webkit-initial-letter: 3 1;
+  initial-letter: 3 1;
+  margin-right: 0.04em;
+}
+
+@supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
+  .book-drop .manuscript .ProseMirror > p:first-of-type:not(.is-editor-empty)::first-letter {
+    float: left;
+    margin: 0.04em 0.08em 0 0;
+    font-size: calc((2 * var(--book-leading) + 0.7) / 0.72 * 1em);
+    line-height: 0.82;
+  }
+
+  .book-raised .manuscript .ProseMirror > p:first-of-type:not(.is-editor-empty)::first-letter {
+    font-size: 3em;
+    line-height: 1;
+  }
+}
+
+.book-smallcaps .manuscript .ProseMirror > p:first-of-type:not(.is-editor-empty)::first-line {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.04em;
+}
+
+.write-chapter-label {
+  display: block;
+  font-family: var(--book-font);
+  font-size: calc(var(--book-size) * 0.8);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* ---------- The manuscript as pages ----------
+   One chapter is one run of pages: the paper is a page wide, and where a
+   page ends a break (lib editor/pages) fills the rest of it, shows its
+   number, and draws the gap to the next page. */
+
+.book-pages .write-scroll {
+  padding: 24px 24px 96px;
+  overflow-x: hidden;
+}
+
+.write-above {
+  width: var(--page-w);
+  max-width: 100%;
+  margin: 0 auto 14px;
+}
+
+.write-above .write-summary {
+  margin-top: 4px;
+}
+
+.write-above .write-shelved,
+.write-above .write-error {
+  margin: 10px 0 0;
+}
+
+.book-pages .write-paper {
+  width: var(--page-w);
+  max-width: none;
+  min-height: var(--page-h);
+  padding: var(--page-mt) var(--page-mx) 0;
+  border-radius: 2px;
+}
+
+.book-pages .write-paper.has-pov {
+  border-top-width: 1px;
+}
+
+.book-pages .write-head {
+  margin-bottom: calc(var(--book-size) * 2.2);
+  padding: var(--page-sink) 0 0;
+  border-bottom: 0;
+}
+
+.book-pages .write-title {
+  margin-top: 0.25em;
+  font-size: calc(var(--book-size) * 1.45);
+  font-weight: 500;
+}
+
+.book-pages .manuscript .ProseMirror {
+  min-height: 0;
+}
+
+.book-pages .manuscript .ProseMirror figure.picture img {
+  max-height: calc(var(--page-content-h) * 0.9);
+  object-fit: contain;
+}
+
+.book-pages .write-foot.outside {
+  width: var(--page-w);
+  max-width: 100%;
+  margin: 18px auto 0;
+  border: 0;
+}
+
+.page-break {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 0;
+  text-indent: 0;
+  line-height: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
+.page-break.inline {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+}
+
+.page-band {
+  position: absolute;
+  left: calc(-1 * var(--page-mx) - 8px);
+  right: calc(-1 * var(--page-mx) - 8px);
+  height: var(--page-gap);
+  background: var(--page-desk, var(--board));
+  box-shadow:
+    inset 0 7px 7px -7px rgba(38, 36, 31, 0.22),
+    inset 0 -5px 5px -5px rgba(38, 36, 31, 0.12);
+}
+
+.page-number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  color: var(--ink-3);
+  font-family: var(--book-font);
+  font-size: calc(var(--book-size) * 0.72);
+  font-variant-numeric: oldstyle-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.manuscript.pages-measuring .page-break {
+  display: none;
+}
+
+.write-page.focus.book-pages .write-paper {
+  border-color: var(--line);
+  background: var(--surface);
 }
 
 .manuscript .ProseMirror p.is-editor-empty:first-child::before {
@@ -4377,6 +4563,216 @@ a {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   font-size: 13px;
+}
+
+.style-panel {
+  position: absolute;
+  top: 52px;
+  right: 14px;
+  bottom: 44px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  width: min(330px, calc(100% - 28px));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+}
+
+.style-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 10px 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.style-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.style-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+}
+
+.style-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+}
+
+.style-section {
+  padding: 12px 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.style-section h3 {
+  margin: 0 0 8px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.style-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 10px 0 0;
+}
+
+.style-section h3 + .style-field {
+  margin-top: 0;
+}
+
+.style-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--hover);
+}
+
+.style-choice {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.style-choice:hover {
+  color: var(--ink);
+}
+
+.style-choice.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.style-choices.breaks .style-choice {
+  flex: 1 0 auto;
+  font-family: var(--serif);
+  font-size: 14px;
+  white-space: pre;
+}
+
+.style-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.style-stepper output {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.style-range {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.style-check {
+  margin-top: 10px;
+}
+
+.style-note {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.font-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.font-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.font-option:hover {
+  background: var(--hover);
+}
+
+.font-option.on {
+  border-color: color-mix(in srgb, var(--focus) 55%, var(--line));
+  background: color-mix(in srgb, var(--focus) 8%, var(--surface));
+}
+
+.font-name {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.font-note {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.style-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.style-foot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.style-foot p {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+/* Room beside the text for the panel, so what changes can be seen. */
+@media (min-width: 761px) {
+  .write-stage.style-open .write-scroll {
+    padding-right: 360px;
+  }
+}
+
+@media (max-width: 760px) {
+  .style-panel {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-height: 70vh;
+  }
 }
 
 .find-row {
@@ -4806,6 +5202,7 @@ a {
 }
 
 .write-page.focus {
+  --page-desk: var(--paper);
   background: var(--paper);
 }
 
@@ -6097,6 +6494,12 @@ button.tl-new-arc:hover {
   margin: 18px 0 0;
   padding: 0;
   border: 0;
+}
+
+.export-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12.5px;
 }
 
 .export-formats legend {

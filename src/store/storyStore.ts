@@ -62,6 +62,8 @@ interface StoryActions {
   replaceText: (query: FindQuery, replacement: string) => { count: number; chapters: number }
   /** Chapters brought in from a manuscript (one undo step); their ids. */
   importChapters: (...args: Tail<Parameters<typeof ops.importChapters>>) => string[]
+  /** A change to how the whole manuscript looks. */
+  setBookStyle: (...args: Tail<Parameters<typeof ops.setBookStyle>>) => void
   /** A finished sprint, kept with the story (not an undo step). */
   addSprint: (...args: Tail<Parameters<typeof ops.addSprint>>) => void
   /** Archives a chapter, arc, beat, character, element or map, with what goes with it (a chapter's beats, say). */
@@ -111,6 +113,7 @@ export const STORY_KEYS = [
   'outlineCuts',
   'sprints',
   'archive',
+  'style',
 ] as const satisfies readonly (keyof StoryData)[]
 
 /** Just the story's data, without the store's actions (for saving and export). */
@@ -131,6 +134,7 @@ export const pickData = (s: StoryData): StoryData => ({
   outlineCuts: s.outlineCuts,
   sprints: s.sprints,
   archive: s.archive,
+  style: s.style,
 })
 
 /**
@@ -211,6 +215,7 @@ export const useStory = create<StoryStore>()(
         // Not in the undo history: the manuscript editor has its own undo.
         setChapterText: (...a) => apply(ops.setChapterText(data(), ...a)),
         setGoals: (...a) => apply(ops.setGoals(data(), ...a), 'setGoals', a[0]),
+        setBookStyle: (...a) => apply(ops.setBookStyle(data(), ...a), 'setBookStyle', Object.keys(a[0]).join()),
         addSprint: (...a) => apply(ops.addSprint(data(), ...a)),
         importChapters: (...a) => {
           const [next, ids] = ops.importChapters(data(), ...a)

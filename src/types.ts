@@ -281,6 +281,38 @@ export interface ArchivedItem {
   cards: { mapId: string; nodes: MapNode[]; edges: MapEdge[] }[]
 }
 
+/** How the whole manuscript looks, in the app and printed (see lib/bookStyle). */
+export interface BookStyle {
+  /** The typeface, by id (lib/bookStyle FONTS). */
+  font: string
+  /** Text size in points, as printed. */
+  size: number
+  /** Line spacing: 1 is single, 2 double. */
+  leading: number
+  /** Paragraphs indented (as in books), or with space between. */
+  paragraphs: 'indent' | 'spaced'
+  align: 'left' | 'justify'
+  /** Words broken at the ends of lines (when justified). */
+  hyphenate: boolean
+  /** A chapter's first letter: as the rest, dropped into the first lines, or raised above them. */
+  initial: 'none' | 'drop' | 'raised'
+  /** A chapter's first line in small capitals. */
+  smallCaps: boolean
+  /** How chapters are numbered in their headings. */
+  numbering: 'chapter-number' | 'chapter-word' | 'word' | 'number' | 'roman'
+  headingAlign: 'left' | 'center'
+  /** The mark between scenes (lib/bookStyle SCENE_BREAKS). */
+  sceneBreak: string
+  /** The manuscript shown as pages. */
+  pages: boolean
+  /** The pages' size (lib/bookStyle PAGE_SIZES). */
+  pageSize: string
+  /** Each chapter starts on a new page, printed. */
+  chapterPage: boolean
+  /** How wide the text is when not shown as pages. */
+  width: 'narrow' | 'medium' | 'wide'
+}
+
 /** Word targets for the whole draft and for each day's writing. */
 export interface StoryGoals {
   draft?: number
@@ -323,4 +355,6 @@ export interface StoryData {
   sprints: SprintRecord[]
   /** Things archived, oldest first. */
   archive: ArchivedItem[]
+  /** How the manuscript looks. */
+  style: BookStyle
 }

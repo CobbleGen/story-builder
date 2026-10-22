@@ -1,6 +1,7 @@
 import type {
   Arc,
   Beat,
+  BookStyle,
   Chapter,
   ChapterStatus,
   ChapterText,
@@ -32,6 +33,7 @@ import { netChange, outlineWords, tally, type WordChange } from '../lib/progress
 import { matcher, replaceInDoc, wordsInDoc, type FindQuery } from '../lib/replace'
 import { TEXT_BOX_SIZE, cleanTextSize } from '../lib/textSize'
 import { archiveOf, archivedOutlineWords } from '../lib/archived'
+import { DEFAULT_STYLE, bookStyleOf } from '../lib/bookStyle'
 import { PAPER_NAMES, cleanColor } from '../lib/colors'
 
 // Pure operations on StoryData. Every op returns a new object and keeps two
@@ -366,6 +368,12 @@ export function setGoals(data: StoryData, patch: StoryGoals): StoryData {
   return { ...data, goals }
 }
 
+/** A change to how the manuscript looks (anything not right in it is left as it was). */
+export function setBookStyle(data: StoryData, patch: Partial<BookStyle>): StoryData {
+  const style = bookStyleOf({ ...data.style, ...patch }, data.style)
+  return (Object.keys(style) as (keyof BookStyle)[]).every((k) => style[k] === data.style[k]) ? data : { ...data, style }
+}
+
 /** A story with nothing in it yet. */
 export function emptyStory(title = 'Untitled story'): StoryData {
   return {
@@ -385,6 +393,7 @@ export function emptyStory(title = 'Untitled story'): StoryData {
     outlineCuts: {},
     sprints: [],
     archive: [],
+    style: DEFAULT_STYLE,
   }
 }
 
@@ -2274,5 +2283,6 @@ export function normalizeStory(input: unknown): StoryData {
     outlineCuts,
     sprints: sprintsOf(raw.sprints),
     archive: archiveOf(raw.archive),
+    style: bookStyleOf(raw.style),
   })
 }

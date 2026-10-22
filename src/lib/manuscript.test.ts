@@ -200,3 +200,80 @@ describe('pictures in the exported manuscript', () => {
     expect(xml).toContain('descr="The harbour"')
   })
 })
+
+describe('the book’s style', () => {
+  const styled = (style: Partial<StoryData['style']>, options: Partial<ExportOptions> = {}) => {
+    const { data } = story()
+    return build({ ...data, style: { ...data.style, ...style } }, { layout: 'book', ...options })
+  }
+
+  it('leaves the standard manuscript as it was', () => {
+    const { data } = story()
+    const m = build({ ...data, style: { ...data.style, numbering: 'roman', sceneBreak: 'fleuron' } })
+    expect(m.style).toBeUndefined()
+    expect(m.chapters[0].label).toBe('Chapter 1')
+    expect(toPlainText(m)).toContain('*  *  *')
+  })
+
+  it('numbers chapters and marks scene breaks its way', () => {
+    const m = styled({ numbering: 'chapter-word', sceneBreak: 'fleuron' })
+    expect(m.chapters.map((c) => c.label)).toEqual(['Chapter One', 'Chapter Three'])
+    expect(toPlainText(m)).toContain('\n\n❧\n\n')
+    expect(toMarkdown(m)).toContain('\n\n❧\n\n')
+    expect(toMarkdown(styled({ sceneBreak: 'hash' }))).toContain('\n\n\\#\n\n')
+    expect(styled({ numbering: 'roman' }).chapters[1].label).toBe('III')
+  })
+
+  it('prints in its typeface, size, spacing and page size, with its chapter openings', () => {
+    const html = toPrintHtml(
+      styled({ font: 'eb-garamond', size: 11, leading: 1.5, align: 'justify', initial: 'drop', smallCaps: true, pageSize: 'a5', headingAlign: 'center', sceneBreak: 'diamond' }),
+    )
+    expect(html).toContain('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:')
+    expect(html).toContain('@page { size: 5.83in 8.27in;')
+    expect(html).toContain("font-family: 'EB Garamond', Garamond")
+    expect(html).toContain('font-size: 11pt; line-height: 1.5;')
+    expect(html).toContain('text-align: justify; -webkit-hyphens: auto; hyphens: auto;')
+    expect(html).toContain('p.opening:not(.quote)::first-letter { -webkit-initial-letter: 3; initial-letter: 3;')
+    expect(html).toContain('p.opening:not(.quote)::first-line { font-variant-caps: small-caps;')
+    expect(html).toContain('text-align: center; font-weight: normal;')
+    // The chapter's first paragraph opens it; the scene break is its mark.
+    expect(html).toContain('<p class="flush opening">It was <em>dark</em>')
+    expect(html).toContain('<p class="scene">◆</p>')
+    // No word count on a book's title page.
+    expect(html).not.toContain('class="count"')
+  })
+
+  it('keeps chapters running on when they don’t start new pages', () => {
+    expect(toPrintHtml(styled({ chapterPage: false }))).not.toMatch(/h2\.chapter \{ break-before: page/)
+    expect(toPrintHtml(styled({ chapterPage: true }))).toMatch(/h2\.chapter \{ break-before: page/)
+    expect(toPrintHtml(styled({ paragraphs: 'spaced' }))).toContain('text-indent: 0;')
+  })
+
+  it('writes a Word document in it', async () => {
+    const blob = await manuscriptDocx(styled({ font: 'lora', size: 11, leading: 1.5, align: 'justify', initial: 'drop', smallCaps: true, pageSize: 'trade' }))
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const xml = await zip.file('word/document.xml')!.async('string')
+    // A drop cap of Word's own, its letter apart; the rest of the first line in small capitals.
+    expect(xml).toMatch(/<w:framePr [^>]*w:dropCap="drop"[^>]*w:lines="3"/)
+    expect(xml).toMatch(/<w:t xml:space="preserve">I<\/w:t>/)
+    expect(xml).toContain('<w:smallCaps/>')
+    expect(xml).toContain('<w:jc w:val="both"/>')
+    // Six by nine inches.
+    expect(xml).toMatch(/<w:pgSz w:w="8640" w:h="12960"/)
+    const styles = await zip.file('word/styles.xml')!.async('string')
+    expect(styles).toContain('w:ascii="Lora"')
+    expect(styles).toContain('w:val="22"')
+    const footer = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f))
+    expect(footer).toBeDefined()
+    expect(await zip.file(footer!)!.async('string')).toContain('PAGE')
+    expect(await zip.file('word/settings.xml')!.async('string')).toContain('w:autoHyphenation')
+  })
+
+  it('raises the first letter in Word too', async () => {
+    const xml = await (await JSZip.loadAsync(await (await manuscriptDocx(styled({ initial: 'raised', size: 12 }))).arrayBuffer()))
+      .file('word/document.xml')!
+      .async('string')
+    expect(xml).not.toContain('w:dropCap')
+    expect(xml).toMatch(/<w:sz w:val="72"\/>(?:<w:szCs w:val="72"\/>)?<\/w:rPr><w:t xml:space="preserve">I<\/w:t>/)
+  })
+})

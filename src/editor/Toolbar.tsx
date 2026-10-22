@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react'
 import { useEditorState } from '@tiptap/react'
 import { insertPictures } from './picture'
 import {
+  BookType,
   Bold,
   Focus,
   Search,
@@ -54,6 +55,8 @@ export function Toolbar({
   onFocusMode,
   focusKeys,
   onFind,
+  onStyle,
+  styleOpen,
   children,
 }: {
   editor: Editor
@@ -61,6 +64,9 @@ export function Toolbar({
   focusKeys?: string
   /** Opens find and replace. */
   onFind?: () => void
+  /** Opens (or closes) the book's style. */
+  onStyle?: () => void
+  styleOpen?: boolean
   /** More tools at the end (the writing sprint). */
   children?: ReactNode
 }) {
@@ -160,7 +166,12 @@ export function Toolbar({
       >
         <RemoveFormatting size={17} />
       </ToolButton>
-      {(onFind || onFocusMode) && <span className="tool-sep" />}
+      {(onFind || onFocusMode || onStyle) && <span className="tool-sep" />}
+      {onStyle && (
+        <ToolButton label="Book style: typeface, size, spacing, pages" active={styleOpen} onClick={onStyle}>
+          <BookType size={17} />
+        </ToolButton>
+      )}
       {onFind && (
         <ToolButton label="Find and replace" shortcut={`${mod}F`} onClick={onFind}>
           <Search size={17} />

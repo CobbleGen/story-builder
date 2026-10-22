@@ -10,8 +10,10 @@ import {
   toPlainText,
   toPrintHtml,
   type ExportFormat,
+  type ExportLayout,
   type HeadingStyle,
 } from '../lib/manuscript'
+import { chapterNumber, fontOf, pageSizeOf } from '../lib/bookStyle'
 import { isShelved } from '../lib/chapterStatus'
 import { loadPictures } from '../lib/exportPictures'
 import { downloadBlob, printHtml, slug } from '../lib/download'
@@ -30,23 +32,34 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const title = useStory((s) => s.title)
   const chapters = useStory((s) => s.chapters)
   const texts = useStory((s) => s.texts)
+  const style = useStory((s) => s.style)
   const lookup = useMentionLookup()
   const options = useUi((s) => s.exportOptions)
   const setOptions = useUi((s) => s.setExportOptions)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
 
-  const manuscript = useMemo(() => buildManuscript({ title, chapters, texts }, lookup, options), [title, chapters, texts, lookup, options])
+  const manuscript = useMemo(() => buildManuscript({ title, chapters, texts, style }, lookup, options), [title, chapters, texts, style, lookup, options])
+  const book = options.layout === 'book'
+  const number = book ? chapterNumber(style, 1) : 'Chapter 1'
   const unwritten = chapters.filter((c) => !texts[c.id]?.words).length
   const shelved = chapters.filter(isShelved).length
   const format = FORMATS.find((f) => f.id === options.format) ?? FORMATS[0]
   const first = chapters[0]
   const firstTitle = first ? plainText(first.title, lookup).trim() : ''
   const example: Record<HeadingStyle, string> = {
-    'number-title': `Chapter 1${firstTitle ? `: ${firstTitle}` : ''}`,
+    'number-title': `${number}${firstTitle ? `: ${firstTitle}` : ''}`,
     title: firstTitle || 'The chapter’s title',
-    number: 'Chapter 1',
+    number,
   }
+  const layouts: { id: ExportLayout; label: string; note: string }[] = [
+    { id: 'manuscript', label: 'Standard manuscript', note: 'Times, double spaced: what agents and editors ask for' },
+    {
+      id: 'book',
+      label: 'Book style',
+      note: `As in the manuscript: ${fontOf(style.font).name}, ${style.size} pt, ${pageSizeOf(style.pageSize).name} pages`,
+    },
+  ]
 
   const run = async () => {
     setBusy(true)
@@ -92,7 +105,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <h2 className="confirm-title">Export manuscript</h2>
-      <p className="confirm-message">Every chapter’s text in order, laid out as a manuscript: double spaced, each chapter on a new page.</p>
+      <p className="confirm-message">
+        {book
+          ? 'Every chapter’s text in order, set in the book’s style (Book style, in the manuscript’s toolbar).'
+          : 'Every chapter’s text in order, laid out as a manuscript: double spaced, each chapter on a new page.'}
+      </p>
 
       <fieldset className="export-formats">
         <legend className="field-label">Format</legend>
@@ -115,6 +132,25 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             </label>
           )
         })}
+      </fieldset>
+
+      <fieldset className="export-formats export-layouts">
+        <legend className="field-label">Layout</legend>
+        {layouts.map((l) => (
+          <label key={l.id} className={`format-option${options.layout === l.id ? ' active' : ''}`}>
+            <input type="radio" name="export-layout" value={l.id} checked={options.layout === l.id} onChange={() => setOptions({ layout: l.id })} />
+            <span className="format-text">
+              <strong>{l.label}</strong>
+              <small>{l.note}</small>
+            </span>
+          </label>
+        ))}
+        {book && (options.format === 'txt' || options.format === 'md') && (
+          <p className="export-note muted">Plain text and Markdown keep the book’s chapter numbers and scene breaks only.</p>
+        )}
+        {book && options.format === 'docx' && (
+          <p className="export-note muted">Word shows the typeface if it’s on the computer that opens the file.</p>
+        )}
       </fieldset>
 
       <label className="field">

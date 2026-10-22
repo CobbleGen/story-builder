@@ -105,6 +105,23 @@ assistant such as Claude read all of it and give you feedback (see
   chapter that has one, and the panel lists how many each holds. Names
   linked with @ aren't text to it: they change when the character or place
   is renamed (it says so when what you're looking for is one).
+- **Book style** (the book button in the manuscript's toolbar): how the
+  whole manuscript looks, in every chapter, changed as you watch. Choose the
+  typeface (twelve: book serifs like EB Garamond, Libre Baskerville, Lora and
+  Literata, sans serifs, or Courier Prime for a typewriter look), the text
+  size and line spacing, indented or spaced paragraphs, ragged or justified
+  lines (with hyphenation), how chapters open (a drop cap or raised cap, and
+  the first line in small capitals), how chapters are numbered ("Chapter 3",
+  "Chapter Three", "Three", "3" or "III") and whether headings are centred,
+  the scene-break mark (⁂, * * *, ❧, ◆, · · ·, # or a blank line), and how
+  wide the text is. **Show the manuscript as pages** sets it on pages of a
+  book's size (trade paperback, digest, pocket book, A5, US Letter or A4),
+  each with its number in the margin and a gap between, paragraphs split
+  between lines where a page ends (never one line alone at a page's foot or
+  top), and the chapter's heading set down the first page; the status line
+  counts the chapter's pages. The style is kept with the story (and syncs
+  with it); each change is one step to undo (the panel has an Undo), and
+  "Back to the usual style" starts again.
 - **Focus mode** (the last button in the manuscript's toolbar, or Ctrl+Shift+F,
   ⌘⇧F on a Mac): only the page on screen. The top bar, beats and arrows go
   away; the toolbar and word count wait, faint, until the pointer comes
@@ -292,9 +309,16 @@ assistant such as Claude read all of it and give you feedback (see
   Bringing text in doesn't count as words written that day.
 - **Export the manuscript** (⋯ → Export manuscript…) as a Word document, a
   PDF (through the print window), plain text or Markdown, laid out as a
-  manuscript: double spaced, each chapter on a new page, with an optional
-  title page. Word files use real headings (so chapters show in Word's
-  navigation pane) and put the title and page number at the top of each page.
+  standard manuscript (double spaced, each chapter on a new page, the title
+  and page number at the top of each page) or in the **book style**: its
+  typeface, size and spacing on pages of its size, chapters opening as in the
+  manuscript (Word gets a drop cap of its own), its chapter numbers and
+  scene breaks, the page number at the foot of each page, and each chapter on
+  a new page or running on, as the style says. Either way there's an optional
+  title page, and Word files use real headings (so chapters show in Word's
+  navigation pane). Word shows the typeface if it's on the computer that
+  opens the file; plain text and Markdown keep the book style's chapter
+  numbers and scene breaks.
 - **Dark mode**: ⋯ → Light, Dark, or Match system.
 
 Your story saves automatically in the browser (IndexedDB) as you type, and
@@ -424,7 +448,8 @@ any static host or sub-folder.
 ### Layout
 
 - `src/types.ts`: the data model (story → chapters, arcs, beats, characters,
-  places and things, chapter texts, story time, mind maps, goals, archive)
+  places and things, chapter texts, story time, mind maps, goals, archive,
+  the book's style)
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
@@ -451,6 +476,12 @@ any static host or sub-folder.
 - `src/lib/mentions.ts` and `src/components/MentionTextarea.tsx`: how
   `@mentions` are stored (as ids) and edited
 - `src/lib/search.ts` and `src/components/SearchDialog.tsx`: search
+- `src/lib/bookStyle.ts`: the book's style (typefaces, page sizes, scene
+  breaks, chapter numbers in words and Roman numerals);
+  `src/editor/useBookStyle.ts` and `src/editor/StylePanel.tsx` show it and
+  change it; `src/editor/pages.ts` sets the manuscript on pages (where pages
+  end is worked out by `paginate`, tested in `pages.test.ts`, from the text
+  measured as laid out)
 - `src/lib/manuscript.ts` and `src/lib/docxExport.ts`: manuscript export
   (the Word library loads only when exporting)
 - `src/store/history.ts`: undo and redo
