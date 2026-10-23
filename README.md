@@ -444,7 +444,7 @@ those you've dealt with. It never changes the story itself. It reads them from y
 The list shows when each link was last used; **Revoke** one and it stops
 working at once. Anyone who has a link can read your stories, so keep them
 private. To see what an assistant gets before connecting your own stories,
-use `https://story-builder-flame.vercel.app/mcp/example`, which reads the
+use `https://arccreator.vercel.app/mcp/example`, which reads the
 example story (open it in a browser for the same instructions).
 
 What the assistant can do, each as a tool (the reading ones read the draft
@@ -477,8 +477,12 @@ only kept for a while.
 
 ## Hosting
 
-Live at **https://story-builder-flame.vercel.app**. It's deployed on Vercel
-from this repository: every push to the production branch redeploys it.
+Live at **https://arccreator.vercel.app**. It's deployed on Vercel from this
+repository: every push to the production branch redeploys it. The old
+address, https://story-builder-flame.vercel.app, serves the same app, so
+review and assistant links made there keep working. A browser keeps what's
+saved in it per address, so a story kept only in the browser (not in an
+account) is at the address it was written at.
 Stories live in each visitor's browser (and, signed in, in their account), so
 updates never touch them. Besides the app's static files there's one
 function, the story server for AI assistants at `/mcp/<key>`
@@ -499,8 +503,9 @@ rest). Without them the app runs as before, in the browser only.
 
 In the Supabase dashboard (Authentication), for links in emails to come back
 to the app: **URL Configuration** → Site URL
-`https://story-builder-flame.vercel.app`, and Redirect URLs
-`https://story-builder-flame.vercel.app/**` and `http://localhost:5173/**`.
+`https://arccreator.vercel.app`, and Redirect URLs
+`https://arccreator.vercel.app/**`, `https://story-builder-flame.vercel.app/**`
+(the old address) and `http://localhost:5173/**`.
 Supabase's own mail sender is for trying things out (it sends only a few
 emails an hour); for real use, set up **SMTP** with a mail service.
 
