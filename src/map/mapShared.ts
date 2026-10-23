@@ -53,6 +53,8 @@ export type StoryFlowNode = Node<
 >
 
 interface MapContextValue {
+  /** The map shown. */
+  mapId: string
   /** The note or text box being typed in, if any. */
   editingId: string | null
   setEditingId: (id: string | null) => void
@@ -64,6 +66,7 @@ interface MapContextValue {
 }
 
 export const MapContext = createContext<MapContextValue>({
+  mapId: '',
   editingId: null,
   setEditingId: () => {},
   openItem: () => {},

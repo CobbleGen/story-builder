@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { reviewing } from '../review/mode'
+import { CardComments, CommentTool } from './MapComments'
 import { Handle, NodeResizer, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react'
 import { ArrowUpRight, BookOpen, Check, ChevronDown, CircleDashed, FileText, IdCard, ListTree, PenLine, Shrink, X } from 'lucide-react'
 import type { Character, MapCardView, MapNode, MapSize, StoryElement } from '../types'
@@ -69,7 +71,7 @@ function Card({ node, selected, kindLabel, color, openLabel, openIcon, children,
     >
       {view && (
         <NodeResizer
-          isVisible={selected}
+          isVisible={selected && !reviewing}
           minWidth={MIN_SIZE[view].width}
           minHeight={MIN_SIZE[view].height}
           lineClassName="map-resize-line"
@@ -83,15 +85,19 @@ function Card({ node, selected, kindLabel, color, openLabel, openIcon, children,
         <button className="map-tool" onClick={() => openItem(node)}>
           {openIcon ?? <ArrowUpRight size={14} />} {openLabel}
         </button>
-        {view && entity?.sizes?.[view] && (
+        <CommentTool id={node.id} />
+        {view && entity?.sizes?.[view] && !reviewing && (
           <button className="map-tool" onClick={() => saveSize(undefined)} title="Back to the standard size">
             <Shrink size={14} /> Standard size
           </button>
         )}
-        <button className="map-tool" onClick={() => removeNode(node.id)} title="Remove from the map (the item itself stays)">
-          <X size={14} /> Remove from map
-        </button>
+        {!reviewing && (
+          <button className="map-tool" onClick={() => removeNode(node.id)} title="Remove from the map (the item itself stays)">
+            <X size={14} /> Remove from map
+          </button>
+        )}
       </NodeToolbar>
+      <CardComments id={node.id} />
       <Handles />
       <div className="map-card-kind">{kindLabel}</div>
       {children}

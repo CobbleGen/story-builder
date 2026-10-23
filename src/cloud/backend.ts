@@ -31,6 +31,22 @@ export interface AssistantLink {
   lastUsedAt: string | null
 }
 
+/** A link that lets an editor read one story and comment on it (see src/review). */
+export interface ReviewLink {
+  id: string
+  storyId: string
+  /** Who it's for ("Anna"). */
+  label: string
+  /** The link's secret part (…/?review=<token>), kept so it can be copied again. */
+  token: string
+  /** ISO dates. */
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** A comment as the account sends it: one row (see comments/model's commentOf). */
+export type CommentRow = Record<string, unknown>
+
 export interface CloudBackend {
   /** Calls back with the signed-in user straight away (null if none), then on every change. */
   onAuthChange(callback: (event: AuthEvent, user: CloudUser | null) => void): () => void
@@ -56,6 +72,21 @@ export interface CloudBackend {
   /** Keeps a new link: only its key's fingerprint (SHA-256, hex) and last characters. */
   addAssistantLink(label: string, keyHash: string, hint: string): Promise<AssistantLink>
   revokeAssistantLink(id: string): Promise<void>
+
+  /** A story's comments, oldest first (see src/comments). */
+  listComments(storyId: string): Promise<CommentRow[]>
+  /** Adds a comment (a reply, with `thread`; else a thread's first, on `target`); its id. `name`: the writer's, as editors see it. */
+  addComment(storyId: string, thread: string | null, target: unknown, body: string, name: string): Promise<string>
+  /** Resolves a thread, or opens it again. */
+  resolveComment(storyId: string, id: string, resolved: boolean, name: string): Promise<void>
+  editComment(storyId: string, id: string, body: string): Promise<void>
+  /** Deletes a comment (any in the writer's story). */
+  removeComment(storyId: string, id: string): Promise<void>
+
+  /** A story's review links, newest first. */
+  listReviewLinks(storyId: string): Promise<ReviewLink[]>
+  addReviewLink(storyId: string, label: string, token: string): Promise<ReviewLink>
+  revokeReviewLink(id: string): Promise<void>
 
   /** The ids of the pictures stored for a user. */
   listPictures(userId: string): Promise<string[]>

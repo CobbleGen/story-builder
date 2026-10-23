@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { reviewing } from '../review/mode'
+import { CardComments, CommentTool } from './MapComments'
 import { NodeResizer, NodeToolbar, type NodeProps } from '@xyflow/react'
 import { Minus, PenLine, Plus, Trash2 } from 'lucide-react'
 import type { MapNode } from '../types'
@@ -100,7 +102,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
       onDoubleClick={start}
     >
       <NodeResizer
-        isVisible={selected && !editing}
+        isVisible={selected && !editing && !reviewing}
         minWidth={120}
         minHeight={80}
         lineClassName="map-resize-line"
@@ -108,19 +110,25 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width, height: p.height })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
-        <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Note colour" />
-        <span className="map-tool-sep" />
-        <TextSizeControl size={node.size ?? NOTE_TEXT_SIZE} onChange={(size) => updateMapNode(id, { size })} />
-        <span className="map-tool-sep" />
-        <ListButtons node={node} />
-        <span className="map-tool-sep" />
-        <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
-          <PenLine size={14} />
-        </button>
-        <button className="map-tool icon-only" onClick={remove} aria-label="Delete" title="Delete">
-          <Trash2 size={14} />
-        </button>
+        {!reviewing && (
+          <>
+            <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Note colour" />
+            <span className="map-tool-sep" />
+            <TextSizeControl size={node.size ?? NOTE_TEXT_SIZE} onChange={(size) => updateMapNode(id, { size })} />
+            <span className="map-tool-sep" />
+            <ListButtons node={node} />
+            <span className="map-tool-sep" />
+            <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
+              <PenLine size={14} />
+            </button>
+            <button className="map-tool icon-only" onClick={remove} aria-label="Delete" title="Delete">
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
+        <CommentTool id={id} />
       </NodeToolbar>
+      <CardComments id={id} />
       <Handles />
       {editing ? (
         <div className="map-note-scroll nodrag nopan nowheel">
@@ -167,7 +175,7 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
       onDoubleClick={start}
     >
       <NodeResizer
-        isVisible={selected && !editing}
+        isVisible={selected && !editing && !reviewing}
         minWidth={80}
         minHeight={30}
         lineClassName="map-resize-line"
@@ -175,25 +183,31 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
-        <TextSizeControl size={node.size} onChange={(size) => updateMapNode(id, { size })} />
-        <span className="map-tool-sep" />
-        <button
-          className={`map-swatch none${node.bg ? '' : ' active'}`}
-          onClick={() => updateMapNode(id, { bg: undefined })}
-          aria-label="No background"
-          title="No background"
-        />
-        <ColorPicker variant="toolbar" count={6} value={bg} onChange={(c) => updateMapNode(id, { bg: c })} label="Background colour" />
-        <span className="map-tool-sep" />
-        <ListButtons node={node} />
-        <span className="map-tool-sep" />
-        <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
-          <PenLine size={14} />
-        </button>
-        <button className="map-tool icon-only" onClick={remove} aria-label="Delete" title="Delete">
-          <Trash2 size={14} />
-        </button>
+        <CommentTool id={id} />
+        {!reviewing && (
+          <>
+            <TextSizeControl size={node.size} onChange={(size) => updateMapNode(id, { size })} />
+            <span className="map-tool-sep" />
+            <button
+              className={`map-swatch none${node.bg ? '' : ' active'}`}
+              onClick={() => updateMapNode(id, { bg: undefined })}
+              aria-label="No background"
+              title="No background"
+            />
+            <ColorPicker variant="toolbar" count={6} value={bg} onChange={(c) => updateMapNode(id, { bg: c })} label="Background colour" />
+            <span className="map-tool-sep" />
+            <ListButtons node={node} />
+            <span className="map-tool-sep" />
+            <button className="map-tool icon-only" onClick={start} aria-label="Edit" title="Edit">
+              <PenLine size={14} />
+            </button>
+            <button className="map-tool icon-only" onClick={remove} aria-label="Delete" title="Delete">
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
       </NodeToolbar>
+      <CardComments id={id} />
       <Handles />
       {editing ? (
         node.list ? (

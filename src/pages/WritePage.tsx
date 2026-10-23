@@ -34,6 +34,13 @@ import { NewBeatDialog } from '../editor/NewBeatDialog'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { dayKey } from '../store/storyOps'
 import { PovPicker } from '../components/PovPicker'
+import { CommentHighlight, markedAt, setCommentMarks, type MarkedPassage } from '../editor/commentHighlight'
+import { anchorAt, docText, type TextAnchor } from '../comments/anchor'
+import { inDraft } from '../comments/model'
+import { openComments, startComment, useCommentCounts, useCommentPanel, useComments, useCommentsOn } from '../comments/store'
+import { CommentCount, CommentsOn } from '../components/Comments'
+import { reviewing } from '../review/mode'
+import type { RichNode } from '../types'
 
 const SAVE_DELAY_MS = 400
 const SAFE_COLOR = /^#[0-9a-f]{3,8}$/i
@@ -141,7 +148,8 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const [dirty, setDirty] = useState(false)
   const [hovered, setHovered] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ from: number; to: number; title: string; description: string } | null>(null)
-  const blocked = useRef(false)
+  // (Reviewing someone's story, nothing typed here is saved: it can't be typed in anyway.)
+  const blocked = useRef(reviewing)
   const unsaved = useRef<PmNode | null>(null)
   // Words added and cut since the last save, as they change the day's tallies.
   const written = useRef<WordTally>({ added: 0, cut: 0 })
@@ -163,9 +171,19 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     known.current = useStory.getState().texts[chapter.id]
   }, [chapter.id, setChapterText])
 
-  const extensions = useMemo(() => [...manuscriptExtensions(`Start writing chapter ${index + 1}…`), CurrentBlock, FindHighlight, Pages], [index])
+  const extensions = useMemo(
+    () => [
+      ...manuscriptExtensions(`Start writing chapter ${index + 1}…`),
+      CurrentBlock,
+      FindHighlight,
+      Pages,
+      CommentHighlight.configure({ onOpen: (id) => openComments({ focus: id }) }),
+    ],
+    [index],
+  )
   const editor = useEditor({
     extensions,
+    editable: !reviewing,
     content: useStory.getState().texts[chapter.id]?.doc ?? '',
     enableContentCheck: true,
     // Never save over text that couldn't be read.
@@ -264,6 +282,49 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     }
     navigate('.', { replace: true, state: null })
   }, [find, editor, lookup, navigate, location.key])
+
+  // The passages with comments on them, marked in the text (open ones, and the one being looked at).
+  const commenting = useCommentsOn()
+  const counts = useCommentCounts()
+  const threads = useComments((s) => s.threads)
+  const openDraftId = useStory((s) => s.draft)
+  const looking = useCommentPanel((s) => (s.open ? s.focus : null))
+  const passages = useMemo<MarkedPassage[]>(
+    () =>
+      threads
+        .filter((t) => t.target.kind === 'text' && t.target.id === chapter.id && inDraft(t.target, openDraftId) && (!t.resolved || t.id === looking))
+        .map((t) => {
+          const { quote, prefix, suffix } = t.target as TextAnchor
+          return { id: t.id, quote, prefix, suffix }
+        }),
+    [threads, chapter.id, openDraftId, looking],
+  )
+  const nameOf = useCallback(
+    (id: string, label: unknown) => {
+      const named = lookup.get(id)
+      return named ? displayName(named) : String(label ?? '')
+    },
+    [lookup],
+  )
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) setCommentMarks(editor, passages, looking, nameOf)
+  }, [editor, passages, looking, nameOf])
+
+  // Opened from a comment: its passage, in the middle of the page, with the comment beside it.
+  const wantComment = (location.state as { comment?: string } | null)?.comment
+  useEffect(() => {
+    if (!wantComment || !editor || editor.isDestroyed) return
+    const phone = window.matchMedia('(max-width: 720px)').matches
+    const panel = useCommentPanel.getState()
+    if (!phone && (!panel.open || panel.focus !== wantComment)) return openComments({ focus: wantComment })
+    const at = markedAt(editor, wantComment)
+    if (at) {
+      const { node } = editor.view.domAtPos(at.from)
+      const el = node instanceof Element ? node : node.parentElement
+      el?.scrollIntoView({ block: 'center' })
+    }
+    navigate('.', { replace: true, state: null })
+  }, [wantComment, editor, passages, navigate])
 
   // The chapter's text changed from outside the editor (replaced in every chapter, or that undone):
   // show it, in place, without counting it as writing or making it an editor undo step.
@@ -386,6 +447,13 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     setDraft({ from, to, ...titleFrom(text) })
   }
 
+  const commentOnSelection = () => {
+    const { from, to, empty } = editor.state.selection
+    if (empty) return
+    const anchor = anchorAt(docText(editor.state.doc.toJSON() as RichNode, nameOf), from, to)
+    if (anchor) startComment({ kind: 'text', id: chapter.id, ...anchor })
+  }
+
   const createBeat = ({ arcId, title, description }: { arcId: string; title: string; description: string }) => {
     if (!draft) return
     const at = chapterIndexFor(chapter.beatIds, linkedRanges(editor.state.doc), draft.from)
@@ -406,13 +474,18 @@ function ChapterWriter({ chapter, index }: WriterProps) {
         </span>
         <ChevronDown size={14} />
         <select value={chapter.id} onChange={(e) => navigate(`/write/${e.target.value}`)} aria-label="Chapter">
-          {chapters.map((c, i) => (
-            <option key={c.id} value={c.id}>
-              {chapterLabel(c, i)}
-            </option>
-          ))}
+          {chapters.map((c, i) => {
+            const n = counts.chapters.get(c.id)
+            return (
+              <option key={c.id} value={c.id}>
+                {chapterLabel(c, i)}
+                {n ? ` · ${n} comment${n === 1 ? '' : 's'}` : ''}
+              </option>
+            )
+          })}
         </select>
       </label>
+      <CommentsOn kind="chapter" id={chapter.id} className="write-comments" />
       <span className="write-head-pickers">
         <PovPicker chapter={chapter} />
       </span>
@@ -441,7 +514,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     <footer className={`write-foot${pages ? ' outside' : ''}`}>
       {next ? (
         <Link to={`/write/${next.id}`} className="next-chapter">
-          Next: {chapterLabel(next, index + 1)} <ChevronRight size={16} />
+          Next: {chapterLabel(next, index + 1)} <CommentCount n={counts.chapters.get(next.id)} /> <ChevronRight size={16} />
         </Link>
       ) : (
         <span className="muted">End of the manuscript</span>
@@ -466,24 +539,26 @@ function ChapterWriter({ chapter, index }: WriterProps) {
         </button>
       )}
       <div className={`write-stage${styleOpen && !findOpen ? ' style-open' : ''}`}>
-        <div className="write-toolbar-row">
-          <Toolbar
-            editor={editor}
-            onFocusMode={focusMode ? undefined : () => setFocusMode(true)}
-            focusKeys={FOCUS_KEYS}
-            onFind={() => {
-              setStyleOpen(false)
-              openFind('find')
-            }}
-            onStyle={() => {
-              useFind.getState().close()
-              setStyleOpen((open) => !open)
-            }}
-            styleOpen={styleOpen}
-          >
-            <SprintButton />
-          </Toolbar>
-        </div>
+        {!reviewing && (
+          <div className="write-toolbar-row">
+            <Toolbar
+              editor={editor}
+              onFocusMode={focusMode ? undefined : () => setFocusMode(true)}
+              focusKeys={FOCUS_KEYS}
+              onFind={() => {
+                setStyleOpen(false)
+                openFind('find')
+              }}
+              onStyle={() => {
+                useFind.getState().close()
+                setStyleOpen((open) => !open)
+              }}
+              styleOpen={styleOpen}
+            >
+              <SprintButton />
+            </Toolbar>
+          </div>
+        )}
         <div className="write-scroll" ref={scroller}>
           {pages && (
             <div className="write-above">
@@ -538,7 +613,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
           <span className={`save-state ${saveStatus === 'error' ? 'error' : ''}`}>{saveLabel}</span>
         </div>
       </div>
-      <SelectionMenu editor={editor} onNewBeat={openNewBeat} />
+      <SelectionMenu editor={editor} onNewBeat={openNewBeat} onComment={commenting ? commentOnSelection : undefined} />
       {draft && (
         <NewBeatDialog
           title={draft.title}

@@ -7,6 +7,7 @@ import type { PersistStorage, StorageValue } from 'zustand/middleware'
 import { create } from 'zustand'
 import { openDb, request, transactionDone } from './idb'
 import { backupOnLoad, saveBackup, type BackupReason } from './backups'
+import { reviewing } from '../review/mode'
 
 export const STORY_KEY = 'story-builder:story'
 const DB_NAME = 'story-builder-data'
@@ -113,6 +114,8 @@ export function flushStory(opts: { journal?: boolean } = {}): Promise<void> {
 }
 
 export function storyStorage<S>(): PersistStorage<S> {
+  // Reviewing someone's story: it isn't kept in this browser, and this browser's own story is left as it is.
+  if (reviewing) return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
   return {
     getItem: async (name) => {
       // A journal is only left behind when the last write didn't finish, so it's the newest copy.

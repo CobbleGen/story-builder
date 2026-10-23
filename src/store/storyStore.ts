@@ -10,7 +10,8 @@ import { archivedNamed } from '../lib/archived'
 import { buildSampleStory } from './sampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
-import { forget, remember, travel } from './history'
+import { forget, notify, remember, travel } from './history'
+import { reviewing } from '../review/mode'
 
 type Tail<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never
 
@@ -171,6 +172,16 @@ const flushAll = () => {
  */
 export const useStoryEpoch = create(() => ({ epoch: 0 }))
 
+let refusedAt = 0
+/** Reviewing someone's story: changes aren't kept (said once in a while, not on every keystroke). */
+function refuse() {
+  if (Date.now() - refusedAt < 4000) return
+  refusedAt = Date.now()
+  notify('You’re reviewing this story, so it can’t be changed here. Leave a comment instead.')
+}
+/** A change to how a card is shown on the mind map (opened up or not), which a reviewer may make for themselves. */
+const viewOnly = (patch: object) => Object.keys(patch).every((k) => k === 'expanded')
+
 export const useStory = create<StoryStore>()(
   persist(
     (set, get) => {
@@ -180,10 +191,12 @@ export const useStory = create<StoryStore>()(
        * it adds to the outline (or cuts) go in today's tally, unless it's a
        * whole other story coming in.
        */
-      const apply = (next: StoryData, name?: string, target?: unknown) => {
+      const apply = (next: StoryData, name?: string, target?: unknown, view = false) => {
         const before = data()
         if (next === before || STORY_KEYS.every((k) => next[k] === before[k])) return
-        if (name) remember(before, name, target)
+        // (Reviewing, only how things are shown changes, in this browser alone, and not as a step to undo.)
+        if (reviewing && !view) return refuse()
+        if (name && !reviewing) remember(before, name, target)
         // (A whole story coming in, or a draft deleted, isn't writing or cutting.)
         set(pickData(name === 'replaceStory' || name === 'deleteDraft' ? next : ops.logOutline(before, next)))
       }
@@ -263,7 +276,7 @@ export const useStory = create<StoryStore>()(
           return done
         },
         addMapNode: (...a) => withId(ops.addMapNode(data(), ...a), 'addMapNode', a[0]),
-        updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0]),
+        updateMapNode: (...a) => apply(ops.updateMapNode(data(), ...a), 'updateMapNode', a[0], viewOnly(a[1])),
         moveMapNodes: (...a) => apply(ops.moveMapNodes(data(), ...a), 'moveMapNodes', a[0]),
         removeMapNodes: (...a) => apply(ops.removeMapNodes(data(), ...a), 'removeMapNodes', a[0]),
         dropMapNodes: (...a) => apply(ops.dropMapNodes(data(), ...a), 'dropMapNodes'),
@@ -289,6 +302,10 @@ export const useStory = create<StoryStore>()(
           if (next !== data()) reopen(next)
         },
         newDraft: (options) => {
+          if (reviewing) {
+            refuse()
+            return get().draft
+          }
           flushAll()
           const [next, id] = drafts.newDraft(data(), options)
           reopen(next)

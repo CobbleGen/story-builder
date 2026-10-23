@@ -113,7 +113,8 @@ export function AssistantLinks() {
       </div>
       <p className="account-small">
         Give an assistant such as Claude a private link to read the stories in your account (the manuscript, outline, timeline, characters,
-        places and mind maps) and give you feedback. It can only read: it can’t change anything.
+        places and mind maps, in every draft) and give you feedback, in its replies or as comments where they belong (ask it to be your
+        editor). It can’t change your stories.
       </p>
 
       {naming && (

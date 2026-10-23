@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { reviewing } from '../review/mode'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -9,6 +10,8 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type SensorDescriptor,
+  type SensorOptions,
   type ClientRect,
   type Collision,
   type CollisionDetection,
@@ -44,6 +47,11 @@ import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { ChapterTag } from '../components/ChapterTag'
 import { PovPicker } from '../components/PovPicker'
+import { CommentCount, CommentsHere, CommentsOn } from '../components/Comments'
+import { useCommentCounts } from '../comments/store'
+
+/** Reviewing someone's story, nothing is dragged. */
+const NO_SENSORS: SensorDescriptor<SensorOptions>[] = []
 
 const MODES: { mode: TimelineMode; label: string }[] = [
   { mode: 'story', label: 'Story order' },
@@ -822,7 +830,7 @@ export function TimelinePage() {
       ) : (
         <div ref={keepScroll} className="tl-scroll" onPointerDown={startBox}>
           <DndContext
-            sensors={sensors}
+            sensors={reviewing ? NO_SENSORS : sensors}
             collisionDetection={byPointer}
             modifiers={[alongOrAcross]}
             onDragStart={({ active }) => {
@@ -1351,6 +1359,7 @@ function ChapterHeading({
   const pov = characters.find((c) => c.id === chapter.povCharacterId)
   const title = plainText(chapter.title, lookup).trim()
   const povName = pov ? plainText(pov.name, lookup).trim() || 'Unnamed character' : ''
+  const counts = useCommentCounts()
   return (
     <>
       {first && (
@@ -1378,6 +1387,7 @@ function ChapterHeading({
           title="Click to change its title or point of view, double-click to write it"
         >
           <span className={`tl-chapter-name${title ? '' : ' untitled'}`}>{title ? <MentionText text={chapter.title} /> : 'Untitled'}</span>
+          <CommentCount n={counts.chapters.get(chapter.id)} />
           {pov && (
             <span className="tl-chapter-pov" style={{ '--char': pov.color } as React.CSSProperties}>
               <Eye size={12} aria-hidden />
@@ -1438,6 +1448,7 @@ function ChapterDetails({ chapter, number, onClose }: { chapter: Chapter; number
         <span className="tl-chapter-pop-label">Point of view</span>
         <PovPicker chapter={chapter} />
       </div>
+      <CommentsHere target={{ kind: 'chapter', id: chapter.id }} />
     </div>
   )
 }
@@ -1605,6 +1616,7 @@ function BeatTile(props: TileProps) {
           </span>
         )}
         {beat.done && <Check size={13} className="tl-done" aria-label="Written" />}
+        <CommentsOn kind="beat" id={beat.id} className="tl-comments" />
       </span>
     </div>
   )

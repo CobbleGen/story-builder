@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { buildSampleStory } from '../src/store/sampleStory'
+import { newDraft } from '../src/store/drafts'
+import * as ops from '../src/store/storyOps'
 import { handleRequest, keyOf } from './mcp'
 import { accountSource, InvalidKey, type AccountStore } from './sources'
 
@@ -12,14 +14,26 @@ const ORIGIN = 'https://story-builder.example'
 const KEY = 'k'.repeat(43)
 const STORE: AccountStore = { url: 'https://store.example', apiKey: 'public-key' }
 
-/** A stand-in account store: the two read-only functions, for one key. */
-function fakeStore(stories: { id: string; title: string; updated_at: string; data: unknown }[]): typeof fetch {
+/** A stand-in account store: the functions an assistant's key opens, for one key, with comments kept in `comments`. */
+function fakeStore(stories: { id: string; title: string; updated_at: string; data: unknown }[], comments: Record<string, unknown>[] = []): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const args = JSON.parse(String(init?.body ?? '{}'))
     if (args.p_key !== KEY) return Response.json({ code: '28000', message: 'invalid key' }, { status: 403 })
     if (url.endsWith('/rpc/assistant_stories')) return Response.json(stories.map(({ id, title, updated_at }) => ({ id, title, updated_at })))
     if (url.endsWith('/rpc/assistant_story')) return Response.json(stories.find((s) => s.id === args.p_story)?.data ?? null)
+    if (url.endsWith('/rpc/assistant_comments')) return Response.json(comments.filter((c) => c.story === args.p_story))
+    if (url.endsWith('/rpc/assistant_add_comment')) {
+      if (args.p_thread && !comments.some((c) => c.id === args.p_thread)) return Response.json({ code: 'P0002', message: 'There’s no such comment to reply to.' }, { status: 404 })
+      const id = `c${comments.length + 1}`
+      comments.push({ id, story: args.p_story, thread: args.p_thread, target: args.p_target, body: args.p_body, author_kind: 'assistant', author_name: 'Claude', created_at: '2026-10-23T10:00:00Z', mine: true })
+      return Response.json(id)
+    }
+    if (url.endsWith('/rpc/assistant_resolve_comment')) {
+      const c = comments.find((x) => x.id === args.p_comment)
+      if (c) c.resolved_at = args.p_resolved ? '2026-10-23T11:00:00Z' : null
+      return new Response(null, { status: 204 })
+    }
     return new Response('not found', { status: 404 })
   }) as typeof fetch
 }
@@ -59,10 +73,18 @@ describe('the story server', () => {
       'get_mind_maps',
       'search_story',
       'get_writing_progress',
+      'get_comments',
+      'add_comment',
+      'reply_to_comment',
+      'resolve_comment',
     ])
-    expect(tools.every((t) => t.annotations?.readOnlyHint && !t.annotations?.destructiveHint)).toBe(true)
+    // Everything reads, and nothing destroys; only commenting writes (comments, never the story).
+    const writes = tools.filter((t) => !t.annotations?.readOnlyHint).map((t) => t.name)
+    expect(writes).toEqual(['add_comment', 'reply_to_comment', 'resolve_comment'])
+    expect(tools.some((t) => t.annotations?.destructiveHint)).toBe(false)
+    expect(client.getInstructions()).toMatch(/can comment on them, as an editor would/)
     const { prompts } = await client.listPrompts()
-    expect(prompts.map((p) => p.name)).toEqual(['review_chapter', 'review_story', 'check_continuity', 'whats_next'])
+    expect(prompts.map((p) => p.name)).toEqual(['review_chapter', 'review_story', 'check_continuity', 'whats_next', 'edit_with_comments', 'answer_comments'])
     const prompt = await client.getPrompt({ name: 'review_chapter', arguments: { chapter: '3' } })
     expect((prompt.messages[0].content as { text: string }).text).toMatch(/chapter 3 of my story/)
   })
@@ -148,7 +170,9 @@ describe('the story server', () => {
     expect(page.status).toBe(200)
     const html = await page.text()
     expect(html).toMatch(/reads the example story/)
-    expect(html).toMatch(/Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress/)
+    expect(html).toMatch(
+      /Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress · Comments · Add a comment · Reply to a comment · Resolve a comment/,
+    )
     expect(html).toMatch(/claude mcp add --transport http story-builder https:\/\/story-builder\.example\/mcp\/example/)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/nope`, { headers: { accept: 'text/html' } }), STORE)).status).toBe(403)
     // Behind Vercel's proxy the function is reached over http; the page gives the https address visitors use.
@@ -169,6 +193,77 @@ describe('the story server', () => {
     expect(keyOf(new Request(`${ORIGIN}/mcp?key=${KEY}`))).toBe(KEY)
     expect(keyOf(new Request(`${ORIGIN}/mcp`, { headers: { authorization: `Bearer ${KEY}` } }))).toBe(KEY)
     expect(keyOf(new Request(`${ORIGIN}/mcp`))).toBeNull()
+  })
+})
+
+describe('comments', () => {
+  it('comments on a passage, a beat and a card of the example story; replies and resolves', async () => {
+    const client = await connect('example')
+    const passage = text(
+      await client.callTool({ name: 'add_comment', arguments: { chapter: '3', quote: 'The same kettle with the dent', comment: 'Lovely detail.' } }),
+    )
+    expect(passage).toMatch(/^Comment (\S+) added, on Chapter 3: The Logbook\. The writer sees it/)
+    const id = /^Comment (\S+) added/.exec(passage)![1]
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'the lamp goes dark', comment: 'Why now?' } }))).toMatch(/on Beat “The lamp goes dark”/)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { mind_map: 'who knows', card: 'smuggling', comment: 'Answer this by chapter 4.' } }))).toMatch(
+      /on Mind map “Who knows what” · Sticky note “What if Theo already knows about the smuggling\?”/,
+    )
+    let all = text(await client.callTool({ name: 'get_comments', arguments: {} }))
+    expect(all).toMatch(/## Chapter 3: The Logbook\n- Comment \S+, on Chapter 3: The Logbook\n  On the words: “The same kettle with the dent”\n  you \(AI assistant\), [\d-]+ [\d:]+: Lovely detail\./)
+    expect(all).toMatch(/## Beats\n- Comment \S+, on Beat “The lamp goes dark”/)
+    expect(text(await client.callTool({ name: 'get_comments', arguments: { chapter: 'the logbook' } }))).not.toMatch(/## Beats/)
+    // Replies, then resolves (by the first few characters of its id, too)
+    expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: id, reply: 'And the barometer.' } }))).toMatch(new RegExp(`added to comment ${id}`))
+    expect(text(await client.callTool({ name: 'resolve_comment', arguments: { comment_id: id.slice(0, 8) } }))).toBe(`Comment ${id} resolved.`)
+    all = text(await client.callTool({ name: 'get_comments', arguments: {} }))
+    expect(all).not.toMatch(/Lovely detail/)
+    all = text(await client.callTool({ name: 'get_comments', arguments: { resolved: true } }))
+    expect(all).toMatch(/Comment \S+ \(resolved\), on Chapter 3[\s\S]*↳ you \(AI assistant\), [\d-]+ [\d:]+: And the barometer\./)
+    expect(text(await client.callTool({ name: 'get_story_overview', arguments: {} }))).toMatch(/## Comments\n\d+ open, \d+ resolved/)
+  })
+
+  it('says what’s wrong with a comment it can’t place', async () => {
+    const client = await connect('example')
+    const missing = await client.callTool({ name: 'add_comment', arguments: { chapter: '3', quote: 'words that are nowhere', comment: 'x' } })
+    expect(missing.isError).toBe(true)
+    expect(text(missing)).toMatch(/Those words aren’t in Chapter 3: The Logbook\. Quote them exactly/)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'x', arc: 'y', comment: 'x' } }))).toMatch(/one thing at a time/)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { quote: 'The same kettle', comment: 'x' } }))).toMatch(/needs the chapter/)
+    expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: 'nope', reply: 'x' } }))).toMatch(/No comment nope/)
+  })
+
+  it('comments through the account, on the draft asked for, and reads that draft', async () => {
+    let data = buildSampleStory()
+    ;[data] = newDraft(data, { copy: true, name: 'Second draft' })
+    data = ops.updateChapter(data, data.chapters[0].id, { title: 'A new beginning' })
+    const comments: Record<string, unknown>[] = []
+    const store = fakeStore([{ id: 's1', title: 'The Lighthouse at Gull Point', updated_at: '2026-10-08T10:00:00Z', data }], comments)
+    const client = new Client({ name: 'test', version: '1.0.0' })
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${ORIGIN}/mcp/${KEY}`), {
+        fetch: async (url, init) => {
+          const original = globalThis.fetch
+          globalThis.fetch = store
+          try {
+            return await handleRequest(new Request(url, init), STORE)
+          } finally {
+            globalThis.fetch = original
+          }
+        },
+      }),
+    )
+    clients.push(client)
+    // The open draft by default; another by name.
+    expect(text(await client.callTool({ name: 'read_chapter', arguments: { chapter: '1' } }))).toMatch(/^# Chapter 1: A new beginning/)
+    expect(text(await client.callTool({ name: 'read_chapter', arguments: { chapter: '1', draft: 'first' } }))).toMatch(/^# Chapter 1: The Storm/)
+    expect(text(await client.callTool({ name: 'read_chapter', arguments: { chapter: '1', draft: 'third' } }))).toMatch(/No draft “third”\. The drafts are: “First draft”, “Second draft”\./)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { chapter: '1', comment: 'Tighter than before.' } }))).toMatch(/on Chapter 1: A new beginning/)
+    expect(comments[0]).toMatchObject({ story: 's1', target: { kind: 'chapter', draft: data.draft, label: 'Chapter 1: A new beginning' }, body: 'Tighter than before.' })
+    // That comment is the second draft's: the first's don't show it, but say it's there.
+    expect(text(await client.callTool({ name: 'get_comments', arguments: { draft: 'first' } }))).toMatch(/1 open comment on other drafts: “Second draft”/)
+    expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: 'c9', reply: 'x' } }))).toMatch(/No comment c9/)
+    expect(text(await client.callTool({ name: 'resolve_comment', arguments: { comment_id: 'c1' } }))).toBe('Comment c1 resolved.')
+    expect(comments[0].resolved_at).toBeTruthy()
   })
 })
 

@@ -5,6 +5,7 @@ import { beatsInBook, storyOrder } from '../store/storyOps'
 import { chapterFacts, jumpsOf } from './chapters'
 import { count, kindNoun, type Story } from './story'
 import { clip } from './text'
+import { ARCHIVE_NOUNS, archiveHere, archivedName } from '../lib/archived'
 
 // The whole story at a glance: the place to start, with pointers to where
 // each part is told in full.
@@ -128,8 +129,15 @@ export function overview(story: Story): string {
     out.push(`## Mind maps\n${maps.join('\n')}`)
   }
 
+  // What the writer has archived: put away, out of the story (the open draft's, and what every draft shares).
+  const archived = archiveHere(data)
+  if (archived.length) {
+    const items = archived.map((a) => `${ARCHIVE_NOUNS[a.kind]} “${archivedName(a, story.lookup)}”`)
+    out.push(`## Archived\nPut away by the writer, out of the story (and of everything here), to bring back if they want: ${items.join('; ')}.`)
+  }
+
   out.push(
-    '## Reading more\nread_chapter (one chapter with its plan), read_manuscript (the text straight through), get_outline (every beat), get_timeline (story time), get_characters and get_places_and_things (full profiles; give a name for one in depth), get_mind_maps (the boards, notes and lines), search_story (anything, anywhere), get_writing_progress (words, goals, the last two weeks).',
+    '## Reading more\nread_chapter (one chapter with its plan), read_manuscript (the text straight through), get_outline (every beat), get_timeline (story time), get_characters and get_places_and_things (full profiles; give a name for one in depth), get_mind_maps (the boards, notes and lines), search_story (anything, anywhere), get_writing_progress (words, goals, the last two weeks), get_comments (what the writer, editors and assistants have said about it). To leave the writer a note on something, add_comment.',
   )
   return out.join('\n\n')
 }

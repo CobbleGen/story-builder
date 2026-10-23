@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { reviewing } from '../review/mode'
+import { CardComments, CommentTool } from './MapComments'
 import { NodeResizer, NodeToolbar, useReactFlow, type NodeProps } from '@xyflow/react'
 import { Columns3, LayoutGrid, PenLine, Rows3, Shapes, Trash2, type LucideIcon } from 'lucide-react'
 import type { ContainerLayout, MapNode } from '../types'
@@ -66,7 +68,7 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
       style={{ '--box': color, '--title-height': `${TITLE_HEIGHT}px` } as React.CSSProperties}
     >
       <NodeResizer
-        isVisible={selected && !editing}
+        isVisible={selected && !editing && !reviewing}
         minWidth={Math.max(MIN.width, min?.width ?? 0)}
         minHeight={Math.max(MIN.height, min?.height ?? 0)}
         lineClassName="map-resize-line"
@@ -95,33 +97,39 @@ export function ContainerNode({ id, data, selected }: NodeProps<StoryFlowNode>) 
         // React Flow puts a toolbar just over its card; a container's sits far down, under the board.
         style={{ zIndex: TOOLBAR_Z }}
       >
-        {LAYOUTS.map(({ layout, label, icon: Icon }) => (
-          <button
-            key={layout}
-            className={`map-tool icon-only${node.layout === layout ? ' active' : ''}`}
-            onClick={() => setLayout(layout)}
-            aria-label={label}
-            aria-pressed={node.layout === layout}
-            title={label}
-          >
-            <Icon size={15} />
-          </button>
-        ))}
-        <span className="map-tool-sep" />
-        <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Container colour" />
-        <span className="map-tool-sep" />
-        <button className="map-tool icon-only" onClick={() => setEditingId(id)} aria-label="Edit title" title="Edit title">
-          <PenLine size={14} />
-        </button>
-        <button
-          className="map-tool icon-only"
-          onClick={() => removeNode(id)}
-          aria-label="Delete container"
-          title="Delete container (the cards on it stay)"
-        >
-          <Trash2 size={14} />
-        </button>
+        <CommentTool id={id} />
+        {!reviewing && (
+          <>
+            {LAYOUTS.map(({ layout, label, icon: Icon }) => (
+              <button
+                key={layout}
+                className={`map-tool icon-only${node.layout === layout ? ' active' : ''}`}
+                onClick={() => setLayout(layout)}
+                aria-label={label}
+                aria-pressed={node.layout === layout}
+                title={label}
+              >
+                <Icon size={15} />
+              </button>
+            ))}
+            <span className="map-tool-sep" />
+            <ColorPicker variant="toolbar" count={6} value={color} onChange={(c) => updateMapNode(id, { color: c })} label="Container colour" />
+            <span className="map-tool-sep" />
+            <button className="map-tool icon-only" onClick={() => setEditingId(id)} aria-label="Edit title" title="Edit title">
+              <PenLine size={14} />
+            </button>
+            <button
+              className="map-tool icon-only"
+              onClick={() => removeNode(id)}
+              aria-label="Delete container"
+              title="Delete container (the cards on it stay)"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
       </NodeToolbar>
+      <CardComments id={id} />
       <Handles />
       <div className="map-container-head" onDoubleClick={() => setEditingId(id)}>
         {editing ? (

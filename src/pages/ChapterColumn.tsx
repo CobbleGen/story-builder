@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Archive, ArrowLeftToLine, ArrowRightToLine, GripHorizontal, PenLine, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeftToLine, ArrowRightToLine, GripHorizontal, MessageSquarePlus, PenLine, Trash2 } from 'lucide-react'
 import type { Chapter } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { Link } from 'react-router-dom'
@@ -15,6 +15,10 @@ import { Menu } from '../components/Menu'
 import { useArchive } from '../lib/useArchive'
 import { askConfirm } from '../lib/confirm'
 import { chapterSortId, type ChapterDragData } from '../lib/dnd'
+import { CommentsOn } from '../components/Comments'
+import { startComment } from '../comments/store'
+import { useCommentsOn } from '../comments/store'
+import { reviewing } from '../review/mode'
 
 interface Props {
   chapter: Chapter
@@ -48,6 +52,7 @@ export function ChapterColumn({
   const words = useStory((s) => s.texts[chapter.id]?.words ?? 0)
   const lookup = useMentionLookup()
   const titleRef = useRef<HTMLTextAreaElement>(null)
+  const commenting = useCommentsOn()
   const data: ChapterDragData = { type: 'chapter', chapterId: chapter.id }
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: chapterSortId(chapter.id), data })
@@ -74,6 +79,17 @@ export function ChapterColumn({
     if (ok) deleteChapter(chapter.id)
   }
 
+  const chapterActions = [
+    { label: 'Insert chapter before', icon: <ArrowLeftToLine size={16} />, onSelect: () => onInsertChapter(index) },
+    { label: 'Insert chapter after', icon: <ArrowRightToLine size={16} />, onSelect: () => onInsertChapter(index + 1) },
+    {
+      label: 'Archive chapter',
+      icon: <Archive size={16} />,
+      onSelect: () => archive('chapter', chapter.id, `chapter ${number}${chapter.title ? `, “${plainText(chapter.title, lookup)}”` : ''}`),
+    },
+    { label: 'Delete chapter', icon: <Trash2 size={16} />, onSelect: remove, danger: true },
+  ]
+
   return (
     <section
       ref={setNodeRef}
@@ -96,17 +112,14 @@ export function ChapterColumn({
             <GripHorizontal size={16} className="grip" />
           </button>
           <PovPicker chapter={chapter} />
+          <CommentsOn kind="chapter" id={chapter.id} className="chapter-comments" />
           <Menu
             label="Chapter options"
             items={[
-              { label: 'Insert chapter before', icon: <ArrowLeftToLine size={16} />, onSelect: () => onInsertChapter(index) },
-              { label: 'Insert chapter after', icon: <ArrowRightToLine size={16} />, onSelect: () => onInsertChapter(index + 1) },
-              {
-                label: 'Archive chapter',
-                icon: <Archive size={16} />,
-                onSelect: () => archive('chapter', chapter.id, `chapter ${number}${chapter.title ? `, “${plainText(chapter.title, lookup)}”` : ''}`),
-              },
-              { label: 'Delete chapter', icon: <Trash2 size={16} />, onSelect: remove, danger: true },
+              ...(commenting
+                ? [{ label: 'Comment on chapter', icon: <MessageSquarePlus size={16} />, onSelect: () => startComment({ kind: 'chapter', id: chapter.id }) }]
+                : []),
+              ...(reviewing ? [] : chapterActions),
             ]}
           />
         </div>
@@ -138,9 +151,9 @@ export function ChapterColumn({
         {beatIds.map((id) => (
           <DraggableBeatCard key={id} beatId={id} activeBeatId={activeBeatId} />
         ))}
-        {beatIds.length === 0 && <div className="chapter-empty">Drag beats here</div>}
+        {beatIds.length === 0 && <div className="chapter-empty">{reviewing ? 'No beats' : 'Drag beats here'}</div>}
       </div>
-      <BeatComposer chapterId={chapter.id} />
+      {!reviewing && <BeatComposer chapterId={chapter.id} />}
     </section>
   )
 }

@@ -9,6 +9,8 @@ import { Modal } from './Modal'
 import { ArcPicker } from './ArcPicker'
 import { MentionTextarea } from './MentionTextarea'
 import { useArchive } from '../lib/useArchive'
+import { CommentsHere } from './Comments'
+import { reviewing } from '../review/mode'
 
 /** Dialog for editing the beat selected in the UI store. Changes save as you type. */
 export function BeatEditor() {
@@ -50,24 +52,29 @@ export function BeatEditor() {
 
   return (
     <Modal
-      title="Edit beat"
+      title={reviewing ? 'Beat' : 'Edit beat'}
       onClose={close}
       accent={arc?.color}
       footer={
         <>
-          <button className="btn ghost danger" onClick={remove}>
-            <Trash2 size={16} /> Delete
-          </button>
-          <button
-            className="btn ghost"
-            onClick={() => {
-              close()
-              archive('beat', beat.id, `“${plainText(beat.title, lookup) || 'Untitled beat'}”`)
-            }}
-            title="Put it away, out of the story, to bring back later"
-          >
-            <Archive size={16} /> Archive
-          </button>
+          <CommentsHere target={{ kind: 'beat', id: beat.id }} />
+          {!reviewing && (
+            <>
+              <button className="btn ghost danger" onClick={remove}>
+                <Trash2 size={16} /> Delete
+              </button>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  close()
+                  archive('beat', beat.id, `“${plainText(beat.title, lookup) || 'Untitled beat'}”`)
+                }}
+                title="Put it away, out of the story, to bring back later"
+              >
+                <Archive size={16} /> Archive
+              </button>
+            </>
+          )}
           {arc && (
             <Link className="btn ghost" to={`/arcs/${arc.id}`} onClick={close}>
               Open arc <ArrowUpRight size={16} />
@@ -97,6 +104,7 @@ export function BeatEditor() {
           <span className="field-label">Chapter</span>
           <select
             className="select"
+            disabled={reviewing}
             value={beat.chapterId ?? ''}
             onChange={(e) => placeBeat(beat.id, e.target.value || null)}
           >
@@ -117,6 +125,7 @@ export function BeatEditor() {
             placeholder="In the story’s own time, e.g. “Day 3, evening”"
             list={whenList}
             maxLength={120}
+            readOnly={reviewing}
             onChange={(e) => updateBeat(beat.id, { when: e.target.value })}
           />
           <datalist id={whenList}>

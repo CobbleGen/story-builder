@@ -28,6 +28,7 @@ import { createMentioned, type NewMentioned } from '../lib/newMentioned'
 import { useMentionables, useMentionLookup } from '../store/storyStore'
 import { MentionName } from './MentionText'
 import { MentionBadge } from './ElementIcon'
+import { reviewing } from '../review/mode'
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'className' | 'onSubmit'> & {
   /** Stored text (mentions as tokens). */
@@ -259,6 +260,8 @@ export function MentionTextarea({
         ref={inner}
         rows={1}
         {...rest}
+        // (Reviewing someone's story: read, not written in.)
+        readOnly={reviewing || rest.readOnly}
         className="mention-input"
         value={display}
         role={plain ? undefined : 'combobox'}

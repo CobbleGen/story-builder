@@ -22,6 +22,11 @@ import { useApplyTheme } from './lib/theme'
 import { tidyPicturesSoon } from './store/tidyPictures'
 import { startCloud } from './cloud'
 import { useKeepTrail } from './lib/trail'
+import { reviewing } from './review/mode'
+import { startReview } from './review/store'
+import { ReviewGate } from './components/Review'
+import { CommentsPanel } from './components/Comments'
+import { useCommentPanel, useCommentsOn } from './comments/store'
 
 // The text editor is large; load it only when someone opens the manuscript.
 const WritePage = lazy(() => import('./pages/WritePage'))
@@ -38,18 +43,24 @@ export default function App() {
   const importOpen = useUi((s) => s.importOpen)
   // Focus mode (on the manuscript page) takes the top bar away too.
   const focusMode = useUi((s) => s.focusMode)
+  // The comments panel, open: the page makes room for it where there's room.
+  const panelOpen = useCommentPanel((s) => s.open)
+  const commentsOn = useCommentsOn()
+  const commentsOpen = panelOpen && commentsOn
   useEffect(() => {
     if (!loaded) return
+    // Reviewing someone's story, this browser's own story and account are left alone.
+    if (reviewing) return startReview()
     tidyPicturesSoon()
     startCloud()
   }, [loaded])
 
   if (!loaded) return <div className="boot">Opening your story…</div>
 
-  return (
+  const app = (
     <HashRouter>
       <Trail />
-      <div className={`app${focusMode ? ' focus-mode' : ''}`}>
+      <div className={`app${focusMode ? ' focus-mode' : ''}${commentsOpen ? ' with-comments' : ''}`}>
         <TopBar />
         <Routes>
           <Route path="/" element={<BoardPage />} />
@@ -83,6 +94,7 @@ export default function App() {
         <SprintPill />
         <SprintDone />
         <ConfirmDialog />
+        <CommentsPanel />
         {saveFailed && (
           <div className="save-banner" role="alert">
             Your latest changes couldn’t be saved in this browser. Use ⋯ → Export story to keep a copy.
@@ -91,6 +103,7 @@ export default function App() {
       </div>
     </HashRouter>
   )
+  return reviewing ? <ReviewGate>{app}</ReviewGate> : app
 }
 
 /** Remembers where you've been in this tab, for the pages' back links. */

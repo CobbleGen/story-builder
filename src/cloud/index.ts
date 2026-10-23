@@ -6,7 +6,9 @@ import { backupNow, flushStory } from '../store/persistence'
 import { saveBackup } from '../store/backups'
 import { getImage, imageIdsIn, retryMissingPictures, setRemotePictures } from '../store/images'
 import { createCloud, type Cloud, type CloudState, type Link } from './engine'
-import type { CloudBackend } from './backend'
+import { CloudError, type CloudBackend } from './backend'
+import { connectComments, refreshComments, type CommentsBackend } from '../comments/store'
+import { reviewing } from '../review/mode'
 
 // The writer's account, wired to the story in this browser. Set up when the
 // build has a backend (VITE_SUPABASE_URL and VITE_SUPABASE_KEY, see .env);
@@ -46,8 +48,9 @@ declare global {
 }
 const testBackend = import.meta.env.DEV && typeof window !== 'undefined' ? window.__testCloud : undefined
 
+// (Reviewing someone's story, this browser's account isn't used: see src/review.)
 export const cloud: Cloud | null =
-  (URL_ && KEY) || testBackend
+  !reviewing && ((URL_ && KEY) || testBackend)
     ? createCloud({
         backend: () => (testBackend ? Promise.resolve(testBackend()) : import('./supabaseBackend').then((m) => m.supabaseBackend(URL_!, KEY!))),
         story: {
@@ -103,6 +106,73 @@ function signedInBefore(): boolean {
   }
 }
 
+const NAME_KEY = 'story-builder:writer-name'
+
+/** The writer's name with their comments, as editors see it ('' for "the writer"). */
+export function writerName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function setWriterName(name: string) {
+  try {
+    localStorage.setItem(NAME_KEY, name.trim().slice(0, 80))
+  } catch {
+    // Without storage, the name lasts until the page closes… or not at all.
+  }
+}
+
+/** The writer's comments on the story open here, through their account. */
+function writerComments(c: Cloud): CommentsBackend {
+  const account = () => {
+    const a = c.account()
+    if (!a) throw new CloudError('Can’t reach your account just now, so comments can’t be changed. Try again in a moment.')
+    return a
+  }
+  return {
+    viewer: 'writer',
+    list: async () => {
+      const { backend, storyId } = account()
+      return backend.listComments(storyId)
+    },
+    add: async (thread, target, body) => {
+      const { backend, storyId } = account()
+      return backend.addComment(storyId, thread, target, body, writerName())
+    },
+    resolve: async (id, resolved) => {
+      const { backend, storyId } = account()
+      return backend.resolveComment(storyId, id, resolved, writerName())
+    },
+    edit: async (id, body) => {
+      const { backend, storyId } = account()
+      return backend.editComment(storyId, id, body)
+    },
+    remove: async (id) => {
+      const { backend, storyId } = account()
+      return backend.removeComment(storyId, id)
+    },
+  }
+}
+
+/** Comments on whichever account story is open here (none while signed out, or the story isn't in the account). */
+function followComments(c: Cloud) {
+  const backend = writerComments(c)
+  const update = () => {
+    const { user, storyId, status } = c.store.getState()
+    const on = !!user && !!storyId && !['off', 'signed-out', 'unlinked', 'connecting'].includes(status)
+    connectComments(on ? backend : null, on ? storyId : null)
+  }
+  update()
+  c.store.subscribe((now, before) => {
+    if (now.user !== before.user || now.storyId !== before.storyId || now.status !== before.status) update()
+    // Connected (again): what's been said meanwhile.
+    if (now.status === 'synced' && before.status !== 'synced' && before.status !== 'saving') void refreshComments()
+  })
+}
+
 let started = false
 
 /** Connects to the account (if signed in) and keeps the story in step from then on. */
@@ -117,6 +187,7 @@ export function startCloud() {
   }
   cloud.start({ connect: signedInBefore() || fromEmail })
   setRemotePictures((id) => cloud!.fetchPicture(id))
+  followComments(cloud)
   // Pictures this browser was missing may be in the account: look again once connected.
   cloud.store.subscribe((now, before) => {
     if (now.user && now.status !== 'connecting' && before.status === 'connecting') retryMissingPictures()
@@ -136,7 +207,9 @@ export function startCloud() {
 
   // Picks up changes made elsewhere when the app comes back into view or online, and every so often.
   const resume = () => {
-    if (document.visibilityState === 'visible') void cloud!.resume()
+    if (document.visibilityState !== 'visible') return
+    void cloud!.resume()
+    void refreshComments()
   }
   window.addEventListener('focus', resume)
   window.addEventListener('online', resume)

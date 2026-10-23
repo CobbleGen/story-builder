@@ -5,6 +5,9 @@ import type { MindMap } from '../types'
 import { useStory } from '../store/storyStore'
 import { askConfirm } from '../lib/confirm'
 import { useArchive } from '../lib/useArchive'
+import { reviewing } from '../review/mode'
+import { useCommentCounts } from '../comments/store'
+import { CommentCount, CommentsHere } from '../components/Comments'
 
 /** The map's name, with a menu to switch maps, start a new one, rename or delete this one. */
 export function MapSwitcher({ map }: { map: MindMap }) {
@@ -16,6 +19,7 @@ export function MapSwitcher({ map }: { map: MindMap }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const counts = useCommentCounts()
   // A new map opens with its name ready to type (the canvas starts afresh for each map).
   const [renaming, setRenaming] = useState(() => (location.state as { rename?: boolean } | null)?.rename === true)
   const box = useRef<HTMLDivElement>(null)
@@ -83,7 +87,7 @@ export function MapSwitcher({ map }: { map: MindMap }) {
         <button
           className="map-switcher-btn"
           onClick={() => setOpen((o) => !o)}
-          onDoubleClick={() => setRenaming(true)}
+          onDoubleClick={() => !reviewing && setRenaming(true)}
           aria-haspopup="menu"
           aria-expanded={open}
           title="Switch maps, or double-click to rename"
@@ -91,6 +95,7 @@ export function MapSwitcher({ map }: { map: MindMap }) {
           <Network size={15} />
           <span className="map-switcher-label">{map.name}</span>
           {maps.length > 1 && <span className="map-switcher-count">{maps.length}</span>}
+          <CommentCount n={counts.maps.get(map.id)} title={`Open comments on this map`} />
           <ChevronDown size={14} />
         </button>
       )}
@@ -109,37 +114,45 @@ export function MapSwitcher({ map }: { map: MindMap }) {
             >
               <Network size={16} />
               <span className="map-switcher-item">{m.name}</span>
+              <CommentCount n={counts.maps.get(m.id)} />
               {m.id === map.id && <Check size={15} className="menu-check" />}
             </button>
           ))}
-          <button role="menuitem" className="menu-item separated" onClick={create}>
-            <Plus size={16} /> New map
-          </button>
-          <button
-            role="menuitem"
-            className="menu-item"
-            onClick={() => {
-              setOpen(false)
-              setRenaming(true)
-            }}
-          >
-            <PenLine size={16} /> Rename this map
-          </button>
-          <button
-            role="menuitem"
-            className="menu-item"
-            onClick={() => {
-              setOpen(false)
-              const next = maps.find((m) => m.id !== map.id)
-              archive('map', map.id, `the map “${map.name}”`)
-              navigate(next ? `/map/${next.id}` : '/map', { replace: true })
-            }}
-          >
-            <Archive size={16} /> Archive this map
-          </button>
-          <button role="menuitem" className="menu-item danger" onClick={remove}>
-            <Trash2 size={16} /> Delete this map
-          </button>
+          <div className="map-switcher-comments">
+            <CommentsHere target={{ kind: 'map', id: map.id }} />
+          </div>
+          {!reviewing && (
+            <>
+              <button role="menuitem" className="menu-item separated" onClick={create}>
+                <Plus size={16} /> New map
+              </button>
+              <button
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  setOpen(false)
+                  setRenaming(true)
+                }}
+              >
+                <PenLine size={16} /> Rename this map
+              </button>
+              <button
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  setOpen(false)
+                  const next = maps.find((m) => m.id !== map.id)
+                  archive('map', map.id, `the map “${map.name}”`)
+                  navigate(next ? `/map/${next.id}` : '/map', { replace: true })
+                }}
+              >
+                <Archive size={16} /> Archive this map
+              </button>
+              <button role="menuitem" className="menu-item danger" onClick={remove}>
+                <Trash2 size={16} /> Delete this map
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

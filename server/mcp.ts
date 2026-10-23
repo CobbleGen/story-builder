@@ -2,22 +2,28 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { z } from 'zod'
 import { upgradeStory } from '../src/store/archive'
+import { switchDraft } from '../src/store/drafts'
 import * as reader from '../src/reader'
 import { findByName } from '../src/reader/story'
-import { EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, looksLikeKey, type AccountStore, type StorySource } from './sources'
+import { CommentRefused, EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, looksLikeKey, type AccountStore, type StorySource } from './sources'
 
 // An MCP server that lets an AI assistant read a writer's stories (never
 // change them): the manuscript, chapters, beats and arcs, story time,
 // characters, places and things, and mind maps, each told in words with
-// everything that connects them. It runs at /mcp/<key> (see server/vercel.ts),
-// a fresh server for each request.
+// everything that connects them, in any of the story's drafts. It can also
+// comment on them, as an editor would: on a passage, a chapter, a beat, an
+// arc, a character, a place, a mind map card or the whole story; the writer
+// sees its comments in Story Builder, where they are, and replies or
+// resolves them. It runs at /mcp/<key> (see server/vercel.ts), a fresh
+// server for each request.
 
 /** What the assistant is told about Story Builder before it reads anything. */
-export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change anything.
+export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change them, but you can comment on them, as an editor would: the writer sees your comments in the app, on the passage or thing they're about, and can reply and resolve them.
 
 How a story is organised:
 - Chapters, in reading order, hold the manuscript. Each may have a summary, a word target and a point-of-view character.
-- A story can have several drafts, each a manuscript of its own (its chapters, arcs and beats). What you read is the draft the writer has open; the overview names the others. Characters, places and things and mind maps are every draft's.
+- A story can have several drafts, each a manuscript of its own (its chapters, arcs and beats). What you read is the draft the writer has open, unless you name another with the draft argument; the overview names them all. Characters, places and things and mind maps are every draft's.
+- The writer can archive things (chapters, arcs, beats, characters, places, maps): put them away, out of the story, to bring back later. They're left out of everything you read; the overview lists them.
 - Beats are the planned events of the story. Each belongs to an arc (a storyline, plot thread or relationship) and is placed in a chapter, in order, or not placed yet. The writer ticks a beat off when it's written, and can link it to the passage that tells it.
 - Story time is the order things happen in the story's world, which can differ from the reading order (flashbacks, flash-forwards). Beats in different arcs can share a moment, happening at once. Two lines mark where the book begins and ends in story time: beats before are backstory, beats after are aftermath. A beat's "when" is the writer's own note ("The next morning").
 - Characters, and places, objects and groups, have a description and details the writer defines (Age, Wants, Fears…). Names in any text can be links (@mentions) to them.
@@ -25,6 +31,8 @@ How a story is organised:
 - Pictures are in the stories but can't be shown here.
 
 Start with get_story_overview, then read what the question needs: read_chapter for a chapter with its plan, read_manuscript for the text straight through, and the other tools for the outline, story time, characters, places and things, mind maps, search and writing progress. When the account has several stories, each tool reads the one edited most recently unless you name another (list_stories lists them).
+
+Comments: get_comments shows what the writer, their editors and assistants have said (open ones, or resolved too), with each comment's id. add_comment leaves a new one: on a passage (the chapter and the exact words you're commenting on, quoted as read_chapter shows them: a phrase or sentence, within one paragraph), a chapter, a beat, an arc, a character, a place or thing, a mind map or a card on one, or the whole story. reply_to_comment answers one, and resolve_comment marks one dealt with (when the writer has made the change, say). Comment when the writer asks you to (to edit their story, say), one point per comment, on the most specific thing it's about.
 
 When you give feedback, quote the writer's own words and name the chapters and beats you mean. Respect their intentions, voice and genre, and remember an outline or draft is unfinished: say what matters most first.`
 
@@ -35,6 +43,13 @@ const storyArg = z
   .optional()
   .describe('Which story, by title (or id), when there are several. Leave it out for the one edited most recently.')
 
+const draftArg = z
+  .string()
+  .optional()
+  .describe('Which draft of the story, by name (e.g. "Second draft"), when it has several. Leave it out for the one the writer has open.')
+
+const COMMENTING = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const
+
 type Reply = { content: { type: 'text'; text: string }[]; isError?: boolean }
 const reply = (text: string, isError = false): Reply => (isError ? { content: [{ type: 'text', text }], isError } : { content: [{ type: 'text', text }] })
 
@@ -42,8 +57,8 @@ const reply = (text: string, isError = false): Reply => (isError ? { content: [{
 export function createServer(source: StorySource, today: () => string = () => new Date().toISOString().slice(0, 10)): McpServer {
   const server = new McpServer({ name: 'story-builder', title: 'Story Builder', version: '1.0.0' }, { instructions: INSTRUCTIONS })
 
-  /** The story asked for (or the one edited last), ready to read; and a note saying which, when there are others. */
-  async function open(ref: string | undefined) {
+  /** The story asked for (or the one edited last), ready to read (in the draft asked for); and a note saying which, when there are others. */
+  async function open(ref: string | undefined, draftRef?: string) {
     const rows = await source.list()
     if (!rows.length) throw new reader.NotFound('There are no stories here yet. A story is here once it’s saved to the writer’s Story Builder account.')
     const row = ref?.trim() ? findByName(rows, ref, (r) => r.title, (r) => r.id) : rows[0]
@@ -51,14 +66,21 @@ export function createServer(source: StorySource, today: () => string = () => ne
     const data = await source.load(row.id)
     if (!data) throw new reader.NotFound(`“${row.title || 'Untitled story'}” isn’t there any more.`)
     const note = rows.length > 1 && !ref?.trim() ? `(From “${row.title || 'Untitled story'}”, the most recently edited of ${rows.length} stories; name another with the story argument.)\n\n` : ''
-    return { story: reader.storyOf(upgradeStory(data)), note }
+    let story = upgradeStory(data)
+    if (draftRef?.trim()) {
+      const draft = findByName(story.drafts, draftRef, (d) => d.name, (d) => d.id)
+      if (!draft) throw new reader.NotFound(`No draft “${draftRef}”. The drafts are: ${story.drafts.map((d) => `“${d.name}”`).join(', ')}.`)
+      story = switchDraft(story, draft.id)
+    }
+    return { story: reader.storyOf(story), note, id: row.id }
   }
 
   /** A tool that reads one story: its reply is the text, or what couldn't be found. */
   function reading<A extends object>(read: (story: reader.Story, args: A) => string) {
     return async (args: A): Promise<Reply> => {
       try {
-        const { story, note } = await open((args as { story?: string }).story)
+        const { story: ref, draft } = args as { story?: string; draft?: string }
+        const { story, note } = await open(ref, draft)
         return reply(note + read(story, args))
       } catch (error) {
         if (error instanceof reader.NotFound) return reply(error.message, true)
@@ -88,10 +110,17 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Story overview',
       description:
         'Start here. The whole story at a glance: chapters in reading order (length, point of view, summary, planned beats), beats not placed yet, arcs, characters, places and things, story time in brief, mind maps, goals.',
-      inputSchema: { story: storyArg },
+      inputSchema: { story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
-    reading((story) => reader.overview(story)),
+    commenting(async (story, id) => {
+      const threads = reader.threadsFrom(await source.comments(id).catch(() => []))
+      const open = threads.filter((th) => !th.resolved).length
+      const said = threads.length
+        ? `\n\n## Comments\n${open} open, ${threads.length - open} resolved (get_comments shows them).`
+        : ''
+      return reader.overview(story) + said
+    }),
   )
 
   server.registerTool(
@@ -104,6 +133,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
         chapter: z.string().describe('The chapter’s number (e.g. "3") or title.'),
         part: z.number().int().min(1).optional().describe('For long chapters, which part to read (1 first).'),
         story: storyArg,
+        draft: draftArg,
       },
       annotations: READ_ONLY,
     },
@@ -120,6 +150,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
         from_chapter: z.number().int().min(1).optional().describe('The first chapter to read (1 if left out).'),
         to_chapter: z.number().int().min(1).optional().describe('The last chapter to read (the last one if left out).'),
         story: storyArg,
+        draft: draftArg,
       },
       annotations: READ_ONLY,
     },
@@ -134,7 +165,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Outline',
       description:
         'The plan: every chapter with its beats in order (arc, when, written or not, beats happening at once, flashbacks), the beats not in a chapter yet, and every arc with its description, characters and beats in the arc’s own order.',
-      inputSchema: { story: storyArg },
+      inputSchema: { story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story) => reader.outline(story)),
@@ -146,7 +177,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Story time',
       description:
         'Every beat in the order it happens in the story’s world (which can differ from the reading order): backstory before where the book begins, the book, aftermath after it ends, beats happening at the same moment, "when" notes, and which beats are told out of order (flashbacks, flash-forwards).',
-      inputSchema: { story: storyArg },
+      inputSchema: { story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story) => reader.timeline(story)),
@@ -158,7 +189,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Characters',
       description:
         'Every character’s profile: description, the details the writer keeps (age, wants, fears…), chapters told from their point of view, arcs they’re in, where they’re named (manuscript, beats, other profiles) and their lines on the mind maps. Give a name for one character in depth, with every passage that names them.',
-      inputSchema: { name: z.string().optional().describe('A character’s name, for that character in depth.'), story: storyArg },
+      inputSchema: { name: z.string().optional().describe('A character’s name, for that character in depth.'), story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story, { name }: { name?: string }) => reader.characters(story, name)),
@@ -170,7 +201,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Places, objects and groups',
       description:
         'Every place, object and group the story keeps track of, with its description, details, where it’s named and its lines on the mind maps. Give a name for one in depth, with every passage that names it.',
-      inputSchema: { name: z.string().optional().describe('A place’s, object’s or group’s name, for that one in depth.'), story: storyArg },
+      inputSchema: { name: z.string().optional().describe('A place’s, object’s or group’s name, for that one in depth.'), story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story, { name }: { name?: string }) => reader.placesAndThings(story, name)),
@@ -182,7 +213,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Mind maps',
       description:
         'The writer’s mind maps: every card (story items, sticky notes and text in full, groups and what’s in them) roughly from the top left, and every line between cards with its label.',
-      inputSchema: { name: z.string().optional().describe('A map’s name, for that one only.'), story: storyArg },
+      inputSchema: { name: z.string().optional().describe('A map’s name, for that one only.'), story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story, { name }: { name?: string }) => reader.mindMaps(story, name)),
@@ -194,7 +225,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
       title: 'Search the story',
       description:
         'Finds words anywhere in the story: the manuscript (by chapter and paragraph), chapters, beats, characters, places and things, arcs and mind map notes. Every word must be found; put "quotes" around words to find them together. Not case or accent sensitive.',
-      inputSchema: { query: z.string().min(1).describe('What to find.'), story: storyArg },
+      inputSchema: { query: z.string().min(1).describe('What to find.'), story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story, { query }: { query: string }) => reader.searchStory(story, query)),
@@ -205,10 +236,148 @@ export function createServer(source: StorySource, today: () => string = () => ne
     {
       title: 'Writing progress',
       description: 'Words written, goals and how close they are, each chapter’s length against its target, beats written, and words written each day for the last two weeks.',
-      inputSchema: { story: storyArg },
+      inputSchema: { story: storyArg, draft: draftArg },
       annotations: READ_ONLY,
     },
     reading((story) => reader.progress(story, today())),
+  )
+
+  /** A tool on a story's comments: its reply, or what couldn't be found or done. */
+  function commenting<A extends object>(act: (story: reader.Story, id: string, args: A) => Promise<string>) {
+    return async (args: A): Promise<Reply> => {
+      try {
+        const { story: ref, draft } = args as { story?: string; draft?: string }
+        const { story, note, id } = await open(ref, draft)
+        return reply(note + (await act(story, id, args)))
+      } catch (error) {
+        if (error instanceof reader.NotFound || error instanceof CommentRefused) return reply(error.message, true)
+        throw error
+      }
+    }
+  }
+
+  /** A comment the assistant names by id: in the story's comments (any thread, any draft). */
+  async function knownComment(storyId: string, wanted: string) {
+    const rows = await source.comments(storyId)
+    const want = wanted.trim()
+    const found = rows.find((r) => r.id === want) ?? rows.find((r) => typeof r.id === 'string' && want.length >= 6 && r.id.startsWith(want))
+    if (!found) throw new reader.NotFound(`No comment ${want}. get_comments lists them, each with its id.`)
+    return found
+  }
+
+  server.registerTool(
+    'get_comments',
+    {
+      title: 'Comments',
+      description:
+        'The comments on the story, from the writer, their editors and AI assistants (you included): what each is on (quoting the passage, for one on the manuscript), what was said, the replies, and its id (to reply to it or resolve it). Open ones unless asked for resolved ones too; all of them, or one chapter’s.',
+      inputSchema: {
+        resolved: z.boolean().optional().describe('Resolved comments too (left out if not).'),
+        chapter: z.string().optional().describe('Only those on one chapter (its number or title) and its text.'),
+        story: storyArg,
+        draft: draftArg,
+      },
+      annotations: READ_ONLY,
+    },
+    commenting(async (story, id, { resolved, chapter }: { resolved?: boolean; chapter?: string }) =>
+      reader.comments(story, await source.comments(id), { resolved, chapter }),
+    ),
+  )
+
+  server.registerTool(
+    'add_comment',
+    {
+      title: 'Add a comment',
+      description:
+        'Leaves the writer a comment, as an editor would, on one thing: a passage of the manuscript (chapter and quote), a whole chapter (chapter alone), a beat, an arc, a character, a place or thing, a mind map or a card on it, or (with none of these) the whole story. The writer sees it in Story Builder where it is, counted on the page it’s on, and can reply or resolve it. One point per comment.',
+      inputSchema: {
+        comment: z.string().min(1).max(5000).describe('What you want to tell the writer.'),
+        chapter: z.string().optional().describe('The chapter (its number or title): for a comment on it, or on a passage of it with quote.'),
+        quote: z
+          .string()
+          .optional()
+          .describe('With chapter: the exact words the comment is on, copied from the chapter’s text as read_chapter shows it (a phrase or a sentence, within one paragraph).'),
+        beat: z.string().optional().describe('A beat, by its title.'),
+        arc: z.string().optional().describe('An arc, by its name.'),
+        character: z.string().optional().describe('A character, by name.'),
+        place_or_thing: z.string().optional().describe('A place, object or group, by name.'),
+        mind_map: z.string().optional().describe('A mind map, by name: for a comment on it, or on a card on it with card.'),
+        card: z.string().optional().describe('With mind_map: a card on it, by its text (a sticky note’s or text box’s words) or what it shows (a chapter’s, character’s… name).'),
+        story: storyArg,
+        draft: draftArg,
+      },
+      annotations: COMMENTING,
+    },
+    commenting(
+      async (
+        story,
+        id,
+        args: {
+          comment: string
+          chapter?: string
+          quote?: string
+          beat?: string
+          arc?: string
+          character?: string
+          place_or_thing?: string
+          mind_map?: string
+          card?: string
+        },
+      ) => {
+        const { target, note } = reader.commentTarget(story, {
+          chapter: args.chapter,
+          quote: args.quote,
+          beat: args.beat,
+          arc: args.arc,
+          character: args.character,
+          placeOrThing: args.place_or_thing,
+          mindMap: args.mind_map,
+          card: args.card,
+        })
+        const made = await source.addComment(id, null, target, args.comment.trim())
+        return `Comment ${made} added, on ${target.label}.${note} The writer sees it in Story Builder.`
+      },
+    ),
+  )
+
+  server.registerTool(
+    'reply_to_comment',
+    {
+      title: 'Reply to a comment',
+      description: 'Replies in a comment’s thread (the writer’s, an editor’s or your own), by the comment’s id from get_comments. Replying to a resolved comment opens it again.',
+      inputSchema: {
+        comment_id: z.string().min(1).describe('The id of the comment (or of any reply in its thread), from get_comments.'),
+        reply: z.string().min(1).max(5000).describe('Your reply.'),
+        story: storyArg,
+      },
+      annotations: COMMENTING,
+    },
+    commenting(async (_story, id, { comment_id, reply: text }: { comment_id: string; reply: string }) => {
+      const found = await knownComment(id, comment_id)
+      const thread = typeof found.thread === 'string' && found.thread ? found.thread : String(found.id)
+      const made = await source.addComment(id, thread, null, text.trim())
+      return `Reply ${made} added to comment ${thread}.`
+    }),
+  )
+
+  server.registerTool(
+    'resolve_comment',
+    {
+      title: 'Resolve a comment',
+      description:
+        'Marks a comment’s thread resolved (dealt with: the writer has made the change, or decided against it), or opens it again with resolved false. By the comment’s id from get_comments.',
+      inputSchema: {
+        comment_id: z.string().min(1).describe('The id of the comment (or of a reply in its thread), from get_comments.'),
+        resolved: z.boolean().optional().describe('False to open it again (true if left out).'),
+        story: storyArg,
+      },
+      annotations: { ...COMMENTING, idempotentHint: true },
+    },
+    commenting(async (_story, id, { comment_id, resolved }: { comment_id: string; resolved?: boolean }) => {
+      const found = await knownComment(id, comment_id)
+      await source.resolveComment(id, String(found.id), resolved !== false)
+      return resolved === false ? `Comment ${String(found.thread || found.id)} is open again.` : `Comment ${String(found.thread || found.id)} resolved.`
+    }),
   )
 
   const ask = (text: string) => ({ messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }] })
@@ -249,7 +418,32 @@ export function createServer(source: StorySource, today: () => string = () => ne
     { title: 'What to write next', description: 'Suggestions for what to write next, from the plan and the progress so far.' },
     () =>
       ask(
-        `Please look at my story in Story Builder and help me decide what to write next. Read the overview, the outline (which beats are written, which chapters are still outlines, which beats aren't in a chapter yet), story time and my writing progress. Suggest the next scenes or chapters to write and why, and point out gaps in the plan: arcs that stop short, characters without an arc, beats not placed in a chapter, threads that never pay off.`,
+        `Please look at my story in Story Builder and help me decide what to write next. Read the overview, the outline (which beats are written, which chapters have no text yet, which beats aren't in a chapter yet), story time and my writing progress. Suggest the next scenes or chapters to write and why, and point out gaps in the plan: arcs that stop short, characters without an arc, beats not placed in a chapter, threads that never pay off.`,
+      ),
+  )
+
+  server.registerPrompt(
+    'edit_with_comments',
+    {
+      title: 'Edit with comments',
+      description: 'An editor’s notes on a chapter (or the whole story), left as comments on the passages and things they’re about, for the writer to work through.',
+      argsSchema: { chapter: z.string().optional().describe('The chapter’s number or title (the whole story if left out).') },
+    },
+    ({ chapter }) =>
+      ask(
+        `Please be my editor for ${chapter ? `chapter ${chapter} of my story` : 'my story'} in Story Builder, and leave your notes as comments I can work through there. First read the story overview and get_comments (so you don't repeat what's been said), then ${chapter ? 'the chapter (read_chapter) and what it needs around it' : 'the manuscript and the outline'}. Then use add_comment for each note: on the exact passage it's about (the chapter and a quote of its words) for line edits, pacing, clarity, dialogue and continuity; on the chapter, beat, arc or character for bigger points. One point per comment, saying what isn't working and suggesting a concrete fix. Leave at most 15, the most important first. Finish by telling me in a few lines what you commented on.`,
+      ),
+  )
+
+  server.registerPrompt(
+    'answer_comments',
+    {
+      title: 'Go through the comments',
+      description: 'Replies to the open comments, and resolves the ones the story has dealt with since.',
+    },
+    () =>
+      ask(
+        `Please go through the open comments on my story in Story Builder (get_comments). For each one, read what it's about as it is now. If the text or plan has dealt with it, resolve it (resolve_comment). If someone asked a question you can answer from the story, or the writer replied to one of your comments, reply (reply_to_comment). Leave the rest open. Then tell me briefly what you resolved, what you replied to, and what's still open that matters most.`,
       ),
   )
 
@@ -383,10 +577,10 @@ async function infoPage(request: Request, key: string | null, source: StorySourc
 <li><strong>Claude Code</strong>: <code>claude mcp add --transport http story-builder ${escape(link)}</code></li>
 <li><strong>Other assistants</strong>: add it as a remote MCP server (Streamable HTTP) at this link.</li>
 </ul>
-<p>Then ask, for example: <em>“Read my story and tell me what you think of chapter 3.”</em></p>
-<h2>What it can read</h2>
+<p>Then ask, for example: <em>“Read my story and tell me what you think of chapter 3.”</em> or <em>“Be my editor: leave comments on chapter 3.”</em></p>
+<h2>What it can do</h2>
 <p>${tools.map(escape).join(' · ')}</p>
-<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps) but can’t change anything. Keep the link private: anyone who has it can read your stories. You can revoke it in Story Builder, under your account.</p>`
+<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps, in every draft) and leave you comments on them, but can’t change them. Keep the link private: anyone who has it can read your stories and comment on them. You can revoke it in Story Builder, under your account.</p>`
     : ''
   const html = `<!doctype html>
 <html lang="en">

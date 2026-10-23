@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { reviewing } from '../review/mode'
 import {
   DndContext,
   KeyboardSensor,
@@ -7,6 +8,8 @@ import {
   closestCenter,
   useSensor,
   useSensors,
+  type SensorDescriptor,
+  type SensorOptions,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -16,6 +19,9 @@ import { GripVertical, Plus, X } from 'lucide-react'
 import type { CharacterAttribute } from '../types'
 import { useStory } from '../store/storyStore'
 import { MentionTextarea } from './MentionTextarea'
+
+/** Reviewing someone's story, nothing is dragged. */
+const NO_SENSORS: SensorDescriptor<SensorOptions>[] = []
 
 interface Props {
   /** The character or element the attributes belong to. */
@@ -51,7 +57,7 @@ export function AttributesEditor({ ownerId, attributes, suggestions, emptyText }
       <h2 className="section-title">Attributes</h2>
       {attributes.length > 0 ? (
         <DndContext
-          sensors={sensors}
+          sensors={reviewing ? NO_SENSORS : sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           onDragEnd={onDragEnd}

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { StoryData } from '../types'
 import { emptyStory, normalizeStory } from '../store/storyOps'
-import { CloudError, type AssistantLink, type AuthEvent, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
+import { CloudError, type AssistantLink, type AuthEvent, type CloudBackend, type CloudStoryRow, type CloudUser, type CommentRow, type ReviewLink } from './backend'
 import { createCloud, type Link } from './engine'
 
 /** An account service in memory: its accounts, stories and pictures, shared by every "device". */
@@ -11,6 +11,8 @@ function memoryService() {
   const stories = new Map<string, { owner: string; row: CloudStoryRow; data: unknown }>()
   const pictures = new Map<string, Blob>()
   const links = new Map<string, { owner: string; link: AssistantLink; keyHash: string }>()
+  const reviewLinks = new Map<string, { owner: string; link: ReviewLink }>()
+  let comments: (CommentRow & { id: string; story_id: string })[] = []
   let online = true
   let next = 1
   const stamp = () => new Date(Date.now() + next++).toISOString()
@@ -101,6 +103,40 @@ function memoryService() {
       },
       async revokeAssistantLink(id) {
         if (links.get(id)?.owner === me().id) links.delete(id)
+      },
+      async listComments(storyId) {
+        if (!mine(storyId)) throw new CloudError('That story isn’t in your account.')
+        return comments.filter((c) => c.story_id === storyId).map((c) => ({ ...c }))
+      },
+      async addComment(storyId, thread, target, body, name) {
+        if (!mine(storyId)) throw new CloudError('That story isn’t in your account.')
+        const id = `comment-${next++}`
+        comments.push({ id, story_id: storyId, thread, target: thread ? null : target, body, author_kind: 'writer', author_name: name, mine: true, created_at: stamp(), resolved_at: null })
+        return id
+      },
+      async resolveComment(storyId, id, resolved) {
+        const c = comments.find((x) => x.id === id && x.story_id === storyId && mine(storyId))
+        if (c) c.resolved_at = resolved ? stamp() : null
+      },
+      async editComment(storyId, id, body) {
+        const c = comments.find((x) => x.id === id && x.story_id === storyId && mine(storyId))
+        if (c) c.body = body
+      },
+      async removeComment(storyId, id) {
+        if (mine(storyId)) comments = comments.filter((c) => c.id !== id)
+      },
+      async listReviewLinks(storyId) {
+        const id = me().id
+        return [...reviewLinks.values()].filter((l) => l.owner === id && l.link.storyId === storyId).map((l) => ({ ...l.link })).reverse()
+      },
+      async addReviewLink(storyId, label, token) {
+        if (!mine(storyId)) throw new CloudError('That story isn’t in your account.')
+        const link = { id: `review-${next++}`, storyId, label, token, createdAt: stamp(), lastUsedAt: null }
+        reviewLinks.set(link.id, { owner: me().id, link })
+        return { ...link }
+      },
+      async revokeReviewLink(id) {
+        if (reviewLinks.get(id)?.owner === me().id) reviewLinks.delete(id)
       },
       async listPictures(userId) {
         me()
@@ -380,5 +416,29 @@ describe('keeping the story in step with the account', () => {
     expect((await a.cloud.listAssistantLinks()).map((l) => l.label)).toEqual(['Another', 'Claude'])
     await a.cloud.revokeAssistantLink(link.id)
     expect((await a.cloud.listAssistantLinks()).map((l) => l.label)).toEqual(['Another'])
+  })
+
+  it('makes review links for the story open here, and reaches its comments', async () => {
+    const service = memoryService()
+    const a = browser(service, 'Mine')
+    // Not signed in: no account to reach.
+    expect(a.cloud.account()).toBeNull()
+    await a.cloud.signUp('w@example.com', 'longpassword')
+    service.confirm('w@example.com')
+    await a.cloud.signIn('w@example.com', 'longpassword')
+    await settle()
+    const storyId = a.state().storyId!
+    const link = await a.cloud.createReviewLink('  For Anna ')
+    expect(link).toMatchObject({ storyId, label: 'For Anna' })
+    expect(link.token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect((await a.cloud.createReviewLink('Ben')).token).not.toBe(link.token)
+    expect((await a.cloud.listReviewLinks()).map((l) => l.label)).toEqual(['Ben', 'For Anna'])
+    await a.cloud.revokeReviewLink(link.id)
+    expect((await a.cloud.listReviewLinks()).map((l) => l.label)).toEqual(['Ben'])
+    // Comments go to the story kept in step with this browser's.
+    const account = a.cloud.account()!
+    expect(account.storyId).toBe(storyId)
+    await account.backend.addComment(storyId, null, { kind: 'story' }, 'A note to self', '')
+    expect((await account.backend.listComments(storyId)).map((c) => c.body)).toEqual(['A note to self'])
   })
 })

@@ -8,6 +8,7 @@ import {
   FilePlus2,
   Feather,
   History,
+  MessageSquareShare,
   Moon,
   Network,
   PenLine,
@@ -36,6 +37,11 @@ import { cloud, useCloud } from '../cloud'
 import { useUi } from '../store/uiStore'
 import { manuscriptWords, outlineWords } from '../lib/progress'
 import { SEARCH_KEYS } from '../lib/searchShortcut'
+import { CommentCount, CommentsButton } from './Comments'
+import { useCommentCounts } from '../comments/store'
+import { ShareDialog } from './ShareDialog'
+import { ReviewBadge } from './Review'
+import { reviewing } from '../review/mode'
 
 export function TopBar() {
   const title = useStory((s) => s.title)
@@ -44,6 +50,8 @@ export function TopBar() {
   const [showBackups, setShowBackups] = useState(false)
   const [showAssistants, setShowAssistants] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const counts = useCommentCounts()
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
   const setProgressOpen = useUi((s) => s.setProgressOpen)
@@ -105,6 +113,31 @@ export function TopBar() {
     await swapIn(build())
   }
 
+  const themeItems = [
+    { label: 'Match system', icon: <SunMoon size={16} />, onSelect: () => setTheme('system'), checked: theme === 'system', separated: true },
+    { label: 'Light', icon: <Sun size={16} />, onSelect: () => setTheme('light'), checked: theme === 'light' },
+    { label: 'Dark', icon: <Moon size={16} />, onSelect: () => setTheme('dark'), checked: theme === 'dark' },
+  ]
+  // Reviewing someone's story: nothing to change, import or export.
+  const reviewItems = [{ label: 'Word counts…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) }, ...themeItems]
+  const storyItems = [
+    { label: 'Word counts and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
+    { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
+    { label: 'Import manuscript…', icon: <FileInput size={16} />, onSelect: () => useUi.getState().setImportOpen(true) },
+    { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
+    { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
+    { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
+    ...(cloud
+      ? [
+          { label: 'Share for comments…', icon: <MessageSquareShare size={16} />, onSelect: () => setShowShare(true) },
+          { label: 'AI assistants…', icon: <Bot size={16} />, onSelect: () => setShowAssistants(true) },
+        ]
+      : []),
+    { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
+    { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
+    ...themeItems,
+  ]
+
   return (
     <header className="topbar">
       <Link to="/" className="brand" aria-label="Story Builder home">
@@ -119,6 +152,7 @@ export function TopBar() {
         <input
           className="story-title"
           value={title}
+          readOnly={reviewing}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Untitled story"
           aria-label="Story title"
@@ -134,10 +168,12 @@ export function TopBar() {
             <span className="nav-long">Chapter </span>
             <span className="nav-short-cap">board</span>
           </span>
+          <CommentCount n={counts.places.board} title={`${counts.places.board} open comments on chapters and beats`} />
         </NavLink>
         <NavLink to="/write" aria-label="Manuscript" title="Manuscript">
           <PenLine size={18} className="nav-icon" aria-hidden />
           <span className="nav-text">Manuscript</span>
+          <CommentCount n={counts.places.manuscript} title={`${counts.places.manuscript} open comments on the manuscript`} />
         </NavLink>
         <NavLink to="/map" aria-label="Mind map" title="Mind map">
           <Network size={18} className="nav-icon" aria-hidden />
@@ -145,10 +181,12 @@ export function TopBar() {
             <span className="nav-long">Mind </span>
             <span className="nav-short-cap">map</span>
           </span>
+          <CommentCount n={counts.places.map} title={`${counts.places.map} open comments on the mind maps`} />
         </NavLink>
         <NavLink to="/timeline" aria-label="Timeline" title="Timeline">
           <ChartGantt size={18} className="nav-icon" aria-hidden />
           <span className="nav-text">Timeline</span>
+          <CommentCount n={counts.places.timeline} title={`${counts.places.timeline} open comments on beats`} />
         </NavLink>
       </nav>
       <div className="topbar-actions">
@@ -157,46 +195,37 @@ export function TopBar() {
           <span className="topbar-search-text">Search</span>
           <kbd className="topbar-kbd">{SEARCH_KEYS}</kbd>
         </button>
-        <UndoButtons />
-        <button
-          className="topbar-progress"
-          onClick={() => setProgressOpen(true)}
-          title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript, ${outline.toLocaleString()} in the outline: word counts and goals`}
-          aria-label="Word counts and goals"
-        >
-          <Target size={16} />
-          {/* While there's only an outline, its count; then the manuscript's, with the outline's beside it where there's room. */}
-          {!total && outline ? (
-            <span className="topbar-words">{outline.toLocaleString()} outline words</span>
-          ) : (
-            <>
-              <span className="topbar-words">{total.toLocaleString()} words</span>
-              {outline > 0 && <span className="topbar-outline">{outline.toLocaleString()} outline</span>}
-            </>
-          )}
-          {goal ? (
-            <span className="topbar-goal" aria-hidden>
-              <span style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} />
-            </span>
-          ) : null}
-        </button>
-        <AccountButton />
+        {reviewing ? <ReviewBadge /> : <UndoButtons />}
+        <CommentsButton />
+        {/* (An editor reviewing the story has no goals to watch.) */}
+        {!reviewing && (
+          <button
+            className="topbar-progress"
+            onClick={() => setProgressOpen(true)}
+            title={`${goal ? `${total.toLocaleString()} of ${goal.toLocaleString()}` : total.toLocaleString()} words in the manuscript, ${outline.toLocaleString()} in the outline: word counts and goals`}
+            aria-label="Word counts and goals"
+          >
+            <Target size={16} />
+            {/* While there's only an outline, its count; then the manuscript's, with the outline's beside it where there's room. */}
+            {!total && outline ? (
+              <span className="topbar-words">{outline.toLocaleString()} outline words</span>
+            ) : (
+              <>
+                <span className="topbar-words">{total.toLocaleString()} words</span>
+                {outline > 0 && <span className="topbar-outline">{outline.toLocaleString()} outline</span>}
+              </>
+            )}
+            {goal ? (
+              <span className="topbar-goal" aria-hidden>
+                <span style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} />
+              </span>
+            ) : null}
+          </button>
+        )}
+        {!reviewing && <AccountButton />}
         <Menu
           label="Story options"
-          items={[
-            { label: 'Word counts and goals…', icon: <Target size={16} />, onSelect: () => setProgressOpen(true) },
-            { label: 'Export manuscript…', icon: <BookDown size={16} />, onSelect: () => setShowExport(true), separated: true },
-            { label: 'Import manuscript…', icon: <FileInput size={16} />, onSelect: () => useUi.getState().setImportOpen(true) },
-            { label: 'Export story (.json)', icon: <Download size={16} />, onSelect: () => void exportStory() },
-            { label: 'Import story…', icon: <Upload size={16} />, onSelect: () => fileRef.current?.click() },
-            { label: 'Backups…', icon: <History size={16} />, onSelect: () => setShowBackups(true) },
-            ...(cloud ? [{ label: 'AI assistants…', icon: <Bot size={16} />, onSelect: () => setShowAssistants(true) }] : []),
-            { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
-            { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
-            { label: 'Match system', icon: <SunMoon size={16} />, onSelect: () => setTheme('system'), checked: theme === 'system', separated: true },
-            { label: 'Light', icon: <Sun size={16} />, onSelect: () => setTheme('light'), checked: theme === 'light' },
-            { label: 'Dark', icon: <Moon size={16} />, onSelect: () => setTheme('dark'), checked: theme === 'dark' },
-          ]}
+          items={reviewing ? reviewItems : storyItems}
         />
         <input
           ref={fileRef}
@@ -213,6 +242,7 @@ export function TopBar() {
       {showBackups && <BackupsDialog onClose={() => setShowBackups(false)} />}
       {showAssistants && <AssistantDialog onClose={() => setShowAssistants(false)} />}
       {showExport && <ExportDialog onClose={() => setShowExport(false)} />}
+      {showShare && <ShareDialog onClose={() => setShowShare(false)} />}
     </header>
   )
 }

@@ -361,12 +361,54 @@ account as well:
 - Signing out leaves the story in the browser; it just stops being saved to
   your account.
 
+### Comments and review links
+
+Comments are notes on the story, kept in your account apart from it, so
+nobody's comment is a change to what you've written. You, the editors you
+share the story with, and AI assistants (below) can all comment, on
+anything:
+
+- **A passage**: select words in the manuscript and press **Comment**. The
+  words stay marked (click them for their comment); the mark follows the
+  text as you edit around it, and a comment whose words you've rewritten
+  says so.
+- **A chapter, beat, arc, character, place or thing**: a chapter's ⋯ menu,
+  the **Comment** button in a beat's dialog and on arc, character and place
+  pages, and in the timeline's chapter details.
+- **A mind map card**: select it and press **Comment** in its toolbar; the
+  map's menu comments on the map as a whole.
+- **The whole story**: from the comments panel.
+
+The **Comments** button in the top bar (its number counts every open one)
+opens the panel: open and resolved comments, each with what it's on (click
+it to go there), the passage it quotes, its replies, and **Reply**,
+**Resolve** or **Reopen**. Small numbers show where comments are: on the
+**Chapter board**, **Manuscript**, **Mind map** and **Timeline** buttons, on
+chapters and beats, in the manuscript's chapter menu (so 3 on the
+manuscript might be 2 on chapter 3 and 1 on chapter 4), on map cards and in
+the sidebar's tabs and lists. Click one for those comments. A reply to a
+resolved comment opens it again; you can delete any comment on your story,
+others only their own. Comments on chapters, arcs, beats and passages belong
+to the draft they were made in.
+
+To have someone comment, **⋯ → Share for comments**: say who it's for, make
+a link (copied straight away; copy it again there whenever you like) and
+send it. Whoever opens it reads the whole story (every draft, but nothing
+you've archived) and comments under the name they give, without an
+account and without being able to change anything; the story isn't kept in
+their browser, and their own Story Builder story (if they have one) is left
+alone. **Turn off** a link and it stops working at once (its comments stay).
+Your name with your comments, as editors see it, is set there too.
+
 ### AI assistants
 
-An AI assistant such as Claude can read your stories (everything in them)
-to give you feedback: a critique of a chapter, a check for continuity slips,
-ideas for what to write next. It can only read; it never changes anything.
-It reads them from your account, so sign in first, then:
+An AI assistant such as Claude can read your stories (everything in them,
+in every draft) to give you feedback: a critique of a chapter, a check for
+continuity slips, ideas for what to write next. It can also be your editor,
+leaving its notes as comments on the passages and things they're about,
+which you work through in the comments panel like anyone's, and it can
+reply to comments and resolve those you've dealt with. It never changes the
+story itself. It reads them from your account, so sign in first, then:
 
 1. **⋯ → AI assistants** (or the same section under your account): **New
    link**, give it a name, and copy the link. It's shown once (the account
@@ -376,7 +418,8 @@ It reads them from your account, so sign in first, then:
      custom connector; name it Story Builder and paste the link as its URL.
    - **Claude Code**: `claude mcp add --transport http story-builder <link>`
    - Any other assistant that takes a remote MCP server (Streamable HTTP).
-3. Ask away: "Read my story and tell me what you think of chapter 3."
+3. Ask away: "Read my story and tell me what you think of chapter 3." or
+   "Be my editor: leave comments on chapter 3."
 
 The list shows when each link was last used; **Revoke** one and it stops
 working at once. Anyone who has a link can read your stories, so keep them
@@ -384,11 +427,12 @@ private. To see what an assistant gets before connecting your own stories,
 use `https://story-builder-flame.vercel.app/mcp/example`, which reads the
 example story (open it in a browser for the same instructions).
 
-What the assistant can read, each as a tool:
+What the assistant can do, each as a tool (the reading ones read the draft
+you have open, or another named with `draft`):
 
 | Tool | What it gives |
 | --- | --- |
-| `get_story_overview` | The whole story at a glance, where it starts: chapters (length, point of view, summary, beats), arcs, characters, places and things, story time in brief, mind maps, goals, and the drafts (the open one is read) |
+| `get_story_overview` | The whole story at a glance, where it starts: chapters (length, point of view, summary, beats), arcs, characters, places and things, story time in brief, mind maps, goals, the drafts, what's archived, and how many comments there are |
 | `read_chapter` | One chapter with its plan: its beats and the passages linked to them, who's named in it, and its text (long chapters in parts) |
 | `read_manuscript` | The text straight through, as much as fits in one reply, and where to carry on |
 | `get_outline` | Every chapter's beats in order, beats not in a chapter yet, and each arc's beats in its own order |
@@ -398,11 +442,17 @@ What the assistant can read, each as a tool:
 | `search_story` | Words anywhere in the story |
 | `get_writing_progress` | Words, goals, chapter by chapter, and the last two weeks |
 | `list_stories` | The stories in the account; the others read the one edited last, unless told another |
+| `get_comments` | The comments (open ones, or resolved too; all, or a chapter's): what each is on, quoting the passage, who said what, and its id |
+| `add_comment` | A comment on a passage (the chapter and the words, quoted), a chapter, beat, arc, character, place or thing, a mind map or a card on one, or the whole story |
+| `reply_to_comment`, `resolve_comment` | A reply in a comment's thread; a thread resolved (or opened again) |
 
 It also explains Story Builder's ideas to the assistant (beats, arcs, story
-time, where the book begins and ends, mentions), and offers ready-made
-requests: feedback on a chapter, feedback on the whole story, a continuity
-check, and what to write next. Pictures aren't included.
+time, where the book begins and ends, mentions, drafts, the archive,
+comments), and offers ready-made requests: feedback on a chapter, feedback
+on the whole story, a continuity check, what to write next, editing with
+comments (on a chapter or the whole story), and going through the open
+comments. Pictures aren't included. On the example story, its comments are
+only kept for a while.
 
 ## Hosting
 
@@ -506,12 +556,35 @@ any static host or sub-folder.
   `engine.test.ts`), `supabaseBackend.ts` talks to Supabase (loaded only
   when someone signs in), and `index.ts` wires them to the app;
   `src/components/Account.tsx` is the account button and dialog
+- `src/comments/`: comments. `model.ts` is what they're on, in threads,
+  counted for the badges and named; `anchor.ts` finds a passage again by
+  its words (and the text either side), loosely (case, quotes, dashes,
+  spaces, Markdown), tested against ProseMirror's positions in
+  `anchor.test.ts`; `store.ts` holds them and the panel's state, through a
+  backend for the writer (their account, wired in `src/cloud/index.ts`) or
+  an editor (a review link). `src/components/Comments.tsx` is the panel,
+  threads, counts and buttons, `src/editor/commentHighlight.ts` marks
+  passages in the manuscript, `src/map/MapComments.tsx` puts them on cards,
+  and `src/components/ShareDialog.tsx` makes review links
+- `src/review/`: an editor's review from a review link (`?review=<token>`).
+  `mode.ts` says whether this page is one: then nothing is saved in the
+  browser (`persistence.ts`, `images.ts`), the account isn't used, and the
+  store turns down changes (`storyStore.ts`, but for opening cards up on
+  the map); `store.ts` opens the story and its comments, and
+  `supabaseReview.ts` reaches them through the link's token;
+  `src/components/Review.tsx` is the editor's welcome and top bar badge
+- `supabase/migrations/…_comments_and_review_links.sql`: the comments and
+  review links tables, reached only through functions that check who's
+  asking (the signed-in writer, a review link's token, an AI assistant's
+  key) and keep every comment to its story; editors see the story's
+  pictures through Storage, which checks the token they send
 - `server/` and `src/reader/`: the story server for AI assistants.
   `src/reader/` tells a story in words (the overview, chapters with their
-  plans, outline, story time, profiles, mind maps, search, progress), from
-  the app's own code; `server/mcp.ts` offers that as MCP tools, prompts and
-  instructions over HTTP, a fresh server per request; `server/sources.ts`
-  reads an account's stories by key, or the example story; and
+  plans, outline, story time, profiles, mind maps, search, progress,
+  comments), from the app's own code; `server/mcp.ts` offers that as MCP
+  tools (reading any draft, and commenting), prompts and instructions over
+  HTTP, a fresh server per request; `server/sources.ts` reads an account's
+  stories and their comments by key, or the example story; and
   `server/vercel.ts` is the function Vercel runs. `server/mcp.test.ts`
   connects to it with an MCP client
 - `src/store/images.ts` and `src/lib/pictures.ts`: the picture store (its own

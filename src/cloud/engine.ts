@@ -139,6 +139,11 @@ export function createCloud(deps: CloudDeps) {
   }
 
   const user = () => state().user
+  /** The account story this browser's is kept in step with. */
+  const linkedStory = () => {
+    if (!link) throw new CloudError('This story isn’t in your account yet.')
+    return link.storyId
+  }
   const need = () => {
     if (!backend) throw new CloudError('Not connected to your account.')
     return backend
@@ -470,6 +475,20 @@ export function createCloud(deps: CloudDeps) {
     },
 
     revokeAssistantLink: (id: string) => need().revokeAssistantLink(id),
+
+    /** The account and the story in it kept in step with this browser's, once connected (for its comments). */
+    account(): { backend: CloudBackend; storyId: string } | null {
+      // (Comments are apart from the story, so they work even while its versions are to be chosen between.)
+      return backend && user() && link ? { backend, storyId: link.storyId } : null
+    },
+
+    /** The links that let editors read the story open here and comment on it, newest first. */
+    listReviewLinks: () => need().listReviewLinks(linkedStory()),
+
+    /** A new review link for the story open here (its token is its secret part). */
+    createReviewLink: (label: string) => need().addReviewLink(linkedStory(), label.trim().slice(0, 80), newKey()),
+
+    revokeReviewLink: (id: string) => need().revokeReviewLink(id),
 
     /** A picture from the account, for one this browser doesn't have. */
     async fetchPicture(id: string): Promise<Blob | null> {

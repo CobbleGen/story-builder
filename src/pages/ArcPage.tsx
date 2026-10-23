@@ -10,6 +10,8 @@ import {
   pointerWithin,
   useSensor,
   useSensors,
+  type SensorDescriptor,
+  type SensorOptions,
   type CollisionDetection,
   type DragEndEvent,
   type Modifier,
@@ -35,6 +37,11 @@ import { askConfirm } from '../lib/confirm'
 import { outlineWords } from '../lib/progress'
 import { outlineKind } from '../lib/outlines'
 import { OutlineBar, OutlineMarkView, OutlineMarks, STEP_TRAY, type StepDragData } from '../components/ArcOutline'
+import { CommentsHere } from '../components/Comments'
+import { reviewing } from '../review/mode'
+
+/** Reviewing someone's story, nothing is dragged. */
+const NO_SENSORS: SensorDescriptor<SensorOptions>[] = []
 
 const typeOf = (data: { current?: unknown } | undefined) => (data?.current as { type?: string } | undefined)?.type
 
@@ -140,17 +147,22 @@ function ArcView({ arc }: { arc: Arc }) {
             submitOnEnter
             onChange={(name) => updateArc(arc.id, { name })}
           />
-          <button
-            className="icon-btn"
-            onClick={() => back(() => archive('arc', arc.id, `the arc “${plainText(arc.name, lookup) || 'Untitled arc'}”`))}
-            title="Archive arc: put it away with its beats, to bring back later"
-            aria-label="Archive arc"
-          >
-            <Archive size={18} />
-          </button>
-          <button className="icon-btn danger" onClick={remove} title="Delete arc" aria-label="Delete arc">
-            <Trash2 size={18} />
-          </button>
+          <CommentsHere target={{ kind: 'arc', id: arc.id }} />
+          {!reviewing && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={() => back(() => archive('arc', arc.id, `the arc “${plainText(arc.name, lookup) || 'Untitled arc'}”`))}
+                title="Archive arc: put it away with its beats, to bring back later"
+                aria-label="Archive arc"
+              >
+                <Archive size={18} />
+              </button>
+              <button className="icon-btn danger" onClick={remove} title="Delete arc" aria-label="Delete arc">
+                <Trash2 size={18} />
+              </button>
+            </>
+          )}
         </div>
         {showColors && (
           <div className="arc-colors">
@@ -183,7 +195,7 @@ function ArcView({ arc }: { arc: Arc }) {
       </header>
 
       <DndContext
-        sensors={sensors}
+        sensors={reviewing ? NO_SENSORS : sensors}
         collisionDetection={arcCollisions}
         modifiers={[arcModifier]}
         onDragStart={({ active }) => {

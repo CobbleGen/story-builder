@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { reviewing } from '../review/mode'
+import { CardComments, CommentTool } from './MapComments'
 import { NodeResizer, NodeToolbar, type NodeProps } from '@xyflow/react'
 import { ImageOff, Maximize2, X } from 'lucide-react'
 import type { MapNode } from '../types'
@@ -22,7 +24,7 @@ export function PictureNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   return (
     <div className={`map-picture-card${url ? '' : ' empty'}`} onDoubleClick={() => url && setViewing(true)}>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !reviewing}
         keepAspectRatio
         minWidth={40}
         minHeight={40}
@@ -36,10 +38,14 @@ export function PictureNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         <button className="map-tool" onClick={() => setViewing(true)} disabled={!url}>
           <Maximize2 size={14} /> Full size
         </button>
-        <button className="map-tool" onClick={() => removeNode(id)} title="Remove the picture from the map">
-          <X size={14} /> Remove from map
-        </button>
+        <CommentTool id={id} />
+        {!reviewing && (
+          <button className="map-tool" onClick={() => removeNode(id)} title="Remove the picture from the map">
+            <X size={14} /> Remove from map
+          </button>
+        )}
       </NodeToolbar>
+      <CardComments id={id} />
       <Handles />
       {url ? (
         <img src={url} alt="" draggable={false} />

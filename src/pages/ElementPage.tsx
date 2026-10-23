@@ -21,6 +21,8 @@ import { KindPicker } from '../components/KindPicker'
 import { AttributesEditor } from '../components/AttributesEditor'
 import { MentionedIn } from '../components/MentionedIn'
 import { PortraitPicker } from '../components/PortraitPicker'
+import { CommentsHere } from '../components/Comments'
+import { reviewing } from '../review/mode'
 
 const SUGGESTED_ATTRIBUTES: Record<ElementKind, string[]> = {
   place: ['Where', 'Looks like', 'Sounds and smells', 'Who’s there', 'History', 'Secret'],
@@ -121,17 +123,22 @@ function ElementView({ element }: { element: StoryElement }) {
             submitOnEnter
             onChange={(value) => updateElement(element.id, { name: value })}
           />
-          <button
-            className="icon-btn"
-            onClick={() => back(() => archive('element', element.id, name))}
-            title={`Archive ${names.noun}: put it away, to bring back later`}
-            aria-label={`Archive ${names.noun}`}
-          >
-            <Archive size={18} />
-          </button>
-          <button className="icon-btn danger" onClick={remove} title={`Delete ${names.noun}`} aria-label={`Delete ${names.noun}`}>
-            <Trash2 size={18} />
-          </button>
+          <CommentsHere target={{ kind: 'element', id: element.id }} />
+          {!reviewing && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={() => back(() => archive('element', element.id, name))}
+                title={`Archive ${names.noun}: put it away, to bring back later`}
+                aria-label={`Archive ${names.noun}`}
+              >
+                <Archive size={18} />
+              </button>
+              <button className="icon-btn danger" onClick={remove} title={`Delete ${names.noun}`} aria-label={`Delete ${names.noun}`}>
+                <Trash2 size={18} />
+              </button>
+            </>
+          )}
         </div>
         {showColors && (
           <div className="arc-colors character-colors">

@@ -19,6 +19,9 @@ import { CharacterAvatar } from './CharacterAvatar'
 import { ElementIcon } from './ElementIcon'
 import { KindPicker } from './KindPicker'
 import { ArchivedPanel } from './Archived'
+import { CommentCount } from './Comments'
+import { useCommentCounts } from '../comments/store'
+import { reviewing } from '../review/mode'
 
 interface Props {
   /** Beats can be dragged from the sidebar onto the chapter board. */
@@ -43,7 +46,10 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
   // (What was archived from the open draft, and from every draft.)
   const archived = useStory((s) => s.archive.filter((a) => !a.draft || a.draft === s.draft).length)
   const open = useUi((s) => s.sidebarOpen)
-  const mode = useUi((s) => s.sidebarMode)
+  const chosen = useUi((s) => s.sidebarMode)
+  // (Reviewing someone's story, what they archived isn't shown.)
+  const mode = reviewing && chosen === 'archived' ? 'arcs' : chosen
+  const counts = useCommentCounts()
   const setMode = useUi((s) => s.setSidebarMode)
   const toggleSidebar = useUi((s) => s.toggleSidebar)
   const toggleArc = useUi((s) => s.toggleArc)
@@ -115,7 +121,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
     >
       <div className="sidebar-head">
         <div className="mode-switch" role="tablist" aria-label="Sidebar">
-          {MODES.map((m) => (
+          {MODES.filter((m) => !reviewing || m.mode !== 'archived').map((m) => (
             <button
               key={m.mode}
               role="tab"
@@ -126,6 +132,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
               onClick={() => setMode(m.mode)}
             >
               {m.mode === 'archived' ? <Archive size={14} aria-hidden /> : m.label}
+              {m.mode !== 'archived' && <CommentCount n={counts.places[m.mode === 'world' ? 'elements' : m.mode]} />}
               <span className="mode-count">
                 {m.mode === 'arcs'
                   ? arcs.length
@@ -149,7 +156,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
             {arcs.map((arc) => (
               <ArcSection key={arc.id} arc={arc} dragEnabled={dragEnabled} movingArcId={movingArcId} />
             ))}
-            <NewArcForm />
+            {!reviewing && <NewArcForm />}
           </>
         ) : mode === 'archived' ? (
           <ArchivedPanel />
@@ -161,7 +168,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
             {characters.map((c) => (
               <CharacterRow key={c.id} character={c} />
             ))}
-            <NewCharacterForm />
+            {!reviewing && <NewCharacterForm />}
           </>
         ) : (
           <>
@@ -183,7 +190,7 @@ export function Sidebar({ dragEnabled = false, unassignActive = false, movingArc
                 </section>
               )
             })}
-            <NewElementForm />
+            {!reviewing && <NewElementForm />}
           </>
         )}
       </div>
@@ -227,6 +234,7 @@ function ArcSection({ arc, dragEnabled, movingArcId }: { arc: Arc; dragEnabled: 
   const setHighlight = useHighlightCleanup(arc.id)
   const navigate = useNavigate()
   const unplaced = arc.beatIds.filter((id) => !beats[id]?.chapterId).length
+  const counts = useCommentCounts()
 
   return (
     <section
@@ -267,6 +275,7 @@ function ArcSection({ arc, dragEnabled, movingArcId }: { arc: Arc; dragEnabled: 
             )}
             <span>{arc.beatIds.length}</span>
           </span>
+          <CommentCount n={counts.things.get(arc.id)} />
         </button>
         <NavLink
           to={`/arcs/${arc.id}`}
@@ -290,9 +299,11 @@ function ArcSection({ arc, dragEnabled, movingArcId }: { arc: Arc; dragEnabled: 
               <SideBeat key={id} beat={beat} number={number} />
             )
           })}
-          <li>
-            <QuickAddBeat arcId={arc.id} />
-          </li>
+          {!reviewing && (
+            <li>
+              <QuickAddBeat arcId={arc.id} />
+            </li>
+          )}
         </ul>
       )}
     </section>
@@ -306,6 +317,7 @@ interface SideBeatProps {
 
 function SideBeat({ beat, number }: SideBeatProps) {
   const openBeat = useUi((s) => s.openBeat)
+  const comments = useCommentCounts().things.get(beat.id)
   return (
     <li>
       <button className="side-beat" onClick={() => openBeat(beat.id)}>
@@ -313,6 +325,7 @@ function SideBeat({ beat, number }: SideBeatProps) {
         <span className="side-beat-title">
           <MentionText text={beat.title} fallback="Untitled beat" />
         </span>
+        <CommentCount n={comments} />
       </button>
     </li>
   )
@@ -322,6 +335,7 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
   const openBeat = useUi((s) => s.openBeat)
   const data: BeatDragData = { type: 'beat', beatId: beat.id, origin: 'sidebar' }
   const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: `sidebar:${beat.id}`, data })
+  const comments = useCommentCounts().things.get(beat.id)
   return (
     <li>
       <div
@@ -341,6 +355,7 @@ function DraggableSideBeat({ beat, number }: SideBeatProps) {
         <span className="side-beat-title">
           <MentionText text={beat.title} fallback="Untitled beat" />
         </span>
+        <CommentCount n={comments} />
       </div>
     </li>
   )
@@ -442,6 +457,7 @@ function CharacterRow({ character }: { character: Character }) {
   const setHighlight = useHighlightCleanup(character.id)
   const arcCount = arcs.filter((a) => a.characterIds.includes(character.id)).length
   const povCount = chapters.filter((c) => c.povCharacterId === character.id).length
+  const counts = useCommentCounts()
   const meta = [povCount ? `${povCount} POV` : '', arcCount ? `${arcCount} arc${arcCount === 1 ? '' : 's'}` : '']
     .filter(Boolean)
     .join(' · ')
@@ -458,6 +474,7 @@ function CharacterRow({ character }: { character: Character }) {
       <CharacterAvatar character={character} />
       <span className="character-row-name">{displayName(character)}</span>
       {meta && <span className="character-row-meta">{meta}</span>}
+      <CommentCount n={counts.things.get(character.id)} />
     </NavLink>
   )
 }
@@ -527,6 +544,7 @@ function ElementRow({ element }: { element: StoryElement }) {
   const beats = useStory((s) => s.beats)
   const setHighlight = useHighlightCleanup(element.id)
   const inBeats = Object.values(beats).filter((b) => mentions(b.title, element.id) || mentions(b.description, element.id)).length
+  const counts = useCommentCounts()
 
   return (
     <NavLink
@@ -539,6 +557,7 @@ function ElementRow({ element }: { element: StoryElement }) {
     >
       <ElementIcon element={element} />
       <span className="character-row-name">{displayName(element)}</span>
+      <CommentCount n={counts.things.get(element.id)} />
       {inBeats > 0 && (
         <span className="character-row-meta">
           {inBeats} beat{inBeats === 1 ? '' : 's'}

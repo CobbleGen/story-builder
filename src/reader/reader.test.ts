@@ -133,3 +133,16 @@ describe('writing progress', () => {
   })
 })
 
+
+describe('what the writer archived', () => {
+  it('is left out of the story, and listed in the overview', async () => {
+    const { archiveItem } = await import('../store/archive')
+    const sample = buildSampleStory()
+    const data = archiveItem(sample, 'chapter', sample.chapters[3].id, 0)
+    const text = overview(storyOf(data))
+    expect(text).toMatch(/## Archived\nPut away by the writer, out of the story \(and of everything here\), to bring back if they want: chapter “Low Tide”\./)
+    expect(text).not.toMatch(/4\. Low Tide/)
+    // Nothing archived: no such part.
+    expect(overview(storyOf(sample))).not.toMatch(/## Archived/)
+  })
+})

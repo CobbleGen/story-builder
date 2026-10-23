@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { reviewing } from '../review/mode'
 import {
   DndContext,
   DragOverlay,
@@ -11,6 +12,8 @@ import {
   rectIntersection,
   useSensor,
   useSensors,
+  type SensorDescriptor,
+  type SensorOptions,
   type Active,
   type CollisionDetection,
   type DragEndEvent,
@@ -31,6 +34,9 @@ import { chapterSortId, type ArcDropData, type BeatDragData, type ChapterDragDat
 import { flash } from '../lib/flash'
 import { useScrollMemory } from '../lib/trail'
 import { ChapterColumn, ChapterOverlay } from './ChapterColumn'
+
+/** Reviewing someone's story, nothing is dragged. */
+const NO_SENSORS: SensorDescriptor<SensorOptions>[] = []
 
 const dragData = (item: { data: { current?: unknown } } | null | undefined) =>
   item?.data.current as DragData | undefined
@@ -250,7 +256,7 @@ export function BoardPage() {
 
   return (
     <DndContext
-      sensors={sensors}
+      sensors={reviewing ? NO_SENSORS : sensors}
       collisionDetection={collisionDetection}
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       onDragStart={onDragStart}

@@ -7,6 +7,7 @@ import { useFind } from '../store/findStore'
 import { notify } from '../store/history'
 import { askConfirm } from '../lib/confirm'
 import { bookWords, draftBook, nextDraftName, openDraft } from '../lib/drafts'
+import { reviewing } from '../review/mode'
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`
 const quoted = (name: string) => `“${name}”`
@@ -120,11 +121,11 @@ export function DraftSwitcher() {
         <button
           className="draft-switcher-btn"
           onClick={() => setMenu((m) => !m)}
-          onDoubleClick={() => setRenaming(true)}
+          onDoubleClick={() => !reviewing && setRenaming(true)}
           aria-haspopup="menu"
           aria-expanded={menu}
           aria-label={`Draft: ${open.name}. Switch drafts or start one`}
-          title="Drafts: open another, or start one (double-click to rename this one)"
+          title={reviewing ? 'Drafts: read another' : 'Drafts: open another, or start one (double-click to rename this one)'}
         >
           <Files size={14} aria-hidden />
           <span className="draft-switcher-label">{open.name}</span>
@@ -144,37 +145,41 @@ export function DraftSwitcher() {
                 </span>
                 {d.id === open.id && <Check size={15} className="menu-check" aria-label="Open" />}
               </button>
-              {drafts.length > 1 && (
+              {drafts.length > 1 && !reviewing && (
                 <button className="icon-btn small danger draft-delete" onClick={() => void remove(d)} title={`Delete ${quoted(d.name)}`} aria-label={`Delete ${d.name}`}>
                   <Trash2 size={14} />
                 </button>
               )}
             </div>
           ))}
-          <button role="menuitem" className="menu-item separated" onClick={() => start(true)}>
-            <Copy size={16} />
-            <span className="draft-item-text">
-              <span>New draft from this one</span>
-              <span className="draft-item-size">A copy to rework; this one stays as it is</span>
-            </span>
-          </button>
-          <button role="menuitem" className="menu-item" onClick={() => start(false)}>
-            <FilePlus2 size={16} />
-            <span className="draft-item-text">
-              <span>New blank draft</span>
-              <span className="draft-item-size">No chapters, arcs or beats yet</span>
-            </span>
-          </button>
-          <button
-            role="menuitem"
-            className="menu-item"
-            onClick={() => {
-              setMenu(false)
-              setRenaming(true)
-            }}
-          >
-            <PenLine size={16} /> Rename this draft
-          </button>
+          {!reviewing && (
+            <>
+              <button role="menuitem" className="menu-item separated" onClick={() => start(true)}>
+                <Copy size={16} />
+                <span className="draft-item-text">
+                  <span>New draft from this one</span>
+                  <span className="draft-item-size">A copy to rework; this one stays as it is</span>
+                </span>
+              </button>
+              <button role="menuitem" className="menu-item" onClick={() => start(false)}>
+                <FilePlus2 size={16} />
+                <span className="draft-item-text">
+                  <span>New blank draft</span>
+                  <span className="draft-item-size">No chapters, arcs or beats yet</span>
+                </span>
+              </button>
+              <button
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  setMenu(false)
+                  setRenaming(true)
+                }}
+              >
+                <PenLine size={16} /> Rename this draft
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

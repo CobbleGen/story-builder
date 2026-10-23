@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { reviewing } from '../review/mode'
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
@@ -407,19 +408,21 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
 
   const context = useMemo(
     () => ({
+      mapId: mindMap.id,
       editingId,
-      setEditingId,
+      // (Reviewing someone's story, nothing on the map is typed in.)
+      setEditingId: reviewing ? () => {} : setEditingId,
       openItem,
       removeNode: (id: string) => void deleteElements({ nodes: [{ id }] }),
       dropTarget,
     }),
-    [editingId, openItem, deleteElements, dropTarget],
+    [mindMap.id, editingId, openItem, deleteElements, dropTarget],
   )
 
   return (
     <MapContext.Provider value={context}>
       <div className="map-page">
-        {paletteOpen ? (
+        {reviewing ? null : paletteOpen ? (
           <MapPalette onMap={onMap} onAdd={addInView} onAddPictures={(files) => void addPictures(files)} />
         ) : (
           <button className="beats-rail" onClick={togglePalette} title="Show the panel" aria-label="Show the add to map panel">
@@ -448,7 +451,7 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
           }}
           onDoubleClick={(e) => {
             // Double-click on empty canvas: a new sticky note right there.
-            if ((e.target as Element).classList.contains('react-flow__pane')) addAt({ kind: 'note' }, e.clientX, e.clientY)
+            if (!reviewing && (e.target as Element).classList.contains('react-flow__pane')) addAt({ kind: 'note' }, e.clientX, e.clientY)
           }}
         >
           <ReactFlow<StoryFlowNode, StoryFlowEdge>
@@ -499,7 +502,9 @@ function MapCanvas({ mindMap }: { mindMap: MindMap }) {
             // In map units: near a dot snaps to it; anywhere else on a card or row joins that.
             connectionRadius={24}
             zoomOnDoubleClick={false}
-            deleteKeyCode={['Backspace', 'Delete']}
+            deleteKeyCode={reviewing ? null : ['Backspace', 'Delete']}
+            nodesDraggable={!reviewing}
+            nodesConnectable={!reviewing}
             minZoom={0.1}
             maxZoom={2.5}
             attributionPosition="top-right"

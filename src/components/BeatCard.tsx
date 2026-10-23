@@ -8,6 +8,8 @@ import type { BeatDragData } from '../lib/dnd'
 import { Check, ChevronDown } from 'lucide-react'
 import { plainText } from '../lib/mentions'
 import { MentionText } from './MentionText'
+import { CommentsOn } from './Comments'
+import { reviewing } from '../review/mode'
 
 type ViewProps = HTMLAttributes<HTMLDivElement> & {
   beat: Beat
@@ -51,7 +53,7 @@ export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatC
             <Check size={12} strokeWidth={3} />
           </span>
         )}
-        {arcPicker ? (
+        {arcPicker && !reviewing ? (
           <ArcPicker beat={beat} arc={arc} />
         ) : (
           <span className="arc-chip">
@@ -59,6 +61,7 @@ export const BeatCardView = forwardRef<HTMLDivElement, ViewProps>(function BeatC
             <MentionText text={arc?.name ?? ''} fallback="Untitled arc" />
           </span>
         )}
+        {!overlay && <CommentsOn kind="beat" id={beat.id} className="beat-comments" />}
       </div>
     </div>
   )

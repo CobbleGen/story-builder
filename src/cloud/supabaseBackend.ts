@@ -1,5 +1,5 @@
 import { createClient, type User } from '@supabase/supabase-js'
-import { CloudError, type AssistantLink, type CloudBackend, type CloudStoryRow, type CloudUser } from './backend'
+import { CloudError, type AssistantLink, type CloudBackend, type CloudStoryRow, type CloudUser, type CommentRow, type ReviewLink } from './backend'
 
 // The backend on Supabase: its accounts (email and password), a `stories`
 // table that each account sees only its own rows of, and a private
@@ -12,6 +12,9 @@ const toUser = (u: User): CloudUser => ({ id: u.id, email: u.email ?? '' })
 const LINK = 'id, label, hint, created_at, last_used_at'
 type LinkRow = { id: string; label: string; hint: string; created_at: string; last_used_at: string | null }
 const toLink = (r: LinkRow): AssistantLink => ({ id: r.id, label: r.label, hint: r.hint, createdAt: r.created_at, lastUsedAt: r.last_used_at })
+const REVIEW = 'id, story_id, label, token, created_at, last_used_at'
+type ReviewRow = { id: string; story_id: string; label: string; token: string; created_at: string; last_used_at: string | null }
+const toReview = (r: ReviewRow): ReviewLink => ({ id: r.id, storyId: r.story_id, label: r.label, token: r.token, createdAt: r.created_at, lastUsedAt: r.last_used_at })
 
 /** Where links in account emails (confirming it, resetting the password) bring people back to: this app. */
 const here = () => `${location.origin}${location.pathname}`
@@ -27,7 +30,7 @@ const FRIENDLY: [RegExp, string][] = [
 ]
 
 /** A Supabase error as a CloudError the writer can read. */
-function fail(error: { message?: string; status?: number; name?: string } | null | undefined, fallback: string): never {
+export function fail(error: { message?: string; status?: number; name?: string } | null | undefined, fallback: string): never {
   const message = error?.message ?? ''
   if (/fetch|network|timed? ?out|load failed/i.test(message) || error?.name === 'AuthRetryableFetchError') {
     throw new CloudError('Can’t reach your account just now. Check the connection.', true)
@@ -136,6 +139,50 @@ export function supabaseBackend(url: string, key: string): CloudBackend {
     async revokeAssistantLink(id) {
       const { error } = await client.from('assistant_keys').delete().eq('id', id)
       if (error) fail(error, 'Couldn’t revoke the link.')
+    },
+
+    async listComments(storyId) {
+      const { data, error } = await client.rpc('writer_comments', { p_story: storyId })
+      if (error) fail(error, 'Couldn’t load the comments.')
+      return (data ?? []) as CommentRow[]
+    },
+
+    async addComment(storyId, thread, target, body, name) {
+      const { data, error } = await client.rpc('writer_add_comment', { p_story: storyId, p_thread: thread, p_target: target, p_body: body, p_name: name })
+      if (error) fail(error, 'Couldn’t post the comment.')
+      return data as string
+    },
+
+    async resolveComment(storyId, id, resolved, name) {
+      const { error } = await client.rpc('writer_resolve_comment', { p_story: storyId, p_comment: id, p_resolved: resolved, p_name: name })
+      if (error) fail(error, resolved ? 'Couldn’t resolve the comment.' : 'Couldn’t reopen the comment.')
+    },
+
+    async editComment(storyId, id, body) {
+      const { error } = await client.rpc('writer_edit_comment', { p_story: storyId, p_comment: id, p_body: body })
+      if (error) fail(error, 'Couldn’t change the comment.')
+    },
+
+    async removeComment(storyId, id) {
+      const { error } = await client.rpc('writer_remove_comment', { p_story: storyId, p_comment: id })
+      if (error) fail(error, 'Couldn’t delete the comment.')
+    },
+
+    async listReviewLinks(storyId) {
+      const { data, error } = await client.from('review_links').select(REVIEW).eq('story_id', storyId).order('created_at', { ascending: false })
+      if (error) fail(error, 'Couldn’t list the review links.')
+      return (data as ReviewRow[]).map(toReview)
+    },
+
+    async addReviewLink(storyId, label, token) {
+      const { data, error } = await client.from('review_links').insert({ story_id: storyId, label, token }).select(REVIEW).single()
+      if (error || !data) fail(error, 'Couldn’t make the link.')
+      return toReview(data as ReviewRow)
+    },
+
+    async revokeReviewLink(id) {
+      const { error } = await client.from('review_links').delete().eq('id', id)
+      if (error) fail(error, 'Couldn’t turn the link off.')
     },
 
     async listPictures(userId) {

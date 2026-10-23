@@ -21,6 +21,8 @@ import { MentionedIn } from '../components/MentionedIn'
 import { PortraitPicker } from '../components/PortraitPicker'
 import { NotInStory } from '../components/Archived'
 import { useArchive } from '../lib/useArchive'
+import { CommentsHere } from '../components/Comments'
+import { reviewing } from '../review/mode'
 
 const SUGGESTED_ATTRIBUTES = ['Age', 'Role', 'Appearance', 'Personality', 'Wants', 'Fears', 'Secret', 'Backstory']
 
@@ -108,17 +110,22 @@ function CharacterView({ character }: { character: Character }) {
             submitOnEnter
             onChange={(value) => updateCharacter(character.id, { name: value })}
           />
-          <button
-            className="icon-btn"
-            onClick={() => back(() => archive('character', character.id, name))}
-            title="Archive character: put them away, to bring back later"
-            aria-label="Archive character"
-          >
-            <Archive size={18} />
-          </button>
-          <button className="icon-btn danger" onClick={remove} title="Delete character" aria-label="Delete character">
-            <Trash2 size={18} />
-          </button>
+          <CommentsHere target={{ kind: 'character', id: character.id }} />
+          {!reviewing && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={() => back(() => archive('character', character.id, name))}
+                title="Archive character: put them away, to bring back later"
+                aria-label="Archive character"
+              >
+                <Archive size={18} />
+              </button>
+              <button className="icon-btn danger" onClick={remove} title="Delete character" aria-label="Delete character">
+                <Trash2 size={18} />
+              </button>
+            </>
+          )}
         </div>
         {showColors && (
           <div className="arc-colors character-colors">

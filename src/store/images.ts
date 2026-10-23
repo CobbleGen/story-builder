@@ -6,6 +6,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { openDb, request, transactionDone } from './idb'
 import { IMAGE_ID } from '../lib/id'
+import { reviewing } from '../review/mode'
 
 export { IMAGE_ID }
 
@@ -91,7 +92,8 @@ async function fromRemote(id: string): Promise<StoredImage | undefined> {
     // Its size is a guess, then; the picture still shows.
   }
   const image: StoredImage = { id, blob, type: blob.type, width, height, name: '', addedAt: Date.now() }
-  await putImage(image).catch(() => {})
+  // (A story being reviewed isn't kept in this browser, nor are its pictures.)
+  if (!reviewing) await putImage(image).catch(() => {})
   return image
 }
 
