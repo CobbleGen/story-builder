@@ -1,17 +1,19 @@
 import type { Editor } from '@tiptap/react'
 import { useEditorState } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
-import { Bold, Italic, MessageSquarePlus, Plus, Underline } from 'lucide-react'
+import { Bold, Italic, MessageSquarePlus, Plus, Replace, Underline } from 'lucide-react'
 
 interface Props {
   editor: Editor
   onNewBeat: () => void
   /** A comment on the selected words (when comments are on). */
   onComment?: () => void
+  /** A change suggested to them (an editor's, reviewing). */
+  onSuggest?: () => void
 }
 
 /** Floats over selected text: quick formatting, "new beat from this text", and a comment on it. Read-only, the comment alone. */
-export function SelectionMenu({ editor, onNewBeat, onComment }: Props) {
+export function SelectionMenu({ editor, onNewBeat, onComment, onSuggest }: Props) {
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -50,6 +52,11 @@ export function SelectionMenu({ editor, onNewBeat, onComment }: Props) {
       {onComment && (
         <button className="selection-beat-btn" onMouseDown={keep} onClick={onComment}>
           <MessageSquarePlus size={15} /> Comment
+        </button>
+      )}
+      {onSuggest && (
+        <button className="selection-beat-btn" onMouseDown={keep} onClick={onSuggest}>
+          <Replace size={15} /> Suggest
         </button>
       )}
     </BubbleMenu>

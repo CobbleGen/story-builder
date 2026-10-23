@@ -1,13 +1,15 @@
-import type { CommentTarget, CommentThread, StoryComment } from '../comments/model'
+import type { CommentTarget, CommentThread, StoryComment, SuggestField } from '../comments/model'
 import { commentOf, describeTarget, draftOf, inDraft, cardName, labelFor, threadsOf } from '../comments/model'
+import { fieldValue, fieldsFor, suggestionView } from '../comments/suggestions'
 import { docText, findAnchor, quoteIn, quoteLine } from '../comments/anchor'
 import { displayName } from '../lib/mentions'
 import { NotFound, count, findByName, findChapter, chapterList, type Story } from './story'
 
 // The comments on a story, in words, for an AI assistant acting as its
-// editor: what each is on (quoting the passage), who said what, and whether
-// it's resolved; and what an assistant names to comment on (a chapter and
-// the words it quotes from it, a beat, an arc, a character…) as a target.
+// editor: what each is on (quoting the passage), the change it suggests if
+// it's a suggestion, who said what, and whether it's resolved; and what an
+// assistant names to comment on (a chapter and the words it quotes from it,
+// a beat, an arc, a character…) or to change, as a target.
 
 const nameFor = (story: Story) => (id: string, label: unknown) => {
   const named = story.lookup.get(id)
@@ -37,9 +39,22 @@ function threadText(story: Story, t: CommentThread): string {
   const { label, gone } = describeTarget(t.target, story.data, story.lookup)
   const lines = [`- Comment ${t.id}${t.resolved ? ' (resolved)' : ''}, on ${label}${gone ? ' (no longer in the story)' : ''}`]
   if (t.target.kind === 'text') lines.push(`  On the words: “${quoteLine(t.target.quote, 300)}”${passageNote(story, t.target)}`)
+  const change = suggestionText(story, t)
+  if (change) lines.push(`  ${change}`)
   for (const c of [t.first, ...t.replies]) lines.push(`  ${c === t.first ? '' : '↳ '}${who(c)}, ${day(c.createdAt)}: ${c.body.replace(/\n+/g, ' / ')}`)
   if (t.resolved && t.first.resolvedBy !== null) lines.push(`  Resolved${t.first.resolvedBy ? ` by ${t.first.resolvedBy}` : ''}, ${day(t.first.resolvedAt ?? '')}.`)
   return lines.join('\n')
+}
+
+/** The change a suggestion suggests, and (while it's open) whether it can still be made as suggested. */
+function suggestionText(story: Story, t: CommentThread): string {
+  const s = t.target.suggest
+  if (!s) return ''
+  const view = suggestionView(t.target, story.data, story.lookup, nameFor(story))
+  const still = !t.resolved && view && !view.ready && view.note ? ` (${view.note.replace(/[.:]\s.*$/, '').replace(/\.$/, '')})` : ''
+  if ('text' in s) return s.text ? `Suggests instead: “${quoteLine(s.text, 300)}”${still}` : `Suggests cutting those words.${still}`
+  const what = view?.what.toLowerCase() ?? s.field
+  return `Suggests a new ${what}: “${quoteLine(story.plain(s.to), 300)}” (was “${quoteLine(story.plain(s.from), 200)}”)${still}`
 }
 
 /** Where a thread is listed: the story, a chapter (with its passages), or one of the other kinds. */
@@ -176,4 +191,47 @@ export function commentTarget(story: Story, on: CommentOn): { target: CommentTar
     } else target = { kind: 'map', id: map.id }
   } else target = { kind: 'story' }
   return { target: { ...target, label: labelFor(target, data, story.lookup) }, note }
+}
+
+/** What an assistant suggests: new words for a quoted passage, or a new value for one of a thing's fields. */
+export interface ChangeTo {
+  field?: string
+  text: string
+}
+
+/** The fields, as an assistant names them. */
+const FIELD_ARGS: Record<string, SuggestField> = { title: 'title', summary: 'summary', description: 'description', notes: 'description', when: 'when', name: 'name', text: 'text' }
+
+/**
+ * A suggested change's target, as it's kept with its comment: the passage
+ * or thing (see `commentTarget`) and the change; `what` it suggests, in a few
+ * words.
+ */
+export function suggestionTarget(story: Story, on: CommentOn, change: ChangeTo): { target: CommentTarget; note: string; what: string } {
+  const { target, note } = commentTarget(story, on)
+  const words = change.text.trim()
+  if (target.kind === 'text') {
+    if (change.field?.trim()) throw new NotFound('A passage is changed by its words alone: leave field out (or leave quote out, to change the chapter’s title or summary).')
+    const instead = words.replace(/\s*\n\s*/g, ' ')
+    if (instead === target.quote.trim()) throw new NotFound('That’s what the passage says already.')
+    return { target: { ...target, suggest: { text: instead } }, note, what: instead ? 'new words for the passage' : 'cutting the passage' }
+  }
+  if (target.kind === 'story')
+    throw new NotFound('Name what to change: a passage (chapter and quote), or a chapter, beat, arc, character, place or thing, or a card on a mind map, with the field to change.')
+  const fields = fieldsFor(target, story.data)
+  const names = fields.map((f) => (f.field === 'description' && target.kind === 'beat' ? 'description (its notes)' : f.field)).join(', ')
+  if (!fields.length)
+    throw new NotFound(
+      target.kind === 'map'
+        ? `Only a sticky note’s or text box’s words, or a group’s title, can be changed on a mind map. For a card that shows a chapter, character… suggest the change to that itself.`
+        : `Nothing on ${target.label} can be changed by a suggestion: comment on it instead.`,
+    )
+  const asked = change.field?.trim().toLowerCase()
+  const field = asked ? FIELD_ARGS[asked] : fields.length === 1 ? fields[0].field : undefined
+  const pick = fields.find((f) => f.field === field)
+  if (!pick) throw new NotFound(`${asked ? `There’s no ${asked} to change on ${target.label}.` : 'Name the field to change.'} What can be changed: ${names}.`)
+  if (!words && (pick.field === 'name' || (pick.field === 'title' && target.kind !== 'map'))) throw new NotFound(`A ${pick.label.toLowerCase()} can’t be empty.`)
+  const from = fieldValue(target, pick.field, story.data) ?? ''
+  if (story.plain(from).trim() === words) throw new NotFound(`That’s what its ${pick.label.toLowerCase()} says already.`)
+  return { target: { ...target, suggest: { field: pick.field, from, to: words } }, note, what: `a new ${pick.label.toLowerCase()}` }
 }

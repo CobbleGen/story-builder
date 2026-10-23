@@ -46,15 +46,26 @@ export function UndoNotice() {
   const notice = useHistory((s) => s.notice)
   useEffect(() => {
     if (!notice) return
-    // Longer notes stay longer.
-    const timer = setTimeout(() => useHistory.setState({ notice: null }), Math.max(2600, notice.text.length * 55))
+    // Longer notes stay longer, and those with a button long enough to press it.
+    const timer = setTimeout(() => useHistory.setState({ notice: null }), Math.max(notice.action ? 7000 : 2600, notice.text.length * 55))
     return () => clearTimeout(timer)
   }, [notice])
   if (!notice) return null
   const text = notice.text.charAt(0).toUpperCase() + notice.text.slice(1)
   return (
-    <div key={notice.id} className="undo-notice" role="status">
+    <div key={notice.id} className={`undo-notice${notice.action ? ' with-action' : ''}`} role="status">
       {text}
+      {notice.action && (
+        <button
+          className="undo-notice-action"
+          onClick={() => {
+            useHistory.setState({ notice: null })
+            notice.action?.run()
+          }}
+        >
+          {notice.action.label}
+        </button>
+      )}
     </div>
   )
 }

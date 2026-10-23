@@ -26,9 +26,48 @@ export type CommentTarget = (
 ) & {
   /** What it was called when the comment was made, for when it's gone. */
   label?: string
+  /** A change suggested to it, which the writer can accept (making it) or decline. */
+  suggest?: Suggestion
 }
 
 export type TargetKind = CommentTarget['kind']
+
+/**
+ * A suggested change: new words for a passage of the manuscript (`text`; ''
+ * to cut it), or a new value for one of a thing's fields (`field`, as it was
+ * when suggested in `from`, and `to`; mentions as tokens).
+ */
+export type Suggestion = { text: string } | { field: SuggestField; from: string; to: string }
+
+/** The fields a change can be suggested to, and what they're called. */
+export type SuggestField = 'title' | 'summary' | 'description' | 'name' | 'when' | 'text'
+
+export const SUGGEST_FIELDS: Partial<Record<TargetKind, { field: SuggestField; label: string }[]>> = {
+  chapter: [
+    { field: 'title', label: 'Title' },
+    { field: 'summary', label: 'Summary' },
+  ],
+  beat: [
+    { field: 'title', label: 'Title' },
+    { field: 'description', label: 'Notes' },
+    { field: 'when', label: 'When it happens' },
+  ],
+  arc: [
+    { field: 'name', label: 'Name' },
+    { field: 'description', label: 'Description' },
+  ],
+  character: [
+    { field: 'name', label: 'Name' },
+    { field: 'description', label: 'Description' },
+  ],
+  element: [
+    { field: 'name', label: 'Name' },
+    { field: 'description', label: 'Description' },
+  ],
+}
+
+/** Longest a suggested passage or field can be. */
+export const SUGGEST_MAX = 5000
 
 export interface StoryComment {
   id: string
@@ -60,6 +99,21 @@ const KINDS = new Set<TargetKind>(['story', 'chapter', 'text', 'beat', 'arc', 'c
 
 const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : undefined)
 
+const FIELDS = new Set<SuggestField>(['title', 'summary', 'description', 'name', 'when', 'text'])
+
+function suggestionOf(value: unknown, kind: TargetKind): Suggestion | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const v = value as Record<string, unknown>
+  if (kind === 'text') {
+    const text = str(v.text, SUGGEST_MAX)
+    return text === undefined ? undefined : { text }
+  }
+  const field = v.field as SuggestField
+  const to = str(v.to, SUGGEST_MAX)
+  if (!FIELDS.has(field) || to === undefined) return undefined
+  return { field, from: str(v.from, SUGGEST_MAX) ?? '', to }
+}
+
 /** A comment's target as saved, made right (null if it can't be). */
 export function targetOf(value: unknown): CommentTarget | null {
   if (!value || typeof value !== 'object') return null
@@ -67,8 +121,9 @@ export function targetOf(value: unknown): CommentTarget | null {
   const kind = v.kind as TargetKind
   if (!KINDS.has(kind)) return null
   const label = str(v.label, 300)
-  const extra = label ? { label } : {}
-  if (kind === 'story') return { kind, ...extra }
+  const suggest = kind === 'story' ? undefined : suggestionOf(v.suggest, kind)
+  const extra = { ...(label ? { label } : {}), ...(suggest ? { suggest } : {}) }
+  if (kind === 'story') return { kind, ...(label ? { label } : {}) }
   const id = str(v.id, 200)
   if (!id) return null
   if (kind === 'map') {

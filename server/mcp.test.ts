@@ -75,14 +75,15 @@ describe('the story server', () => {
       'get_writing_progress',
       'get_comments',
       'add_comment',
+      'suggest_change',
       'reply_to_comment',
       'resolve_comment',
     ])
-    // Everything reads, and nothing destroys; only commenting writes (comments, never the story).
+    // Everything reads, and nothing destroys; only commenting writes (comments and suggestions, never the story).
     const writes = tools.filter((t) => !t.annotations?.readOnlyHint).map((t) => t.name)
-    expect(writes).toEqual(['add_comment', 'reply_to_comment', 'resolve_comment'])
+    expect(writes).toEqual(['add_comment', 'suggest_change', 'reply_to_comment', 'resolve_comment'])
     expect(tools.some((t) => t.annotations?.destructiveHint)).toBe(false)
-    expect(client.getInstructions()).toMatch(/can comment on them, as an editor would/)
+    expect(client.getInstructions()).toMatch(/can comment on them and suggest changes, as an editor would/)
     const { prompts } = await client.listPrompts()
     expect(prompts.map((p) => p.name)).toEqual(['review_chapter', 'review_story', 'check_continuity', 'whats_next', 'edit_with_comments', 'answer_comments'])
     const prompt = await client.getPrompt({ name: 'review_chapter', arguments: { chapter: '3' } })
@@ -171,7 +172,7 @@ describe('the story server', () => {
     const html = await page.text()
     expect(html).toMatch(/reads the example story/)
     expect(html).toMatch(
-      /Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress · Comments · Add a comment · Reply to a comment · Resolve a comment/,
+      /Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress · Comments · Add a comment · Suggest a change · Reply to a comment · Resolve a comment/,
     )
     expect(html).toMatch(/claude mcp add --transport http story-builder https:\/\/story-builder\.example\/mcp\/example/)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/nope`, { headers: { accept: 'text/html' } }), STORE)).status).toBe(403)
@@ -230,6 +231,45 @@ describe('comments', () => {
     expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'x', arc: 'y', comment: 'x' } }))).toMatch(/one thing at a time/)
     expect(text(await client.callTool({ name: 'add_comment', arguments: { quote: 'The same kettle', comment: 'x' } }))).toMatch(/needs the chapter/)
     expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: 'nope', reply: 'x' } }))).toMatch(/No comment nope/)
+  })
+
+  it('suggests changes: new words for a passage, a beat’s title, a sticky note’s words', async () => {
+    const client = await connect('example')
+    const passage = text(
+      await client.callTool({
+        name: 'suggest_change',
+        arguments: { chapter: '3', quote: 'The same kettle with the dent', new_text: 'The dented kettle', comment: 'Fewer words.' },
+      }),
+    )
+    expect(passage).toMatch(/^Suggestion \S+ added, on Chapter 3: The Logbook: new words for the passage\. The writer sees it in Story Builder and can accept or decline it\./)
+    expect(text(await client.callTool({ name: 'suggest_change', arguments: { beat: 'the lamp goes dark', field: 'title', new_text: 'The lamp fails' } }))).toMatch(
+      /on Beat “The lamp goes dark”: a new title\./,
+    )
+    expect(text(await client.callTool({ name: 'suggest_change', arguments: { mind_map: 'who knows', card: 'smuggling', new_text: 'Theo knows about the smuggling.' } }))).toMatch(
+      /Sticky note “What if Theo already knows about the smuggling\?”: a new text\./,
+    )
+    const all = text(await client.callTool({ name: 'get_comments', arguments: {} }))
+    expect(all).toMatch(/On the words: “The same kettle with the dent”\n  Suggests instead: “The dented kettle”\n  you \(AI assistant\), [\d-]+ [\d:]+: Fewer words\./)
+    expect(all).toMatch(/Suggests a new title: “The lamp fails” \(was “The lamp goes dark”\)\n  you \(AI assistant\), [\d-]+ [\d:]+: Suggests a new title\./)
+    expect(all).toMatch(/Suggests a new text: “Theo knows about the smuggling\.” \(was “What if Theo already knows about the smuggling\?”\)/)
+  })
+
+  it('says what’s wrong with a change it can’t suggest', async () => {
+    const client = await connect('example')
+    const call = async (args: Record<string, unknown>) => {
+      const result = await client.callTool({ name: 'suggest_change', arguments: args })
+      expect(result.isError).toBe(true)
+      return text(result)
+    }
+    expect(await call({ new_text: 'x' })).toMatch(/Name what to change/)
+    expect(await call({ beat: 'the lamp goes dark', new_text: 'x' })).toMatch(/Name the field to change\. What can be changed: title, description \(its notes\), when\./)
+    expect(await call({ arc: 'theo', field: 'summary', new_text: 'x' })).toMatch(/There’s no summary to change on Arc “[^”]+”\. What can be changed: name, description\./)
+    expect(await call({ beat: 'the lamp goes dark', field: 'title', new_text: 'The lamp goes dark' })).toMatch(/That’s what its title says already/)
+    expect(await call({ beat: 'the lamp goes dark', field: 'title', new_text: '  ' })).toMatch(/A title can’t be empty/)
+    expect(await call({ chapter: '3', quote: 'The same kettle with the dent', field: 'title', new_text: 'x' })).toMatch(/changed by its words alone/)
+    expect(await call({ chapter: '3', quote: 'The same kettle with the dent', new_text: 'The same kettle with the dent' })).toMatch(/says already/)
+    expect(await call({ chapter: '3', quote: 'words that are nowhere', new_text: 'x' })).toMatch(/Those words aren’t in Chapter 3/)
+    expect(await call({ mind_map: 'who knows', new_text: 'x' })).toMatch(/Name the card on the mind map/)
   })
 
   it('comments through the account, on the draft asked for, and reads that draft', async () => {

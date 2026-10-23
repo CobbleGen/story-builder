@@ -5412,7 +5412,7 @@ a {
   border: 0;
   border-radius: 7px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-size: 13px;
   font-weight: 500;
 }
@@ -5463,6 +5463,34 @@ a {
   transform: translateX(-50%);
   animation: notice-in 0.16s ease-out;
   pointer-events: none;
+}
+
+.undo-notice.with-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 8px;
+  pointer-events: auto;
+}
+
+.undo-notice-action {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.undo-notice-action:hover {
+  background: color-mix(in srgb, var(--on-primary) 26%, transparent);
+}
+
+.undo-notice-action:focus-visible {
+  outline: 2px solid var(--on-primary);
+  outline-offset: 1px;
 }
 
 @keyframes notice-in {
@@ -8275,6 +8303,132 @@ button.tl-new-arc:hover {
 
 .comment-mark.active {
   background: color-mix(in srgb, var(--comment) 28%, transparent);
+}
+
+/* A resolved one, shown while the panel shows the resolved. */
+.comment-mark.resolved {
+  background: color-mix(in srgb, var(--ink-3) 12%, transparent);
+  border-bottom: 2px dotted var(--ink-3);
+}
+
+.comment-mark.resolved.active {
+  background: color-mix(in srgb, var(--ink-3) 24%, transparent);
+}
+
+/* A suggested change in the text: the words struck through, the words suggested just after. */
+.comment-mark.suggested {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  border-bottom: 0;
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+  text-decoration-thickness: 1.5px;
+}
+
+.comment-mark.suggested.active {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.suggest-insert {
+  margin-left: 0.25em;
+  padding: 0 1px;
+  border-bottom: 2px solid var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: color-mix(in srgb, var(--success) 70%, var(--ink));
+  cursor: pointer;
+}
+
+.suggest-insert.active {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+/* A suggested change, in its thread. */
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--column);
+}
+
+.suggestion-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.suggestion-change {
+  margin: 0;
+  font: 13.5px/1.5 var(--serif);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.suggestion-change del {
+  color: var(--ink-2);
+  text-decoration-color: var(--danger);
+  text-decoration-thickness: 1.5px;
+}
+
+.suggestion-change ins {
+  color: color-mix(in srgb, var(--success) 70%, var(--ink));
+  text-decoration: underline;
+  text-decoration-color: var(--success);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.suggestion .comment-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.suggest-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.suggest-fields button {
+  padding: 3px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: 12px var(--sans);
+  cursor: pointer;
+}
+
+.suggest-fields button:hover {
+  color: var(--ink);
+}
+
+.suggest-fields button.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.suggest-input {
+  --pad: 7px 9px;
+  min-height: 64px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.suggest-input:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+.write-suggest {
+  flex: none;
 }
 
 /* Sharing for comments. */

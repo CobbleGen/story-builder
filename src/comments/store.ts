@@ -1,6 +1,10 @@
 import { create } from 'zustand'
-import { useStory } from '../store/storyStore'
+import { pickData, saveWriting, useStory } from '../store/storyStore'
+import { displayName } from '../lib/mentions'
+import { archivedNamed } from '../lib/archived'
+import { suggestedChange } from './makeChange'
 import { useUi } from '../store/uiStore'
+import { useHistory } from '../store/history'
 import { lookupOf } from '../lib/mentions'
 import { commentOf, countComments, labelFor, threadsOf, type CommentCounts, type CommentTarget, type CommentThread, type StoryComment, type TargetKind } from './model'
 
@@ -114,6 +118,43 @@ export const resolveThread = (thread: string, resolved: boolean) => act((b) => b
 export const editComment = (id: string, body: string) => act((b) => b.edit(id, body.trim()))
 export const removeComment = (id: string) => act((b) => b.remove(id))
 
+/** The words with which a suggested change is accepted or declined, as a reply in its thread. */
+export const ACCEPTED = 'Accepted the suggested change.'
+export const DECLINED = 'Declined the suggested change.'
+
+/**
+ * Makes a suggested change (one step to undo), then says so in its thread
+ * and resolves it. Throws, changing nothing, when it can't be made as
+ * suggested any more.
+ */
+export async function acceptSuggestion(thread: CommentThread) {
+  saveWriting()
+  const story = useStory.getState()
+  // (Named as the editor names them, archived ones too, so the words are found as they're shown.)
+  const lookup = lookupOf([...story.characters, ...story.elements, ...archivedNamed(story)])
+  const nameOf = (id: string, label: unknown) => {
+    const named = lookup.get(id)
+    return named ? displayName(named) : String(label ?? '')
+  }
+  const change = await suggestedChange(pickData(story), thread.target, lookup, nameOf)
+  if (!change) throw new Error('This change can’t be made as suggested any more: the story has changed since. Make it by hand, or decline it.')
+  useStory.getState().applySuggestion(change)
+  await act((b) => b.add(thread.id, null, ACCEPTED))
+  await act((b) => b.resolve(thread.id, true))
+}
+
+/** Takes back the change last accepted, while it's still the last thing done to the story. */
+export function undoAccepted() {
+  const last = useHistory.getState().past.at(-1)
+  if (last?.key.startsWith('acceptSuggestion')) useStory.getState().undo()
+}
+
+/** Leaves the story as it is, and says so in the thread, resolving it. */
+export async function declineSuggestion(thread: CommentThread) {
+  await act((b) => b.add(thread.id, null, DECLINED))
+  await act((b) => b.resolve(thread.id, true))
+}
+
 /** Whether comments can be read and made here: signed in with the story in the account, or reviewing. */
 export const useCommentsOn = () => useComments((s) => !!s.backend)
 
@@ -155,13 +196,17 @@ interface PanelState {
   focus: string | null
   /** A new comment being written, on this. */
   compose: CommentTarget | null
+  /** The new comment suggests a change (to what `compose` is on). */
+  suggesting: boolean
   resolved: boolean
 }
 
-export const useCommentPanel = create<PanelState>(() => ({ open: false, filter: null, focus: null, compose: null, resolved: false }))
+export const useCommentPanel = create<PanelState>(() => ({ open: false, filter: null, focus: null, compose: null, suggesting: false, resolved: false }))
 
 /** Opens the comments: on one thing, at one thread, or to write a new one. */
-export function openComments(options: { filter?: CommentFilter | null; focus?: string | null; compose?: CommentTarget | null } = {}) {
+export function openComments(
+  options: { filter?: CommentFilter | null; focus?: string | null; compose?: CommentTarget | null; suggesting?: boolean } = {},
+) {
   // (The beat being edited makes way: its comments are in the panel, and it opens again from there.)
   if (useUi.getState().editingBeatId) useUi.getState().openBeat(null)
   useCommentPanel.setState({
@@ -169,19 +214,20 @@ export function openComments(options: { filter?: CommentFilter | null; focus?: s
     filter: options.filter ?? null,
     focus: options.focus ?? null,
     compose: options.compose ?? null,
+    suggesting: !!options.suggesting,
     ...(options.focus ? { resolved: !!useComments.getState().threads.find((t) => t.id === options.focus)?.resolved } : {}),
   })
 }
 
-export const closeComments = () => useCommentPanel.setState({ open: false, compose: null, focus: null })
+export const closeComments = () => useCommentPanel.setState({ open: false, compose: null, suggesting: false, focus: null })
 
-/** Opens the panel with a new comment on `target`, named as it is now (for when it's gone). */
-export function startComment(target: CommentTarget) {
+/** Opens the panel with a new comment on `target`, named as it is now (for when it's gone); with `suggesting`, one suggesting a change to it. */
+export function startComment(target: CommentTarget, suggesting = false) {
   const data = useStory.getState()
   const lookup = lookupOf([...data.characters, ...data.elements])
   const draft = 'id' in target && ['chapter', 'text', 'beat', 'arc'].includes(target.kind) ? { draft: data.draft } : {}
   const named = { ...target, ...draft } as CommentTarget
-  openComments({ filter: filterFor(named), compose: { ...named, label: labelFor(named, data, lookup) } })
+  openComments({ filter: filterFor(named), compose: { ...named, label: labelFor(named, data, lookup) }, suggesting })
 }
 
 export const filterFor = (t: CommentTarget): CommentFilter =>

@@ -24,8 +24,14 @@ export interface HistoryEntry {
 interface HistoryState {
   past: HistoryEntry[]
   future: HistoryEntry[]
-  /** A short note after undoing or redoing, like "Undid delete beat". */
-  notice: { text: string; id: number } | null
+  /** A short note after undoing or redoing, like "Undid delete beat"; with something to do about it, perhaps. */
+  notice: { text: string; id: number; action?: NoticeAction } | null
+}
+
+/** A button on a notice ("Undo"). */
+export interface NoticeAction {
+  label: string
+  run: () => void
 }
 
 export const useHistory = create<HistoryState>(() => ({ past: [], future: [], notice: null }))
@@ -125,6 +131,7 @@ const LABELS: Record<string, string> = {
   importChapters: 'import chapters',
   // "replace “Theo”"; see labelOf.
   replaceText: 'replace text',
+  acceptSuggestion: 'accept a suggested change',
 }
 
 export const labelFor = (name: string) => LABELS[name] ?? 'change'
@@ -224,9 +231,9 @@ export function restore(copy: StoryData, now: StoryData, takenAt: number): Story
 
 let noticeId = 0
 
-/** A brief note of something done, where undo notes go ("Archived chapter 3…"). */
-export function notify(text: string) {
-  useHistory.setState({ notice: { text, id: ++noticeId } })
+/** A brief note of something done, where undo notes go ("Archived chapter 3…"); with a button, `action`. */
+export function notify(text: string, action?: NoticeAction) {
+  useHistory.setState({ notice: { text, id: ++noticeId, ...(action ? { action } : {}) } })
 }
 
 /** Steps back (or forward) through the history, handing the story to `apply`. */

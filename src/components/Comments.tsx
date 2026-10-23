@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUpRight, Bot, Check, Feather, MessageSquare, MessageSquarePlus, MoreHorizontal, PenLine, RotateCcw, X } from 'lucide-react'
+import { ArrowUpRight, Bot, Check, Feather, MessageSquare, MessageSquarePlus, MoreHorizontal, PenLine, Replace, RotateCcw, X } from 'lucide-react'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { notify } from '../store/history'
 import { askConfirm } from '../lib/confirm'
 import { when } from '../lib/when'
 import { displayName } from '../lib/mentions'
+import { reviewing } from '../review/mode'
+import { MentionTextarea } from './MentionTextarea'
+import { fieldValue, fieldsFor, suggestionView } from '../comments/suggestions'
 import { docText, findAnchor, quoteLine } from '../comments/anchor'
 import {
   authorName,
@@ -16,12 +19,16 @@ import {
   type CommentTarget,
   type CommentThread,
   type StoryComment,
+  type SuggestField,
   type TargetKind,
 } from '../comments/model'
 import { useGoTo } from '../comments/goTo'
 import {
+  acceptSuggestion,
   addComment,
   closeComments,
+  declineSuggestion,
+  undoAccepted,
   filterFor,
   startComment,
   editComment,
@@ -144,7 +151,7 @@ function Panel() {
   const threads = useComments((s) => s.threads)
   const error = useComments((s) => s.error)
   const loaded = useComments((s) => s.loaded)
-  const { filter, focus, compose, resolved } = useCommentPanel()
+  const { filter, focus, compose, suggesting, resolved } = useCommentPanel()
   const data = useStory((s) => s)
   const lookup = useMentionLookup()
   const viewer = useViewer()
@@ -194,7 +201,7 @@ function Panel() {
       </div>
       <div className="comments-scroll">
         {compose ? (
-          <Composer target={compose} />
+          <Composer key={`${JSON.stringify(compose)}:${suggesting}`} target={compose} />
         ) : (
           <button className="comments-new" onClick={() => startComment(filter && filter.kind !== 'story' ? filterTarget(filter) : { kind: 'story' })}>
             <MessageSquarePlus size={16} /> {filterLabel && filter?.kind !== 'story' ? `Comment on ${filterLabel}` : 'Comment on the whole story'}
@@ -321,13 +328,14 @@ function ThreadCard({ thread, focused }: { thread: CommentThread; focused: boole
         )}
         {gone && <span className="comment-note">No longer in the story</span>}
       </div>
-      {thread.target.kind === 'text' && (
+      {thread.target.kind === 'text' && !thread.target.suggest && (
         <blockquote className="comment-quote">
           {quoteLine(thread.target.quote, 220)}
           {passage === 'changed' && <span className="comment-note"> The words have changed since.</span>}
           {passage === 'gone' && !gone && <span className="comment-note"> Not in the chapter any more.</span>}
         </blockquote>
       )}
+      {thread.target.suggest && <SuggestionBox thread={thread} />}
       <Comment comment={thread.first} viewer={viewer} />
       {thread.replies.map((r) => (
         <Comment key={r.id} comment={r} viewer={viewer} reply />
@@ -339,7 +347,9 @@ function ThreadCard({ thread, focused }: { thread: CommentThread; focused: boole
       )}
       <div className="comment-actions">
         <Reply thread={thread} />
-        {thread.resolved ? (
+        {thread.target.suggest && !thread.resolved && viewer === 'writer' ? (
+          <SuggestionActions thread={thread} />
+        ) : thread.resolved ? (
           <button className="btn ghost small" disabled={busy} onClick={() => void resolve(false)}>
             <RotateCcw size={14} /> Reopen
           </button>
@@ -513,8 +523,69 @@ function Reply({ thread }: { thread: CommentThread }) {
   )
 }
 
-/** Writing a new comment on something. */
+/** A suggested change, as it would be made: what's there, struck through, and what's suggested. */
+function SuggestionBox({ thread }: { thread: CommentThread }) {
+  const data = useStory((s) => s)
+  const lookup = useMentionLookup()
+  const view = suggestionView(thread.target, data, lookup, nameFrom(lookup))
+  if (!view) return null
+  return (
+    <div className="suggestion">
+      <span className="suggestion-what">
+        <Replace size={13} aria-hidden /> Suggested change{view.what === 'The words' ? '' : `: ${view.what.toLowerCase()}`}
+      </span>
+      <p className="suggestion-change">
+        {view.from && <del>{quoteLine(view.from, 400)}</del>} {view.to ? <ins>{quoteLine(view.to, 400)}</ins> : <em className="comment-note">(cut)</em>}
+      </p>
+      {!thread.resolved && view.note && <p className="comment-note">{view.note}</p>}
+    </div>
+  )
+}
+
+const nameFrom = (lookup: ReturnType<typeof useMentionLookup>) => (id: string, label: unknown) => {
+  const m = lookup.get(id)
+  return m ? displayName(m) : String(label ?? '')
+}
+
+/** The writer's buttons on a suggested change: make it, or not. */
+function SuggestionActions({ thread }: { thread: CommentThread }) {
+  const data = useStory((s) => s)
+  const lookup = useMentionLookup()
+  const [busy, setBusy] = useState(false)
+  const view = suggestionView(thread.target, data, lookup, nameFrom(lookup))
+  const run = async (accept: boolean) => {
+    setBusy(true)
+    try {
+      if (accept) await acceptSuggestion(thread)
+      else await declineSuggestion(thread)
+      if (accept) notify('Change made.', { label: 'Undo', run: undoAccepted })
+      else notify('Declined: the story stays as it is.')
+    } catch (error) {
+      notify(message(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <button className="btn ghost small" disabled={busy} onClick={() => void run(false)} title="Leave it as it is, and resolve this">
+        <X size={14} /> Decline
+      </button>
+      <button className="btn primary small" disabled={busy || !view?.ready} onClick={() => void run(true)} title="Make the change, and resolve this">
+        <Check size={14} /> Accept
+      </button>
+    </>
+  )
+}
+
+/** Writing a new comment on something (or suggesting a change to it). */
 function Composer({ target }: { target: CommentTarget }) {
+  const suggesting = useCommentPanel((s) => s.suggesting)
+  if (suggesting) return <SuggestComposer target={target} />
+  return <CommentComposer target={target} />
+}
+
+function CommentComposer({ target }: { target: CommentTarget }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const data = useStory((s) => s)
@@ -570,6 +641,98 @@ function Composer({ target }: { target: CommentTarget }) {
   )
 }
 
+/** Suggesting a change: new words for a passage, or a new value for one of a thing's fields. */
+function SuggestComposer({ target }: { target: CommentTarget }) {
+  const data = useStory((s) => s)
+  const lookup = useMentionLookup()
+  const fields = target.kind === 'text' ? [] : fieldsFor(target, data)
+  const [field, setField] = useState<SuggestField | undefined>(fields[0]?.field)
+  const was = target.kind === 'text' ? target.quote : field ? (fieldValue(target, field, data) ?? '') : ''
+  const [to, setTo] = useState(was)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const { label } = describeTarget(target, data, lookup)
+  // (A name, or a title but a group's, can't be suggested away.)
+  const emptied = target.kind !== 'text' && !to.trim() && (field === 'name' || (field === 'title' && target.kind !== 'map'))
+  const changed = (to.trim() !== was.trim() || (target.kind === 'text' && to === '')) && !emptied
+  const pick = (f: SuggestField) => {
+    setField(f)
+    setTo(fieldValue(target, f, data) ?? '')
+  }
+  const send = async () => {
+    if (!changed || busy) return
+    setBusy(true)
+    try {
+      const suggest = target.kind === 'text' ? { text: to.trim() } : { field: field!, from: was, to: to.trim() }
+      const what = target.kind === 'text' ? (to.trim() ? 'new words for this passage' : 'cutting this passage') : `a new ${fields.find((f) => f.field === field)?.label.toLowerCase() ?? 'value'}`
+      const id = await addComment({ ...target, suggest }, note.trim() || `Suggests ${what}.`)
+      useCommentPanel.setState({ compose: null, suggesting: false, focus: id, resolved: false })
+      notify('Suggestion sent: the writer can accept or decline it.')
+    } catch (error) {
+      notify(message(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (target.kind !== 'text' && !fields.length) return <CommentComposer target={target} />
+  return (
+    <form
+      className="comment-thread composing suggesting"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void send()
+      }}
+    >
+      <div className="comment-on">
+        <span className="comment-on-label">Suggest a change to {label}</span>
+      </div>
+      {target.kind === 'text' ? (
+        <>
+          <blockquote className="comment-quote">{quoteLine(target.quote, 220)}</blockquote>
+          <label className="field">
+            <span className="field-label">Instead (empty to cut it)</span>
+            <textarea className="plain-input" value={to} autoFocus rows={4} maxLength={5000} onChange={(e) => setTo(e.target.value)} aria-label="Suggested words" />
+          </label>
+        </>
+      ) : (
+        <>
+          {fields.length > 1 && (
+            <div className="suggest-fields" role="radiogroup" aria-label="What to change">
+              {fields.map((f) => (
+                <button key={f.field} type="button" role="radio" aria-checked={f.field === field} className={f.field === field ? 'active' : ''} onClick={() => pick(f.field)}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <MentionTextarea key={field} suggesting autoFocus className="suggest-input" value={to} onChange={setTo} aria-label="Suggested words" />
+        </>
+      )}
+      <textarea className="plain-input" value={note} rows={2} maxLength={4000} placeholder="Why (optional)" aria-label="Why" onChange={(e) => setNote(e.target.value)} />
+      <div className="comment-form-actions">
+        <button className="btn primary small" disabled={!changed || busy}>
+          {busy ? 'Sending…' : 'Suggest'}
+        </button>
+        <button type="button" className="btn ghost small" onClick={() => useCommentPanel.setState({ compose: null, suggesting: false })}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** A button to suggest a change to something (for an editor reviewing the story). */
+export function SuggestButton({ target, className = 'btn ghost small' }: { target: CommentTarget; className?: string }) {
+  const on = useCommentsOn()
+  const changeable = useStory((s) => target.kind === 'text' || fieldsFor(target, s).length > 0)
+  if (!on || !reviewing || !changeable) return null
+  return (
+    <button type="button" className={className} onClick={() => startComment(target, true)}>
+      <Replace size={15} /> Suggest a change
+    </button>
+  )
+}
+
 /**
  * The comments on one thing, in its own page or panel (a beat, an arc, a
  * character…): a count and a button to start one, opening the panel.
@@ -587,6 +750,7 @@ export function CommentsHere({ target }: { target: CommentTarget }) {
       <button className="btn ghost small" onClick={() => startComment(target)}>
         <MessageSquarePlus size={15} /> Comment
       </button>
+      <SuggestButton target={target} />
       {mine.length > 0 && (
         <button className="link-btn" onClick={() => openComments({ filter })}>
           {open.length ? plural(open.length, 'open comment') : `${plural(mine.length - open.length, 'resolved comment')}`}

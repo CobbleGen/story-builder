@@ -38,7 +38,7 @@ import { CommentHighlight, markedAt, setCommentMarks, type MarkedPassage } from 
 import { anchorAt, docText, type TextAnchor } from '../comments/anchor'
 import { inDraft } from '../comments/model'
 import { openComments, startComment, useCommentCounts, useCommentPanel, useComments, useCommentsOn } from '../comments/store'
-import { CommentCount, CommentsOn } from '../components/Comments'
+import { CommentCount, CommentsOn, SuggestButton } from '../components/Comments'
 import { reviewing } from '../review/mode'
 import type { RichNode } from '../types'
 
@@ -289,15 +289,18 @@ function ChapterWriter({ chapter, index }: WriterProps) {
   const threads = useComments((s) => s.threads)
   const openDraftId = useStory((s) => s.draft)
   const looking = useCommentPanel((s) => (s.open ? s.focus : null))
+  // Resolved ones are marked only while the panel shows the resolved comments.
+  const showingResolved = useCommentPanel((s) => s.open && s.resolved)
   const passages = useMemo<MarkedPassage[]>(
     () =>
       threads
-        .filter((t) => t.target.kind === 'text' && t.target.id === chapter.id && inDraft(t.target, openDraftId) && (!t.resolved || t.id === looking))
+        .filter((t) => t.target.kind === 'text' && t.target.id === chapter.id && inDraft(t.target, openDraftId) && t.resolved === showingResolved)
         .map((t) => {
-          const { quote, prefix, suffix } = t.target as TextAnchor
-          return { id: t.id, quote, prefix, suffix }
+          const { quote, prefix, suffix, suggest } = t.target as TextAnchor & { suggest?: { text?: string } }
+          // (A resolved suggestion is just where it was: accepted or not, there's no change to show.)
+          return { id: t.id, quote, prefix, suffix, resolved: t.resolved, suggest: !t.resolved && typeof suggest?.text === 'string' ? suggest.text : undefined }
         }),
-    [threads, chapter.id, openDraftId, looking],
+    [threads, chapter.id, openDraftId, showingResolved],
   )
   const nameOf = useCallback(
     (id: string, label: unknown) => {
@@ -306,9 +309,6 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     },
     [lookup],
   )
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) setCommentMarks(editor, passages, looking, nameOf)
-  }, [editor, passages, looking, nameOf])
 
   // Opened from a comment: its passage, in the middle of the page, with the comment beside it.
   const wantComment = (location.state as { comment?: string } | null)?.comment
@@ -344,6 +344,11 @@ function ChapterWriter({ chapter, index }: WriterProps) {
       // Text that can't be read stays as the editor has it.
     }
   }, [stored, editor])
+
+  // (After the text, so passages come back once it's replaced from outside: a change accepted, or undone.)
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) setCommentMarks(editor, passages, looking, nameOf)
+  }, [editor, passages, looking, nameOf, stored])
 
   // Find and replace: Ctrl+F (⌘F) to find, Ctrl+H or Ctrl+Alt+F (⌘⌥F) to replace; what's selected is what's found.
   const findOpen = useFind((s) => s.open)
@@ -447,11 +452,11 @@ function ChapterWriter({ chapter, index }: WriterProps) {
     setDraft({ from, to, ...titleFrom(text) })
   }
 
-  const commentOnSelection = () => {
+  const commentOnSelection = (suggesting = false) => {
     const { from, to, empty } = editor.state.selection
     if (empty) return
     const anchor = anchorAt(docText(editor.state.doc.toJSON() as RichNode, nameOf), from, to)
-    if (anchor) startComment({ kind: 'text', id: chapter.id, ...anchor })
+    if (anchor) startComment({ kind: 'text', id: chapter.id, ...anchor }, suggesting)
   }
 
   const createBeat = ({ arcId, title, description }: { arcId: string; title: string; description: string }) => {
@@ -486,6 +491,7 @@ function ChapterWriter({ chapter, index }: WriterProps) {
         </select>
       </label>
       <CommentsOn kind="chapter" id={chapter.id} className="write-comments" />
+      <SuggestButton target={{ kind: 'chapter', id: chapter.id }} className="btn ghost small write-suggest" />
       <span className="write-head-pickers">
         <PovPicker chapter={chapter} />
       </span>
@@ -613,7 +619,12 @@ function ChapterWriter({ chapter, index }: WriterProps) {
           <span className={`save-state ${saveStatus === 'error' ? 'error' : ''}`}>{saveLabel}</span>
         </div>
       </div>
-      <SelectionMenu editor={editor} onNewBeat={openNewBeat} onComment={commenting ? commentOnSelection : undefined} />
+      <SelectionMenu
+        editor={editor}
+        onNewBeat={openNewBeat}
+        onComment={commenting ? () => commentOnSelection() : undefined}
+        onSuggest={commenting && reviewing ? () => commentOnSelection(true) : undefined}
+      />
       {draft && (
         <NewBeatDialog
           title={draft.title}

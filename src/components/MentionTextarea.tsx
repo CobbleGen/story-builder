@@ -43,6 +43,8 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
   onSubmit?: (value: string) => void
   /** Plain text: no mentions or suggestions. */
   plain?: boolean
+  /** Written in even while reviewing someone's story (a suggested change). */
+  suggesting?: boolean
 }
 
 type Option = { kind: 'item'; item: Mentionable } | { kind: 'create'; what: NewMentioned; name: string }
@@ -66,6 +68,7 @@ export function MentionTextarea({
   submitOnEnter,
   onSubmit,
   plain,
+  suggesting,
   onKeyDown,
   onBlur,
   onFocus,
@@ -261,7 +264,7 @@ export function MentionTextarea({
         rows={1}
         {...rest}
         // (Reviewing someone's story: read, not written in.)
-        readOnly={reviewing || rest.readOnly}
+        readOnly={(reviewing && !suggesting) || rest.readOnly}
         className="mention-input"
         value={display}
         role={plain ? undefined : 'combobox'}

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Archive, ArrowLeftToLine, ArrowRightToLine, GripHorizontal, MessageSquarePlus, PenLine, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeftToLine, ArrowRightToLine, GripHorizontal, MessageSquarePlus, PenLine, Replace, Trash2 } from 'lucide-react'
 import type { Chapter } from '../types'
 import { useMentionLookup, useStory } from '../store/storyStore'
 import { Link } from 'react-router-dom'
@@ -118,6 +118,9 @@ export function ChapterColumn({
             items={[
               ...(commenting
                 ? [{ label: 'Comment on chapter', icon: <MessageSquarePlus size={16} />, onSelect: () => startComment({ kind: 'chapter', id: chapter.id }) }]
+                : []),
+              ...(commenting && reviewing
+                ? [{ label: 'Suggest a change…', icon: <Replace size={16} />, onSelect: () => startComment({ kind: 'chapter', id: chapter.id }, true) }]
                 : []),
               ...(reviewing ? [] : chapterActions),
             ]}

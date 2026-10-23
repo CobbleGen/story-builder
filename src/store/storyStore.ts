@@ -96,6 +96,8 @@ interface StoryActions {
   /** Deletes a draft that isn't open. */
   deleteDraft: (...args: Tail<Parameters<typeof drafts.deleteDraft>>) => void
   moveDraft: (...args: Tail<Parameters<typeof drafts.moveDraft>>) => void
+  /** A change someone suggested, accepted (one step to undo). */
+  applySuggestion: (change: (data: StoryData) => StoryData) => void
   /** Swaps in a whole story (import, new story, sample). */
   replaceStory: (data: unknown) => void
   /** Swaps in a story from the writer's account: not a change made here, and not one to undo. */
@@ -164,6 +166,8 @@ export function onBeforeSwitch(flush: () => void): () => void {
 const flushAll = () => {
   for (const flush of flushers) flush()
 }
+/** Saves what's being written now (the manuscript editor's text), before something is done to the saved text. */
+export const saveWriting = flushAll
 
 /**
  * Goes up whenever a whole other story (or another copy of it) is swapped
@@ -314,6 +318,11 @@ export const useStory = create<StoryStore>()(
         renameDraft: (...a) => apply(drafts.renameDraft(data(), ...a), 'renameDraft', a[0]),
         deleteDraft: (...a) => apply(drafts.deleteDraft(data(), ...a), 'deleteDraft', a[0]),
         moveDraft: (...a) => apply(drafts.moveDraft(data(), ...a), 'moveDraft'),
+        applySuggestion: (change) => {
+          // What's being written goes in first, so the change is made to the text as it is.
+          flushAll()
+          apply(change(data()), 'acceptSuggestion')
+        },
         replaceStory: (input) => {
           flushAll()
           apply(upgradeStory(input), 'replaceStory')

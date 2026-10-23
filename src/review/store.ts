@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { useStory } from '../store/storyStore'
 import { setRemotePictures, retryMissingPictures } from '../store/images'
-import { connectComments, refreshComments, type CommentsBackend } from '../comments/store'
+import { connectComments, refreshComments, useCommentPanel, type CommentsBackend } from '../comments/store'
 import { reviewToken } from './mode'
 import { LinkGone, type ReviewBackend } from './backend'
 
@@ -99,6 +99,21 @@ function editorComments(b: ReviewBackend): CommentsBackend {
   }
 }
 
+let comments: { backend: ReviewBackend; comments: CommentsBackend } | null = null
+let openedAt = 0
+
+/** Shows the story as the review link opened it. */
+function show(b: ReviewBackend, story: Awaited<ReturnType<ReviewBackend['open']>>) {
+  useStory.getState().loadStory(story.data as never)
+  setRemotePictures((id) => b.downloadPicture(story.owner, id))
+  retryMissingPictures()
+  useReview.setState({ status: 'open', error: null, title: story.title, label: story.label, savedAt: story.updatedAt })
+  // (The same comments as before, if they are: they stay shown while they're fetched again.)
+  if (comments?.backend !== b) comments = { backend: b, comments: editorComments(b) }
+  connectComments(comments.comments, story.id)
+  openedAt = Date.now()
+}
+
 /** Opens the story the review link is to (again, to see the writer's latest). */
 export async function openReview(): Promise<void> {
   if (!reviewToken) {
@@ -107,30 +122,45 @@ export async function openReview(): Promise<void> {
   }
   try {
     backend ??= await loadBackend(reviewToken)
-    const b = backend
-    const story = await b.open()
-    useStory.getState().loadStory(story.data as never)
-    setRemotePictures((id) => b.downloadPicture(story.owner, id))
-    retryMissingPictures()
-    useReview.setState({ status: 'open', error: null, title: story.title, label: story.label, savedAt: story.updatedAt })
-    connectComments(editorComments(b), story.id)
+    show(backend, await backend.open())
     void refreshComments()
   } catch (error) {
     trouble(error)
   }
 }
 
+/**
+ * Coming back to the review: the comments again, and the writer's latest if
+ * they've saved since (so what's commented on and suggested is what they
+ * have). Not while a comment is being written, nor more than every half minute.
+ */
+async function catchUp() {
+  const b = backend
+  if (b && Date.now() - openedAt > 30_000 && !useCommentPanel.getState().compose) {
+    openedAt = Date.now()
+    try {
+      const story = await b.open()
+      if (story.updatedAt !== useReview.getState().savedAt && !useCommentPanel.getState().compose) show(b, story)
+    } catch (error) {
+      // (Turned off meanwhile: say so. Anything else, the story stays as it is, to try again later.)
+      if (error instanceof LinkGone) return trouble(error)
+    }
+  }
+  void refreshComments()
+}
+
 let started = false
 
-/** Opens the review, and keeps its comments up to date while it's open. */
+/** Opens the review, and keeps its comments (and story) up to date while it's open. */
 export function startReview() {
   if (started) return
   started = true
   void openReview()
-  const again = () => {
-    if (document.visibilityState === 'visible' && useReview.getState().status === 'open') void refreshComments()
+  const visible = () => document.visibilityState === 'visible' && useReview.getState().status === 'open'
+  const back = () => {
+    if (visible()) void catchUp()
   }
-  window.addEventListener('focus', again)
-  document.addEventListener('visibilitychange', again)
-  setInterval(again, 60_000)
+  window.addEventListener('focus', back)
+  document.addEventListener('visibilitychange', back)
+  setInterval(() => visible() && void refreshComments(), 60_000)
 }

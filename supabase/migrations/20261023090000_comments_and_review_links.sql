@@ -48,7 +48,9 @@ create policy "Owners revoke review links" on public.review_links
 -- ---------- Comments ----------
 
 -- A comment starts a thread (`thread` null, with what it's on in `target`) or
--- replies to one. A thread is resolved, or not, as a whole. `author_key` is a
+-- replies to one. A thread is resolved, or not, as a whole. Its target can
+-- carry a suggested change (new words for a passage, or a new value for a
+-- field), which the writer accepts or declines in the app. `author_key` is a
 -- fingerprint of a secret kept in the editor's browser, so they can change and
 -- delete their own comments (and nobody can pass as them); `via` is the review
 -- link or assistant key it came through. A deleted comment is kept, marked
@@ -136,7 +138,7 @@ begin
   elsif v_target is null
      or jsonb_typeof(v_target) <> 'object'
      or coalesce(v_target ->> 'kind', '') not in ('story', 'chapter', 'text', 'beat', 'arc', 'character', 'element', 'map')
-     or octet_length(v_target::text) > 8000 then
+     or octet_length(v_target::text) > 48000 then
     raise exception 'What the comment is on isn''t clear.' using errcode = '22023';
   end if;
   if (select count(*) from public.comments c where c.story_id = p_story and c.deleted_at is null) >= 5000 then

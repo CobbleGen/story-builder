@@ -12,13 +12,14 @@ import { CommentRefused, EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, 
 // characters, places and things, and mind maps, each told in words with
 // everything that connects them, in any of the story's drafts. It can also
 // comment on them, as an editor would: on a passage, a chapter, a beat, an
-// arc, a character, a place, a mind map card or the whole story; the writer
-// sees its comments in Story Builder, where they are, and replies or
-// resolves them. It runs at /mcp/<key> (see server/vercel.ts), a fresh
+// arc, a character, a place, a mind map card or the whole story; and suggest
+// changes (new words for a passage, a new title or description…). The writer
+// sees its comments in Story Builder, where they are, replies or resolves
+// them, and accepts or declines its suggestions. It runs at /mcp/<key> (see server/vercel.ts), a fresh
 // server for each request.
 
 /** What the assistant is told about Story Builder before it reads anything. */
-export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change them, but you can comment on them, as an editor would: the writer sees your comments in the app, on the passage or thing they're about, and can reply and resolve them.
+export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change them yourself, but you can comment on them and suggest changes, as an editor would: the writer sees your comments and suggestions in the app, on the passage or thing they're about, and can reply, resolve them, and accept or decline a suggested change.
 
 How a story is organised:
 - Chapters, in reading order, hold the manuscript. Each may have a summary, a word target and a point-of-view character.
@@ -32,7 +33,7 @@ How a story is organised:
 
 Start with get_story_overview, then read what the question needs: read_chapter for a chapter with its plan, read_manuscript for the text straight through, and the other tools for the outline, story time, characters, places and things, mind maps, search and writing progress. When the account has several stories, each tool reads the one edited most recently unless you name another (list_stories lists them).
 
-Comments: get_comments shows what the writer, their editors and assistants have said (open ones, or resolved too), with each comment's id. add_comment leaves a new one: on a passage (the chapter and the exact words you're commenting on, quoted as read_chapter shows them: a phrase or sentence, within one paragraph), a chapter, a beat, an arc, a character, a place or thing, a mind map or a card on one, or the whole story. reply_to_comment answers one, and resolve_comment marks one dealt with (when the writer has made the change, say). Comment when the writer asks you to (to edit their story, say), one point per comment, on the most specific thing it's about.
+Comments: get_comments shows what the writer, their editors and assistants have said (open ones, or resolved too), with each comment's id. add_comment leaves a new one: on a passage (the chapter and the exact words you're commenting on, quoted as read_chapter shows them: a phrase or sentence, within one paragraph), a chapter, a beat, an arc, a character, a place or thing, a mind map or a card on one, or the whole story. suggest_change suggests a change the writer can make with one click, like a suggested edit in a shared document: new words for a passage (the chapter, the exact words as read_chapter shows them, and what you'd put instead, or nothing to cut them), or a new title, summary, description, name or "when" for a chapter, beat, arc, character or place, or new words for a card on a mind map; with a comment saying why. Accepting it makes the change in the story (and resolves it), declining it leaves the story as it is. reply_to_comment answers a comment, and resolve_comment marks one dealt with (when the writer has made the change, say). Comment or suggest when the writer asks you to (to edit their story, say), one point per comment, on the most specific thing it's about. Suggest a change when you know the exact words; comment when it's for the writer to decide how.
 
 When you give feedback, quote the writer's own words and name the chapters and beats you mean. Respect their intentions, voice and genre, and remember an outline or draft is unfinished: say what matters most first.`
 
@@ -270,7 +271,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     {
       title: 'Comments',
       description:
-        'The comments on the story, from the writer, their editors and AI assistants (you included): what each is on (quoting the passage, for one on the manuscript), what was said, the replies, and its id (to reply to it or resolve it). Open ones unless asked for resolved ones too; all of them, or one chapter’s.',
+        'The comments on the story, from the writer, their editors and AI assistants (you included): what each is on (quoting the passage, for one on the manuscript), the change it suggests (for a suggestion), what was said, the replies, and its id (to reply to it or resolve it). Open ones unless asked for resolved ones too; all of them, or one chapter’s.',
       inputSchema: {
         resolved: z.boolean().optional().describe('Resolved comments too (left out if not).'),
         chapter: z.string().optional().describe('Only those on one chapter (its number or title) and its text.'),
@@ -336,6 +337,77 @@ export function createServer(source: StorySource, today: () => string = () => ne
         })
         const made = await source.addComment(id, null, target, args.comment.trim())
         return `Comment ${made} added, on ${target.label}.${note} The writer sees it in Story Builder.`
+      },
+    ),
+  )
+
+  server.registerTool(
+    'suggest_change',
+    {
+      title: 'Suggest a change',
+      description:
+        'Suggests a change for the writer to accept or decline, like a suggested edit in a shared document: new words for a passage of the manuscript (chapter, quote and new_text; an empty new_text cuts the words), or a new value for one field of a chapter (title, summary), a beat (title, description, when), an arc, a character or a place or thing (name, description), or a card on a mind map (a sticky note’s or text box’s text, a group’s title). The writer sees the change where it is (in the text, struck through with your words beside it) and in the comments; accepting makes it. Say why in comment. One change per suggestion.',
+      inputSchema: {
+        new_text: z
+          .string()
+          .max(5000)
+          .describe('The words to put in place of the quoted passage (empty to cut it; within one paragraph, no line breaks), or the field’s new value. Plain text: names of characters and places become links again where they were.'),
+        comment: z.string().max(4000).optional().describe('Why: what the change does for the story (a short note, shown with it).'),
+        chapter: z.string().optional().describe('The chapter (its number or title): for a passage of it, with quote; or alone, to change its title or summary.'),
+        quote: z
+          .string()
+          .optional()
+          .describe('With chapter: the exact words to change, copied from the chapter’s text as read_chapter shows it (a phrase or a sentence or two, within one paragraph).'),
+        field: z
+          .enum(['title', 'summary', 'description', 'when', 'name', 'text'])
+          .optional()
+          .describe('What to change on the chapter, beat, arc, character, place or card (not for a passage). Left out, the only one there is.'),
+        beat: z.string().optional().describe('A beat, by its title.'),
+        arc: z.string().optional().describe('An arc, by its name.'),
+        character: z.string().optional().describe('A character, by name.'),
+        place_or_thing: z.string().optional().describe('A place, object or group, by name.'),
+        mind_map: z.string().optional().describe('With card: the mind map it’s on, by name.'),
+        card: z.string().optional().describe('With mind_map: a sticky note, text box or group on it, by its text or title.'),
+        story: storyArg,
+        draft: draftArg,
+      },
+      annotations: COMMENTING,
+    },
+    commenting(
+      async (
+        story,
+        id,
+        args: {
+          new_text: string
+          comment?: string
+          chapter?: string
+          quote?: string
+          field?: string
+          beat?: string
+          arc?: string
+          character?: string
+          place_or_thing?: string
+          mind_map?: string
+          card?: string
+        },
+      ) => {
+        if (args.mind_map && !args.card?.trim()) throw new reader.NotFound('Name the card on the mind map to change (card).')
+        const { target, note, what } = reader.suggestionTarget(
+          story,
+          {
+            chapter: args.chapter,
+            quote: args.quote,
+            beat: args.beat,
+            arc: args.arc,
+            character: args.character,
+            placeOrThing: args.place_or_thing,
+            mindMap: args.mind_map,
+            card: args.card,
+          },
+          { field: args.field, text: args.new_text },
+        )
+        const made = await source.addComment(id, null, target, args.comment?.trim() || `Suggests ${what}.`)
+        return `Suggestion ${made} added, on ${target.label}: ${what}.${note} The writer sees it in Story Builder and can accept or decline it.`
       },
     ),
   )
@@ -426,12 +498,12 @@ export function createServer(source: StorySource, today: () => string = () => ne
     'edit_with_comments',
     {
       title: 'Edit with comments',
-      description: 'An editor’s notes on a chapter (or the whole story), left as comments on the passages and things they’re about, for the writer to work through.',
+      description: 'An editor’s notes on a chapter (or the whole story), left as comments and suggested changes on the passages and things they’re about, for the writer to work through.',
       argsSchema: { chapter: z.string().optional().describe('The chapter’s number or title (the whole story if left out).') },
     },
     ({ chapter }) =>
       ask(
-        `Please be my editor for ${chapter ? `chapter ${chapter} of my story` : 'my story'} in Story Builder, and leave your notes as comments I can work through there. First read the story overview and get_comments (so you don't repeat what's been said), then ${chapter ? 'the chapter (read_chapter) and what it needs around it' : 'the manuscript and the outline'}. Then use add_comment for each note: on the exact passage it's about (the chapter and a quote of its words) for line edits, pacing, clarity, dialogue and continuity; on the chapter, beat, arc or character for bigger points. One point per comment, saying what isn't working and suggesting a concrete fix. Leave at most 15, the most important first. Finish by telling me in a few lines what you commented on.`,
+        `Please be my editor for ${chapter ? `chapter ${chapter} of my story` : 'my story'} in Story Builder, and leave your notes as comments I can work through there. First read the story overview and get_comments (so you don't repeat what's been said), then ${chapter ? 'the chapter (read_chapter) and what it needs around it' : 'the manuscript and the outline'}. Then leave a note for each point: for a line edit where you know the words you'd use, suggest_change on the exact passage (the chapter, a quote of its words and your new words), so I can accept it with a click; for anything I should decide how to fix (pacing, clarity, dialogue, continuity), add_comment on the exact passage it's about; on the chapter, beat, arc or character for bigger points. One point per note, saying what isn't working and, in a comment, suggesting a concrete fix. Leave at most 15, the most important first, and keep my voice in any words you suggest. Finish by telling me in a few lines what you commented on and suggested.`,
       ),
   )
 
@@ -443,7 +515,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     },
     () =>
       ask(
-        `Please go through the open comments on my story in Story Builder (get_comments). For each one, read what it's about as it is now. If the text or plan has dealt with it, resolve it (resolve_comment). If someone asked a question you can answer from the story, or the writer replied to one of your comments, reply (reply_to_comment). Leave the rest open. Then tell me briefly what you resolved, what you replied to, and what's still open that matters most.`,
+        `Please go through the open comments on my story in Story Builder (get_comments). For each one, read what it's about as it is now. If the text or plan has dealt with it, resolve it (resolve_comment); leave suggested changes for me to accept or decline. If someone asked a question you can answer from the story, or the writer replied to one of your comments, reply (reply_to_comment). Leave the rest open. Then tell me briefly what you resolved, what you replied to, and what's still open that matters most.`,
       ),
   )
 
@@ -580,7 +652,7 @@ async function infoPage(request: Request, key: string | null, source: StorySourc
 <p>Then ask, for example: <em>“Read my story and tell me what you think of chapter 3.”</em> or <em>“Be my editor: leave comments on chapter 3.”</em></p>
 <h2>What it can do</h2>
 <p>${tools.map(escape).join(' · ')}</p>
-<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps, in every draft) and leave you comments on them, but can’t change them. Keep the link private: anyone who has it can read your stories and comment on them. You can revoke it in Story Builder, under your account.</p>`
+<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps, in every draft) and leave you comments on them, or suggest changes for you to accept or decline, but can’t change them itself. Keep the link private: anyone who has it can read your stories and comment on them. You can revoke it in Story Builder, under your account.</p>`
     : ''
   const html = `<!doctype html>
 <html lang="en">

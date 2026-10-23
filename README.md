@@ -379,6 +379,25 @@ anything:
   map's menu comments on the map as a whole.
 - **The whole story**: from the comments panel.
 
+The highlight on a passage goes once its comment is resolved; with the
+panel on **Resolved**, resolved ones are marked again (greyed).
+
+**Suggested changes.** An editor (or an AI assistant) can go further and
+suggest the change itself, as in a shared document: new words for a
+passage (select it and press **Suggest**; leave the words empty to cut
+it), or a new title, summary, notes, name or description for a chapter,
+beat, arc, character or place, or new words for a sticky note, text box or
+group on a mind map (**Suggest a change** where the **Comment** button
+is). In the manuscript the words show struck through, with the suggested
+words just after them in green (not part of the text until accepted); in
+the panel each shows what it changes from and to. **Accept** makes the
+change and resolves it (the notice's **Undo** takes it back, as does the
+top bar's undo, or Ctrl+Z anywhere but in the manuscript's text);
+**Decline** resolves it and leaves the story as it is. Either way a reply
+in its thread says which, so the editor sees it. A suggestion whose words
+you've changed since can't be accepted as it is: make it by hand, or
+decline it.
+
 The **Comments** button in the top bar (its number counts every open one)
 opens the panel: open and resolved comments, each with what it's on (click
 it to go there), the passage it quotes, its replies, and **Reply**,
@@ -397,7 +416,8 @@ send it. Whoever opens it reads the whole story (every draft, but nothing
 you've archived) and comments under the name they give, without an
 account and without being able to change anything; the story isn't kept in
 their browser, and their own Story Builder story (if they have one) is left
-alone. **Turn off** a link and it stops working at once (its comments stay).
+alone. Coming back to the page brings your latest (if you've saved since),
+so what they comment on is what you have. **Turn off** a link and it stops working at once (its comments stay).
 Your name with your comments, as editors see it, is set there too.
 
 ### AI assistants
@@ -405,10 +425,10 @@ Your name with your comments, as editors see it, is set there too.
 An AI assistant such as Claude can read your stories (everything in them,
 in every draft) to give you feedback: a critique of a chapter, a check for
 continuity slips, ideas for what to write next. It can also be your editor,
-leaving its notes as comments on the passages and things they're about,
-which you work through in the comments panel like anyone's, and it can
-reply to comments and resolve those you've dealt with. It never changes the
-story itself. It reads them from your account, so sign in first, then:
+leaving its notes as comments on the passages and things they're about, or
+suggesting changes for you to accept or decline, which you work through in
+the comments panel like anyone's, and it can reply to comments and resolve
+those you've dealt with. It never changes the story itself. It reads them from your account, so sign in first, then:
 
 1. **⋯ → AI assistants** (or the same section under your account): **New
    link**, give it a name, and copy the link. It's shown once (the account
@@ -442,16 +462,17 @@ you have open, or another named with `draft`):
 | `search_story` | Words anywhere in the story |
 | `get_writing_progress` | Words, goals, chapter by chapter, and the last two weeks |
 | `list_stories` | The stories in the account; the others read the one edited last, unless told another |
-| `get_comments` | The comments (open ones, or resolved too; all, or a chapter's): what each is on, quoting the passage, who said what, and its id |
+| `get_comments` | The comments (open ones, or resolved too; all, or a chapter's): what each is on, quoting the passage, the change a suggestion suggests, who said what, and its id |
 | `add_comment` | A comment on a passage (the chapter and the words, quoted), a chapter, beat, arc, character, place or thing, a mind map or a card on one, or the whole story |
+| `suggest_change` | A suggested change, for you to accept or decline: new words for a quoted passage (or cutting it), or a new title, summary, description, name or "when" for a chapter, beat, arc, character or place, or new words for a mind map card |
 | `reply_to_comment`, `resolve_comment` | A reply in a comment's thread; a thread resolved (or opened again) |
 
 It also explains Story Builder's ideas to the assistant (beats, arcs, story
 time, where the book begins and ends, mentions, drafts, the archive,
-comments), and offers ready-made requests: feedback on a chapter, feedback
-on the whole story, a continuity check, what to write next, editing with
-comments (on a chapter or the whole story), and going through the open
-comments. Pictures aren't included. On the example story, its comments are
+comments and suggestions), and offers ready-made requests: feedback on a
+chapter, feedback on the whole story, a continuity check, what to write
+next, editing with comments and suggested changes (on a chapter or the
+whole story), and going through the open comments. Pictures aren't included. On the example story, its comments are
 only kept for a while.
 
 ## Hosting
@@ -556,8 +577,11 @@ any static host or sub-folder.
   `engine.test.ts`), `supabaseBackend.ts` talks to Supabase (loaded only
   when someone signs in), and `index.ts` wires them to the app;
   `src/components/Account.tsx` is the account button and dialog
-- `src/comments/`: comments. `model.ts` is what they're on, in threads,
-  counted for the badges and named; `anchor.ts` finds a passage again by
+- `src/comments/`: comments. `model.ts` is what they're on (and the change
+  a suggestion suggests), in threads, counted for the badges and named;
+  `suggestions.ts` says what a suggestion would change now, and
+  `makeChange.ts` makes it (a passage's new words with the editor's schema,
+  loaded only then); `anchor.ts` finds a passage again by
   its words (and the text either side), loosely (case, quotes, dashes,
   spaces, Markdown), tested against ProseMirror's positions in
   `anchor.test.ts`; `store.ts` holds them and the panel's state, through a
@@ -582,7 +606,7 @@ any static host or sub-folder.
   `src/reader/` tells a story in words (the overview, chapters with their
   plans, outline, story time, profiles, mind maps, search, progress,
   comments), from the app's own code; `server/mcp.ts` offers that as MCP
-  tools (reading any draft, and commenting), prompts and instructions over
+  tools (reading any draft, commenting and suggesting changes), prompts and instructions over
   HTTP, a fresh server per request; `server/sources.ts` reads an account's
   stories and their comments by key, or the example story; and
   `server/vercel.ts` is the function Vercel runs. `server/mcp.test.ts`
