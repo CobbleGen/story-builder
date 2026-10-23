@@ -279,7 +279,7 @@ export async function manuscriptDocx(m: Manuscript, pictures: ExportPictures = n
       }
     : { top: INCH, right: INCH, bottom: INCH, left: INCH, header: HALF_INCH }
   const doc = new Document({
-    creator: m.author || 'Story Builder',
+    creator: m.author || 'Arc Creator',
     title: m.title,
     ...(justify && style?.hyphenate ? { hyphenation: { autoHyphenation: true } } : {}),
     styles: {

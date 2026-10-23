@@ -48,7 +48,7 @@ export class InvalidKey extends Error {
 
 export const EXAMPLE_KEY = 'example'
 
-/** What Story Builder makes: 32 random bytes, as base64url. */
+/** What Arc Creator makes: 32 random bytes, as base64url. */
 export const looksLikeKey = (key: string) => /^[A-Za-z0-9_-]{43}$/.test(key)
 
 let example: ReturnType<typeof buildSampleStory> | null = null

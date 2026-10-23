@@ -78,7 +78,7 @@ export function BackupsDialog({ onClose }: { onClose: () => void }) {
         day while you use it, and before the story is replaced. The last 30 are kept.
       </p>
       {backups === null ? null : backups.length === 0 ? (
-        <p className="section-empty backup-empty">No backups yet. The first is made the next time Story Builder opens.</p>
+        <p className="section-empty backup-empty">No backups yet. The first is made the next time Arc Creator opens.</p>
       ) : (
         <ul className="backup-list">
           {backups.map((b) => {

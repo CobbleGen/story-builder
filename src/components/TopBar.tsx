@@ -6,7 +6,6 @@ import {
   ChartGantt,
   Download,
   FilePlus2,
-  Feather,
   History,
   MessageSquareShare,
   Moon,
@@ -31,6 +30,7 @@ import { ExportDialog } from './ExportDialog'
 import { downloadBlob, slug } from '../lib/download'
 import { exportImages, imageIdsIn, importImages } from '../store/images'
 import { UndoButtons } from './UndoControls'
+import { Logo } from './Logo'
 import { DraftSwitcher } from './DraftSwitcher'
 import { AccountButton, AssistantDialog } from './Account'
 import { cloud, useCloud } from '../cloud'
@@ -140,9 +140,9 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <Link to="/" className="brand" aria-label="Story Builder home">
-        <Feather size={18} />
-        <span>Story Builder</span>
+      <Link to="/" className="brand" aria-label="Arc Creator home">
+        <Logo />
+        <span>Arc Creator</span>
       </Link>
       <span className="topbar-sep" aria-hidden>
         /

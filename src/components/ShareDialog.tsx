@@ -31,7 +31,7 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
           <p className="confirm-message">
             Give an editor a link to read the story (every draft of it) and comment on anything in it: passages of the manuscript, chapters, beats,
             arcs, characters, places and mind maps. They can’t change anything. Comments are kept in your account, so{' '}
-            {off ? 'this needs a version of Story Builder with accounts.' : user ? 'first keep this story in your account (Your account → Your stories).' : 'sign in first.'}
+            {off ? 'this needs a version of Arc Creator with accounts.' : user ? 'first keep this story in your account (Your account → Your stories).' : 'sign in first.'}
           </p>
           {!off && !user && <SignIn />}
         </>

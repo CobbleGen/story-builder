@@ -76,7 +76,7 @@ async function loadBackend(token: string): Promise<ReviewBackend> {
   if (test) return test(token)
   const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
   const key = import.meta.env.VITE_SUPABASE_KEY as string | undefined
-  if (!url || !key) throw new Error('This copy of Story Builder isn’t connected to accounts, so it can’t open review links.')
+  if (!url || !key) throw new Error('This copy of Arc Creator isn’t connected to accounts, so it can’t open review links.')
   const { supabaseReview } = await import('./supabaseReview')
   return supabaseReview(url, key, token)
 }

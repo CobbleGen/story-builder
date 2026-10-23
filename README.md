@@ -1,4 +1,4 @@
-# Story Builder
+# Arc Creator
 
 A planning board for writers. Lay your book out chapter by chapter and drag
 colour-coded story beats into place, Trello-style.
@@ -415,7 +415,7 @@ a link (copied straight away; copy it again there whenever you like) and
 send it. Whoever opens it reads the whole story (every draft, but nothing
 you've archived) and comments under the name they give, without an
 account and without being able to change anything; the story isn't kept in
-their browser, and their own Story Builder story (if they have one) is left
+their browser, and their own Arc Creator story (if they have one) is left
 alone. Coming back to the page brings your latest (if you've saved since),
 so what they comment on is what you have. **Turn off** a link and it stops working at once (its comments stay).
 Your name with your comments, as editors see it, is set there too.
@@ -435,8 +435,8 @@ those you've dealt with. It never changes the story itself. It reads them from y
    keeps only a fingerprint of it), so copy it then.
 2. Give the link to the assistant:
    - **Claude** (on the web, desktop or phone): Settings → Connectors → Add
-     custom connector; name it Story Builder and paste the link as its URL.
-   - **Claude Code**: `claude mcp add --transport http story-builder <link>`
+     custom connector; name it Arc Creator and paste the link as its URL.
+   - **Claude Code**: `claude mcp add --transport http arc-creator <link>`
    - Any other assistant that takes a remote MCP server (Streamable HTTP).
 3. Ask away: "Read my story and tell me what you think of chapter 3." or
    "Be my editor: leave comments on chapter 3."
@@ -467,7 +467,7 @@ you have open, or another named with `draft`):
 | `suggest_change` | A suggested change, for you to accept or decline: new words for a quoted passage (or cutting it), or a new title, summary, description, name or "when" for a chapter, beat, arc, character or place, or new words for a mind map card |
 | `reply_to_comment`, `resolve_comment` | A reply in a comment's thread; a thread resolved (or opened again) |
 
-It also explains Story Builder's ideas to the assistant (beats, arcs, story
+It also explains Arc Creator's ideas to the assistant (beats, arcs, story
 time, where the book begins and ends, mentions, drafts, the archive,
 comments and suggestions), and offers ready-made requests: feedback on a
 chapter, feedback on the whole story, a continuity check, what to write

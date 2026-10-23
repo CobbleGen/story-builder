@@ -14,12 +14,12 @@ import { CommentRefused, EXAMPLE_KEY, InvalidKey, accountSource, exampleSource, 
 // comment on them, as an editor would: on a passage, a chapter, a beat, an
 // arc, a character, a place, a mind map card or the whole story; and suggest
 // changes (new words for a passage, a new title or description…). The writer
-// sees its comments in Story Builder, where they are, replies or resolves
+// sees its comments in Arc Creator, where they are, replies or resolves
 // them, and accepts or declines its suggestions. It runs at /mcp/<key> (see server/vercel.ts), a fresh
 // server for each request.
 
-/** What the assistant is told about Story Builder before it reads anything. */
-export const INSTRUCTIONS = `Story Builder is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change them yourself, but you can comment on them and suggest changes, as an editor would: the writer sees your comments and suggestions in the app, on the passage or thing they're about, and can reply, resolve them, and accept or decline a suggested change.
+/** What the assistant is told about Arc Creator before it reads anything. */
+export const INSTRUCTIONS = `Arc Creator is a writing app for novels and other long stories. Through this server you can read a writer's stories: everything they have written and planned. You can't change them yourself, but you can comment on them and suggest changes, as an editor would: the writer sees your comments and suggestions in the app, on the passage or thing they're about, and can reply, resolve them, and accept or decline a suggested change.
 
 How a story is organised:
 - Chapters, in reading order, hold the manuscript. Each may have a summary, a word target and a point-of-view character.
@@ -56,12 +56,12 @@ const reply = (text: string, isError = false): Reply => (isError ? { content: [{
 
 /** The MCP server for one source of stories. `today` is the date (YYYY-MM-DD) for writing progress. */
 export function createServer(source: StorySource, today: () => string = () => new Date().toISOString().slice(0, 10)): McpServer {
-  const server = new McpServer({ name: 'story-builder', title: 'Story Builder', version: '1.0.0' }, { instructions: INSTRUCTIONS })
+  const server = new McpServer({ name: 'arc-creator', title: 'Arc Creator', version: '1.0.0' }, { instructions: INSTRUCTIONS })
 
   /** The story asked for (or the one edited last), ready to read (in the draft asked for); and a note saying which, when there are others. */
   async function open(ref: string | undefined, draftRef?: string) {
     const rows = await source.list()
-    if (!rows.length) throw new reader.NotFound('There are no stories here yet. A story is here once it’s saved to the writer’s Story Builder account.')
+    if (!rows.length) throw new reader.NotFound('There are no stories here yet. A story is here once it’s saved to the writer’s Arc Creator account.')
     const row = ref?.trim() ? findByName(rows, ref, (r) => r.title, (r) => r.id) : rows[0]
     if (!row) throw new reader.NotFound(`No story “${ref}”. The stories are: ${rows.map((r) => `“${r.title || 'Untitled story'}”`).join(', ')}.`)
     const data = await source.load(row.id)
@@ -290,7 +290,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     {
       title: 'Add a comment',
       description:
-        'Leaves the writer a comment, as an editor would, on one thing: a passage of the manuscript (chapter and quote), a whole chapter (chapter alone), a beat, an arc, a character, a place or thing, a mind map or a card on it, or (with none of these) the whole story. The writer sees it in Story Builder where it is, counted on the page it’s on, and can reply or resolve it. One point per comment.',
+        'Leaves the writer a comment, as an editor would, on one thing: a passage of the manuscript (chapter and quote), a whole chapter (chapter alone), a beat, an arc, a character, a place or thing, a mind map or a card on it, or (with none of these) the whole story. The writer sees it in Arc Creator where it is, counted on the page it’s on, and can reply or resolve it. One point per comment.',
       inputSchema: {
         comment: z.string().min(1).max(5000).describe('What you want to tell the writer.'),
         chapter: z.string().optional().describe('The chapter (its number or title): for a comment on it, or on a passage of it with quote.'),
@@ -336,7 +336,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
           card: args.card,
         })
         const made = await source.addComment(id, null, target, args.comment.trim())
-        return `Comment ${made} added, on ${target.label}.${note} The writer sees it in Story Builder.`
+        return `Comment ${made} added, on ${target.label}.${note} The writer sees it in Arc Creator.`
       },
     ),
   )
@@ -407,7 +407,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
           { field: args.field, text: args.new_text },
         )
         const made = await source.addComment(id, null, target, args.comment?.trim() || `Suggests ${what}.`)
-        return `Suggestion ${made} added, on ${target.label}: ${what}.${note} The writer sees it in Story Builder and can accept or decline it.`
+        return `Suggestion ${made} added, on ${target.label}: ${what}.${note} The writer sees it in Arc Creator and can accept or decline it.`
       },
     ),
   )
@@ -463,7 +463,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     },
     ({ chapter }) =>
       ask(
-        `Please give me editorial feedback on chapter ${chapter} of my story in Story Builder. First read the story overview, then the chapter (read_chapter), and as much around it as you need: the characters in it, the outline around it, and the chapters before it if it carries on from them. Then tell me what's working and what could be stronger: pacing, tension, clarity, point of view, voice and dialogue, description. Check that it delivers the beats planned for it and fits what comes before and after. Quote the passages you mean and suggest concrete revisions for the most important ones. It may be an early draft, so say what matters most first.`,
+        `Please give me editorial feedback on chapter ${chapter} of my story in Arc Creator. First read the story overview, then the chapter (read_chapter), and as much around it as you need: the characters in it, the outline around it, and the chapters before it if it carries on from them. Then tell me what's working and what could be stronger: pacing, tension, clarity, point of view, voice and dialogue, description. Check that it delivers the beats planned for it and fits what comes before and after. Quote the passages you mean and suggest concrete revisions for the most important ones. It may be an early draft, so say what matters most first.`,
       ),
   )
 
@@ -472,7 +472,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     { title: 'Feedback on the whole story', description: 'Big-picture feedback, as from a developmental editor.' },
     () =>
       ask(
-        `Please read my story in Story Builder and give me big-picture feedback, the way a developmental editor would. Start with the story overview, then read what's written (read_manuscript), the outline, story time, the characters, places and things, and the mind maps. Tell me about the structure and pacing, each arc's shape and payoff, the characters (what they want, how they change, whether they're consistent), the stakes and tension, and anything confusing or missing. Point to specific chapters and beats, and finish with the three changes that would help the story most.`,
+        `Please read my story in Arc Creator and give me big-picture feedback, the way a developmental editor would. Start with the story overview, then read what's written (read_manuscript), the outline, story time, the characters, places and things, and the mind maps. Tell me about the structure and pacing, each arc's shape and payoff, the characters (what they want, how they change, whether they're consistent), the stakes and tension, and anything confusing or missing. Point to specific chapters and beats, and finish with the three changes that would help the story most.`,
       ),
   )
 
@@ -481,7 +481,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     { title: 'Check continuity', description: 'Finds contradictions in the story: facts, timeline, who knows what.' },
     () =>
       ask(
-        `Please check my story in Story Builder for continuity problems: places where the text contradicts the characters' or places' details, the timeline (when things happen, who is where, who knows what and when), the outline, or itself. Read the overview, story time, the characters, places and things, and the written chapters. List each problem with where it is (chapter and a quote) and what it contradicts, most serious first. Tell me if you find none.`,
+        `Please check my story in Arc Creator for continuity problems: places where the text contradicts the characters' or places' details, the timeline (when things happen, who is where, who knows what and when), the outline, or itself. Read the overview, story time, the characters, places and things, and the written chapters. List each problem with where it is (chapter and a quote) and what it contradicts, most serious first. Tell me if you find none.`,
       ),
   )
 
@@ -490,7 +490,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     { title: 'What to write next', description: 'Suggestions for what to write next, from the plan and the progress so far.' },
     () =>
       ask(
-        `Please look at my story in Story Builder and help me decide what to write next. Read the overview, the outline (which beats are written, which chapters have no text yet, which beats aren't in a chapter yet), story time and my writing progress. Suggest the next scenes or chapters to write and why, and point out gaps in the plan: arcs that stop short, characters without an arc, beats not placed in a chapter, threads that never pay off.`,
+        `Please look at my story in Arc Creator and help me decide what to write next. Read the overview, the outline (which beats are written, which chapters have no text yet, which beats aren't in a chapter yet), story time and my writing progress. Suggest the next scenes or chapters to write and why, and point out gaps in the plan: arcs that stop short, characters without an arc, beats not placed in a chapter, threads that never pay off.`,
       ),
   )
 
@@ -503,7 +503,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     },
     ({ chapter }) =>
       ask(
-        `Please be my editor for ${chapter ? `chapter ${chapter} of my story` : 'my story'} in Story Builder, and leave your notes as comments I can work through there. First read the story overview and get_comments (so you don't repeat what's been said), then ${chapter ? 'the chapter (read_chapter) and what it needs around it' : 'the manuscript and the outline'}. Then leave a note for each point: for a line edit where you know the words you'd use, suggest_change on the exact passage (the chapter, a quote of its words and your new words), so I can accept it with a click; for anything I should decide how to fix (pacing, clarity, dialogue, continuity), add_comment on the exact passage it's about; on the chapter, beat, arc or character for bigger points. One point per note, saying what isn't working and, in a comment, suggesting a concrete fix. Leave at most 15, the most important first, and keep my voice in any words you suggest. Finish by telling me in a few lines what you commented on and suggested.`,
+        `Please be my editor for ${chapter ? `chapter ${chapter} of my story` : 'my story'} in Arc Creator, and leave your notes as comments I can work through there. First read the story overview and get_comments (so you don't repeat what's been said), then ${chapter ? 'the chapter (read_chapter) and what it needs around it' : 'the manuscript and the outline'}. Then leave a note for each point: for a line edit where you know the words you'd use, suggest_change on the exact passage (the chapter, a quote of its words and your new words), so I can accept it with a click; for anything I should decide how to fix (pacing, clarity, dialogue, continuity), add_comment on the exact passage it's about; on the chapter, beat, arc or character for bigger points. One point per note, saying what isn't working and, in a comment, suggesting a concrete fix. Leave at most 15, the most important first, and keep my voice in any words you suggest. Finish by telling me in a few lines what you commented on and suggested.`,
       ),
   )
 
@@ -515,7 +515,7 @@ export function createServer(source: StorySource, today: () => string = () => ne
     },
     () =>
       ask(
-        `Please go through the open comments on my story in Story Builder (get_comments). For each one, read what it's about as it is now. If the text or plan has dealt with it, resolve it (resolve_comment); leave suggested changes for me to accept or decline. If someone asked a question you can answer from the story, or the writer replied to one of your comments, reply (reply_to_comment). Leave the rest open. Then tell me briefly what you resolved, what you replied to, and what's still open that matters most.`,
+        `Please go through the open comments on my story in Arc Creator (get_comments). For each one, read what it's about as it is now. If the text or plan has dealt with it, resolve it (resolve_comment); leave suggested changes for me to accept or decline. If someone asked a question you can answer from the story, or the writer replied to one of your comments, reply (reply_to_comment). Leave the rest open. Then tell me briefly what you resolved, what you replied to, and what's still open that matters most.`,
       ),
   )
 
@@ -542,7 +542,7 @@ const refuse = (status: number, message: string) =>
   withCors(Response.json({ jsonrpc: '2.0', error: { code: -32001, message }, id: null }, { status }))
 
 const BAD_LINK =
-  'This Story Builder link doesn’t work: it may have been revoked, or not copied whole. Make a new one in Story Builder (your account → AI assistants).'
+  'This Arc Creator link doesn’t work: it may have been revoked, or not copied whole. Make a new one in Arc Creator (your account → AI assistants).'
 
 /** The key from /mcp/<key>, ?key= (as Vercel's routing passes it on), or an Authorization: Bearer header. */
 export function keyOf(request: Request): string | null {
@@ -635,8 +635,8 @@ async function infoPage(request: Request, key: string | null, source: StorySourc
         key === EXAMPLE_KEY
           ? `This link reads the example story, <em>${escape(rows[0]?.title ?? '')}</em>, so you can try it out.`
           : rows.length
-            ? `This link reads the stories in a Story Builder account:<ul>${titles}</ul>`
-            : 'This link reads a Story Builder account that has no stories in it yet.'
+            ? `This link reads the stories in a Arc Creator account:<ul>${titles}</ul>`
+            : 'This link reads a Arc Creator account that has no stories in it yet.'
     } catch (error) {
       status = error instanceof InvalidKey ? BAD_LINK : 'Couldn’t reach the stories just now. Try again in a moment.'
     }
@@ -646,13 +646,13 @@ async function infoPage(request: Request, key: string | null, source: StorySourc
     ? `<h2>Connect an assistant</h2>
 <ul>
 <li><strong>Claude</strong> (on the web, desktop or phone): Settings → Connectors → Add custom connector. Give it a name, paste this link as its URL, and add it.</li>
-<li><strong>Claude Code</strong>: <code>claude mcp add --transport http story-builder ${escape(link)}</code></li>
+<li><strong>Claude Code</strong>: <code>claude mcp add --transport http arc-creator ${escape(link)}</code></li>
 <li><strong>Other assistants</strong>: add it as a remote MCP server (Streamable HTTP) at this link.</li>
 </ul>
 <p>Then ask, for example: <em>“Read my story and tell me what you think of chapter 3.”</em> or <em>“Be my editor: leave comments on chapter 3.”</em></p>
 <h2>What it can do</h2>
 <p>${tools.map(escape).join(' · ')}</p>
-<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps, in every draft) and leave you comments on them, or suggest changes for you to accept or decline, but can’t change them itself. Keep the link private: anyone who has it can read your stories and comment on them. You can revoke it in Story Builder, under your account.</p>`
+<p class="small">The assistant can read everything in the stories (the manuscript, chapters, beats, arcs, timeline, characters, places and mind maps, in every draft) and leave you comments on them, or suggest changes for you to accept or decline, but can’t change them itself. Keep the link private: anyone who has it can read your stories and comment on them. You can revoke it in Arc Creator, under your account.</p>`
     : ''
   const html = `<!doctype html>
 <html lang="en">
@@ -660,7 +660,7 @@ async function infoPage(request: Request, key: string | null, source: StorySourc
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Story Builder for AI assistants</title>
+<title>Arc Creator for AI assistants</title>
 <style>
 :root { color-scheme: light dark; }
 body { max-width: 640px; margin: 48px auto; padding: 0 20px; font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #26241f; background: #f3f1ec; }
@@ -673,7 +673,7 @@ li { margin: 6px 0; }
 </style>
 </head>
 <body>
-<h1>Story Builder for AI assistants</h1>
+<h1>Arc Creator for AI assistants</h1>
 <p>${status}</p>
 ${how}
 </body>

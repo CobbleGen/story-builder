@@ -17,10 +17,10 @@ function HowToConnect({ url }: { url: string }) {
   return (
     <ul className="assistant-how">
       <li>
-        <strong>Claude</strong> (on the web, desktop or phone): Settings → Connectors → Add custom connector. Name it Story Builder and paste the link as its URL.
+        <strong>Claude</strong> (on the web, desktop or phone): Settings → Connectors → Add custom connector. Name it Arc Creator and paste the link as its URL.
       </li>
       <li>
-        <strong>Claude Code</strong>: <code>claude mcp add --transport http story-builder {url}</code>
+        <strong>Claude Code</strong>: <code>claude mcp add --transport http arc-creator {url}</code>
       </li>
       <li>
         <strong>Other assistants</strong>: add it as a remote MCP server.

@@ -58,8 +58,8 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 describe('the story server', () => {
   it('introduces itself, and lists read-only tools and prompts', async () => {
     const client = await connect('example')
-    expect(client.getServerVersion()?.name).toBe('story-builder')
-    expect(client.getInstructions()).toMatch(/Story Builder is a writing app/)
+    expect(client.getServerVersion()?.name).toBe('arc-creator')
+    expect(client.getInstructions()).toMatch(/Arc Creator is a writing app/)
     const { tools } = await client.listTools()
     expect(tools.map((t) => t.name)).toEqual([
       'list_stories',
@@ -174,14 +174,14 @@ describe('the story server', () => {
     expect(html).toMatch(
       /Story overview · Read a chapter · Read the manuscript · Outline · Story time · Characters · Places, objects and groups · Mind maps · Search the story · Writing progress · Comments · Add a comment · Suggest a change · Reply to a comment · Resolve a comment/,
     )
-    expect(html).toMatch(/claude mcp add --transport http story-builder https:\/\/story-builder\.example\/mcp\/example/)
+    expect(html).toMatch(/claude mcp add --transport http arc-creator https:\/\/story-builder\.example\/mcp\/example/)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/nope`, { headers: { accept: 'text/html' } }), STORE)).status).toBe(403)
     // Behind Vercel's proxy the function is reached over http; the page gives the https address visitors use.
     const proxied = await handleRequest(
       new Request('http://internal.example/mcp?key=example', { headers: { accept: 'text/html', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'story-builder-flame.vercel.app' } }),
       STORE,
     )
-    expect(await proxied.text()).toMatch(/story-builder https:\/\/story-builder-flame\.vercel\.app\/mcp\/example</)
+    expect(await proxied.text()).toMatch(/arc-creator https:\/\/story-builder-flame\.vercel\.app\/mcp\/example</)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/example`, { headers: { accept: 'text/event-stream' } }), STORE)).status).toBe(405)
     expect((await handleRequest(new Request(`${ORIGIN}/mcp/example`, { method: 'DELETE' }), STORE)).status).toBe(405)
     const preflight = await handleRequest(new Request(`${ORIGIN}/mcp/example`, { method: 'OPTIONS' }), STORE)
@@ -241,7 +241,7 @@ describe('comments', () => {
         arguments: { chapter: '3', quote: 'The same kettle with the dent', new_text: 'The dented kettle', comment: 'Fewer words.' },
       }),
     )
-    expect(passage).toMatch(/^Suggestion \S+ added, on Chapter 3: The Logbook: new words for the passage\. The writer sees it in Story Builder and can accept or decline it\./)
+    expect(passage).toMatch(/^Suggestion \S+ added, on Chapter 3: The Logbook: new words for the passage\. The writer sees it in Arc Creator and can accept or decline it\./)
     expect(text(await client.callTool({ name: 'suggest_change', arguments: { beat: 'the lamp goes dark', field: 'title', new_text: 'The lamp fails' } }))).toMatch(
       /on Beat “The lamp goes dark”: a new title\./,
     )

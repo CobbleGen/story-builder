@@ -97,7 +97,7 @@ export function AssistantDialog({ onClose }: { onClose: () => void }) {
           <h2 className="confirm-title">Let an AI assistant read your stories</h2>
           <p className="confirm-message">
             An assistant such as Claude can read everything in your stories (the manuscript, outline, timeline, characters, places and mind maps) to
-            give you feedback, in its replies or as comments on what they’re about, but never change them. It reads them from your account, so {off ? 'this needs a version of Story Builder with accounts.' : 'sign in first.'}
+            give you feedback, in its replies or as comments on what they’re about, but never change them. It reads them from your account, so {off ? 'this needs a version of Arc Creator with accounts.' : 'sign in first.'}
           </p>
           {!off && <SignIn />}
         </>
