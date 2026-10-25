@@ -1936,6 +1936,35 @@ const ids = (value: unknown): string[] =>
  * Coerces untrusted data (an import, or old saved state) into a valid story,
  * repairing any broken links between beats, arcs and chapters.
  */
+/**
+ * Cards resized on a container that places them freely were once saved at
+ * their place on the map instead of from the container's corner, which put
+ * them far off it, out of sight. Such a card (well outside its container,
+ * which it's back on once the container's place is taken off) goes back.
+ */
+function findResizedAway(nodes: MapNode[]) {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  // A container's corner on the map, when it's known: on the map, or placed freely on one that's known.
+  const cornerOf = (id: string, seen = 0): { x: number; y: number } | null => {
+    const box = byId.get(id)
+    if (!box || box.kind !== 'container' || seen > nodes.length) return null
+    const parent = parentOf(box)
+    if (!parent) return { x: box.x, y: box.y }
+    const outer = byId.get(parent)
+    const at = outer?.kind === 'container' && outer.layout === 'free' ? cornerOf(parent, seen + 1) : null
+    return at && { x: at.x + box.x, y: at.y + box.y }
+  }
+  const SLACK = 200
+  for (const node of nodes) {
+    const box = byId.get(parentOf(node) ?? '')
+    if (box?.kind !== 'container' || box.layout !== 'free') continue
+    const on = (x: number, y: number) => x >= -SLACK && x <= box.width - 20 && y >= -SLACK && y <= box.height - 20
+    if (on(node.x, node.y)) continue
+    const corner = cornerOf(box.id)
+    if (corner && on(node.x - corner.x, node.y - corner.y)) Object.assign(node, { x: node.x - corner.x, y: node.y - corner.y })
+  }
+}
+
 export function normalizeStory(input: unknown): StoryData {
   const raw = isRecord(input) ? input : {}
   const list = (value: unknown) => (Array.isArray(value) ? value : []).filter(isRecord)
@@ -2228,6 +2257,7 @@ export function normalizeStory(input: unknown): StoryData {
     for (const node of nodes) {
       if (parentOf(node) && isWithin(nodes, parentOf(node)!, node.id)) delete (node as { containerId?: string }).containerId
     }
+    findResizedAway(nodes)
     const nodeIds = new Set(nodes.map((n) => n.id))
     const edges: MapEdge[] = list(rawMap.edges)
       .map((e) => {

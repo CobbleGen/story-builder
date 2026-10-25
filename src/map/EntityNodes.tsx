@@ -10,7 +10,7 @@ import { MentionText } from '../components/MentionText'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 import { ElementIcon, KindIcon } from '../components/ElementIcon'
 import { ELEMENT_KIND_NAMES } from '../lib/elements'
-import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { useMap, useResizePlace, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 import { BeatList, ChapterPages, Details } from './CardPanels'
 import { Anchor } from './Anchor'
 import { itemAnchor } from '../lib/anchors'
@@ -50,6 +50,7 @@ function Card({ node, selected, kindLabel, color, openLabel, openIcon, children,
   const { openItem, removeNode } = useMap()
   const updateMapNode = useStory((s) => s.updateMapNode)
   const toolbar = useToolbarPlacement(node.id, selected)
+  const resize = useResizePlace(node)
   const entity = 'refId' in node ? node : null
   const view = entity?.expanded
   // Opened cards can be resized; a resized card fills the size it was given.
@@ -76,9 +77,8 @@ function Card({ node, selected, kindLabel, color, openLabel, openIcon, children,
           minHeight={MIN_SIZE[view].height}
           lineClassName="map-resize-line"
           handleClassName="map-resize-handle"
-          onResizeEnd={(_, p) =>
-            saveSize({ width: Math.round(p.width), height: Math.round(p.height) }, { x: Math.round(p.x), y: Math.round(p.y) })
-          }
+          onResizeStart={resize.onResizeStart}
+          onResizeEnd={(_, p) => saveSize({ width: Math.round(p.width), height: Math.round(p.height) }, resize.placed(p))}
         />
       )}
       <NodeToolbar isVisible={selected} position={toolbar.position} align={toolbar.align} className="map-toolbar">

@@ -11,7 +11,7 @@ import { MentionText } from '../components/MentionText'
 import { MentionTextarea } from '../components/MentionTextarea'
 import { Handles } from './EntityNodes'
 import { ListButtons, ListEditor, TextList } from './TextList'
-import { focusSoon, paint, paperClasses, useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { focusSoon, paint, paperClasses, useMap, useResizePlace, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, NOTE_TEXT_SIZE, cleanTextSize, stepTextSize, textLook } from '../lib/textSize'
 
 type NoteMapNode = Extract<MapNode, { kind: 'note' }>
@@ -93,6 +93,7 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const { editing, input, start, stop, remove } = useEditing(id)
   const toolbar = useToolbarPlacement(id, selected)
+  const resize = useResizePlace(node)
   const color = paint(node.color, NOTE_COLOR)
 
   return (
@@ -107,7 +108,8 @@ export function NoteNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         minHeight={80}
         lineClassName="map-resize-line"
         handleClassName="map-resize-handle"
-        onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width, height: p.height })}
+        onResizeStart={resize.onResizeStart}
+        onResizeEnd={(_, p) => updateMapNode(id, { ...resize.placed(p), width: Math.round(p.width), height: Math.round(p.height) })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         {!reviewing && (
@@ -166,6 +168,7 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const { editing, input, start, stop, remove } = useEditing(id)
   const toolbar = useToolbarPlacement(id, selected)
+  const resize = useResizePlace(node)
   const bg = node.bg ? paint(node.bg, NOTE_COLOR) : undefined
 
   return (
@@ -180,7 +183,8 @@ export function TextNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         minHeight={30}
         lineClassName="map-resize-line"
         handleClassName="map-resize-handle"
-        onResizeEnd={(_, p) => updateMapNode(id, { x: p.x, y: p.y, width: p.width })}
+        onResizeStart={resize.onResizeStart}
+        onResizeEnd={(_, p) => updateMapNode(id, { ...resize.placed(p), width: Math.round(p.width) })}
       />
       <NodeToolbar isVisible={selected && !editing} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         <CommentTool id={id} />

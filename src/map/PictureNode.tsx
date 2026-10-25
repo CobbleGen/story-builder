@@ -8,7 +8,7 @@ import { useStory } from '../store/storyStore'
 import { useImageUrl } from '../store/images'
 import { PictureViewer } from '../components/PictureViewer'
 import { Handles } from './EntityNodes'
-import { useMap, useToolbarPlacement, type StoryFlowNode } from './mapShared'
+import { useMap, useResizePlace, useToolbarPlacement, type StoryFlowNode } from './mapShared'
 
 type PictureMapNode = Extract<MapNode, { kind: 'image' }>
 
@@ -19,6 +19,7 @@ export function PictureNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
   const updateMapNode = useStory((s) => s.updateMapNode)
   const { removeNode } = useMap()
   const toolbar = useToolbarPlacement(id, selected)
+  const resize = useResizePlace(node)
   const [viewing, setViewing] = useState(false)
 
   return (
@@ -30,9 +31,8 @@ export function PictureNode({ id, data, selected }: NodeProps<StoryFlowNode>) {
         minHeight={40}
         lineClassName="map-resize-line"
         handleClassName="map-resize-handle"
-        onResizeEnd={(_, p) =>
-          updateMapNode(id, { x: Math.round(p.x), y: Math.round(p.y), width: Math.round(p.width), height: Math.round(p.height) })
-        }
+        onResizeStart={resize.onResizeStart}
+        onResizeEnd={(_, p) => updateMapNode(id, { ...resize.placed(p), width: Math.round(p.width), height: Math.round(p.height) })}
       />
       <NodeToolbar isVisible={selected} position={toolbar.position} align={toolbar.align} className="map-toolbar">
         <button className="map-tool" onClick={() => setViewing(true)} disabled={!url}>

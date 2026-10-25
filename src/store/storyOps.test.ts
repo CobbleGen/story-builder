@@ -1529,6 +1529,39 @@ describe('containers on the map', () => {
     expect(normalizeStory(loaded)).toEqual(loaded)
   })
 
+  it('brings back cards a resize sent off a container that places them freely', () => {
+    const note = (id: string, x: number, y: number, containerId: string) => ({ id, kind: 'note', x, y, width: 120, height: 90, text: '', color: 'yellow', containerId })
+    const loaded = normalizeStory({
+      mindMap: {
+        nodes: [
+          { id: 'free', kind: 'container', x: 1000, y: 600, width: 400, height: 300, color: 'blue', layout: 'free' },
+          { id: 'inner', kind: 'container', x: 50, y: 80, width: 300, height: 200, color: 'blue', layout: 'free', containerId: 'free' },
+          { id: 'stacked', kind: 'container', x: 2000, y: 0, width: 300, height: 300, color: 'blue', layout: 'vertical' },
+          { id: 'inStack', kind: 'container', x: 0, y: 0, width: 200, height: 200, color: 'blue', layout: 'free', containerId: 'stacked' },
+          // Saved at its place on the map (1040, 660), 40 by 60 from the container's corner
+          note('lost', 1040, 660, 'free'),
+          // Where it should be, from the corner; and one hanging off the left edge a little
+          note('fine', 40, 60, 'free'),
+          note('edge', -60, 30, 'free'),
+          // On a container on a container: the map's place, 1000 + 50 + 30 by 600 + 80 + 20
+          note('lostInner', 1080, 700, 'inner'),
+          // On a container in a stack (whose corner isn't saved): left alone
+          note('unknown', 2040, 1000, 'inStack'),
+        ],
+      },
+    })
+    const at = (id: string) => {
+      const n = loaded.mindMaps[0].nodes.find((x) => x.id === id)!
+      return [n.x, n.y, parentOf(n)]
+    }
+    expect(at('lost')).toEqual([40, 60, 'free'])
+    expect(at('fine')).toEqual([40, 60, 'free'])
+    expect(at('edge')).toEqual([-60, 30, 'free'])
+    expect(at('lostInner')).toEqual([30, 20, 'inner'])
+    expect(at('unknown')).toEqual([2040, 1000, 'inStack'])
+    expect(normalizeStory(loaded)).toEqual(loaded)
+  })
+
   it('repairs containers and what’s on them when loading', () => {
     const loaded = normalizeStory({
       mindMap: {

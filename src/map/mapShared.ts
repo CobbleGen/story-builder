@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext } from 'react'
+import { createContext, useCallback, useContext, useRef } from 'react'
 import { Position, useNodeId, useStore, useUpdateNodeInternals, type Node } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStory } from '../store/storyStore'
@@ -6,6 +6,25 @@ import type { MapNode, MapSize, NoteColor } from '../types'
 import { CONTAINER_COLOR, NOTE_COLOR, type NewMapNode } from '../store/storyOps'
 import { cleanColor, isPale, needsLightInk } from '../lib/colors'
 import { TEXT_BOX_SIZE } from '../lib/textSize'
+
+/**
+ * Resizing a card by hand: where it's saved once let go. React Flow gives the
+ * card's corner on the map, but a card on a container is saved from the
+ * container's corner, so it's moved by as much as its corner did (dragging a
+ * top or left edge), from where it's saved.
+ */
+export function useResizePlace(node: { x: number; y: number }) {
+  const from = useRef<{ x: number; y: number } | null>(null)
+  return {
+    onResizeStart: (_: unknown, p: { x: number; y: number }) => {
+      from.current = { x: p.x, y: p.y }
+    },
+    placed: (p: { x: number; y: number }) => {
+      const start = from.current ?? p
+      return { x: Math.round(node.x + p.x - start.x), y: Math.round(node.y + p.y - start.y) }
+    },
+  }
+}
 
 /** Data type for things dragged from the palette onto the canvas. */
 export const DRAG_MIME = 'application/x-story-map-node'
