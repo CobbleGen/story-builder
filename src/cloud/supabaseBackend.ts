@@ -24,6 +24,7 @@ const FRIENDLY: [RegExp, string][] = [
   [/email not confirmed/i, 'Confirm your email address first: follow the link in the email we sent you.'],
   [/already registered|already been registered|already exists/i, 'There’s already an account with that email address. Sign in instead.'],
   [/rate limit|too many/i, 'Too many tries just now. Wait a little and try again.'],
+  [/error sending|sending .*email|email address not authorized|smtp/i, 'The email couldn’t be sent just now. Try again later: your story is still saved in this browser.'],
   [/password should be|weak password/i, 'Choose a longer password: at least 8 characters.'],
   [/unable to validate email|invalid email|invalid format/i, 'That doesn’t look like an email address.'],
   [/same.*password|different from the old/i, 'Choose a password different from your old one.'],

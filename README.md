@@ -8,6 +8,12 @@ It has four views: the **chapter board**, the **manuscript**, the
 assistant such as Claude read all of it and give you feedback (see
 [AI assistants](#ai-assistants)).
 
+A first visit opens the example story, *The Lighthouse at Gull Point*, with a
+welcome saying what it is and where work is kept, and a button to start a
+blank story instead. If something ever breaks, a page says so (the story's
+saved) with a way back and the details to report; a page left open across a
+new version reloads to get it.
+
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
   chapter by its "Chapter N" label to reorder the book (numbers update
@@ -495,8 +501,10 @@ organization): its sign-in (email and password), a `stories` table that
 every account sees only its own rows of, and a private `pictures` bucket
 with a folder per account, plus `assistant_keys` (the fingerprints of the
 links for AI assistants) and two functions that read a key's account's
-stories, which is all the story server can reach. `supabase/migrations/`
-holds its schema. The app
+stories, which is all the story server can reach. Each account can keep up
+to 200 stories of up to 20 MB each, and 1,000 pictures in up to 100 MB, so
+no one account can fill the project's space (`…_account_limits.sql`).
+`supabase/migrations/` holds its schema. The app
 finds it through `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` in `.env`
 (public values: the key only lets people sign in; the row rules do the
 rest). Without them the app runs as before, in the browser only.

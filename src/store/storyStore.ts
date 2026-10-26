@@ -186,6 +186,8 @@ function refuse() {
 /** A change to how a card is shown on the mind map (opened up or not), which a reviewer may make for themselves. */
 const viewOnly = (patch: object) => Object.keys(patch).every((k) => k === 'expanded')
 
+let openedFresh = false
+
 export const useStory = create<StoryStore>()(
   persist(
     (set, get) => {
@@ -346,11 +348,16 @@ export const useStory = create<StoryStore>()(
       // Older saves are upgraded by normalizeStory in merge below.
       migrate: (persisted) => persisted as StoryStore,
       // Saved data is repaired on load so a bad save can't break the board.
-      merge: (persisted, current) =>
-        persisted ? { ...current, ...upgradeStory(persisted) } : current,
+      merge: (persisted, current) => {
+        openedFresh = !persisted
+        return persisted ? { ...current, ...upgradeStory(persisted) } : current
+      },
     },
   ),
 )
+
+/** No story was kept in this browser when the page opened (someone's first visit: the example is open). */
+export const openedWithoutAStory = () => openedFresh
 
 /** Chapter id -> chapter number (1-based). */
 export function useChapterNumbers(): Record<string, number> {

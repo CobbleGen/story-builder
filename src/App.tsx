@@ -26,6 +26,7 @@ import { reviewing } from './review/mode'
 import { startReview } from './review/store'
 import { ReviewGate } from './components/Review'
 import { CommentsPanel } from './components/Comments'
+import { Welcome } from './components/Welcome'
 import { useCommentPanel, useCommentsOn } from './comments/store'
 
 // The text editor is large; load it only when someone opens the manuscript.
@@ -95,6 +96,7 @@ export default function App() {
         <SprintDone />
         <ConfirmDialog />
         <CommentsPanel />
+        {!reviewing && <Welcome />}
         {saveFailed && (
           <div className="save-banner" role="alert">
             Your latest changes couldn’t be saved in this browser. Use ⋯ → Export story to keep a copy.

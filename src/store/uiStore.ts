@@ -20,6 +20,8 @@ export interface MapViewport {
 export type Highlight = { kind: 'arc' | 'character' | 'element'; id: string } | null
 
 interface UiState {
+  /** The first-visit welcome has been seen. */
+  welcomed: boolean
   sidebarOpen: boolean
   sidebarMode: SidebarMode
   expandedArcs: Record<string, boolean>
@@ -91,6 +93,7 @@ const RECENT_COLORS = 12
 export const useUi = create<UiState>()(
   persist(
     (set) => ({
+      welcomed: false,
       // Start with the sidebar closed on phones, where it covers the board.
       sidebarOpen: typeof window === 'undefined' || window.innerWidth > 760,
       sidebarMode: 'arcs',
@@ -156,6 +159,7 @@ export const useUi = create<UiState>()(
         return { ...current, ...rest, mapViewports, exportOptions }
       },
       partialize: (s) => ({
+        welcomed: s.welcomed,
         sidebarOpen: s.sidebarOpen,
         sidebarMode: s.sidebarMode,
         expandedArcs: s.expandedArcs,
