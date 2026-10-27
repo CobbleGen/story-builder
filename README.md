@@ -373,8 +373,9 @@ account as well:
 - If the same story was changed in two places before either saw the other's
   change, nothing is overwritten: you're asked which version to keep, and
   the other goes into that browser's backups.
-- **Your account** lists your stories: open one, start a new one, or delete
-  one you don't need. Signed in, ⋯ → New blank story, Load example story and
+- **Your account** lists your stories: open one, start a new one, add the
+  example story (a copy of its own, to look around in), or delete one you
+  don't need. Signed in, ⋯ → New blank story, Load example story and
   Import story each add a new story to your account rather than replacing
   the one open.
 - Signing out leaves the story in the browser; it just stops being saved to

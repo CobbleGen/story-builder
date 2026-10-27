@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BookPlus, CircleAlert, CloudOff, LogOut, RefreshCw, Trash2, UserRound } from 'lucide-react'
+import { BookPlus, CircleAlert, CloudOff, LogOut, RefreshCw, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { cloud, useCloud, type CloudState } from '../cloud'
 import { askConfirm } from '../lib/confirm'
 import { buildBlankStory } from '../store/sampleStory'
+import { buildExampleStory, EXAMPLE_TITLE } from '../store/exampleStory'
 import { when } from '../lib/when'
 import { Modal } from './Modal'
 import { AssistantLinks } from './AssistantLinks'
@@ -357,13 +358,23 @@ function AccountView({ onClose }: { onClose: () => void }) {
       <div className="account-stories-head">
         <h3 className="progress-heading">Your stories</h3>
         {state.status !== 'unlinked' && (
-          <button
-            className="btn ghost small"
-            disabled={!!busy || state.status === 'conflict'}
-            onClick={() => void run('new', () => cloud!.newStory(buildBlankStory()))}
-          >
-            <BookPlus size={15} /> New story
-          </button>
+          <div className="account-stories-new">
+            <button
+              className="btn ghost small"
+              disabled={!!busy || state.status === 'conflict'}
+              onClick={() => void run('example', () => cloud!.newStory(buildExampleStory()))}
+              title={`Add the example, ${EXAMPLE_TITLE}, to your account as a new story and open it`}
+            >
+              <Sparkles size={15} /> {busy === 'example' ? 'Adding…' : 'Add the example'}
+            </button>
+            <button
+              className="btn ghost small"
+              disabled={!!busy || state.status === 'conflict'}
+              onClick={() => void run('new', () => cloud!.newStory(buildBlankStory()))}
+            >
+              <BookPlus size={15} /> New story
+            </button>
+          </div>
         )}
       </div>
       {state.stories === null ? (
