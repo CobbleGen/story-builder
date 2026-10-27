@@ -362,7 +362,10 @@ export function TimelinePage() {
   const justDropped = useRef(false)
 
   const story = useMemo(() => storyOrder({ chapters, arcs, beats, timeline }), [chapters, arcs, beats, timeline])
-  const jumps = useMemo(() => timeJumps(story, chapters.flatMap((c) => c.beatIds)), [story, chapters])
+  const jumps = useMemo(
+    () => timeJumps(story, chapters.flatMap((c) => c.beatIds), beatsInBook({ chapters, arcs, beats, timeline })),
+    [story, chapters, arcs, beats, timeline],
+  )
   // Whether matching this order to the other would change anything.
   const unmatched = useMemo(() => {
     const data = { chapters, arcs, beats, timeline }

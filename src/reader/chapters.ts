@@ -1,7 +1,7 @@
 import type { Beat, Chapter } from '../types'
 import type { Jump } from '../lib/timeline'
 import { timeJumps } from '../lib/timeline'
-import { storyOrder } from '../store/storyOps'
+import { beatsInBook, storyOrder } from '../store/storyOps'
 import { NotFound, chapterList, count, findChapter, type Story } from './story'
 import { PART_CHARS, clip, linkedPassages, mentionCounts, splitParts, textParagraphs } from './text'
 
@@ -17,7 +17,7 @@ const JUMP_WORDS: Record<Jump, string> = {
 }
 
 /** Beats read out of order, by id (see lib/timeline). */
-export const jumpsOf = (story: Story) => timeJumps(storyOrder(story.data), story.data.chapters.flatMap((c) => c.beatIds))
+export const jumpsOf = (story: Story) => timeJumps(storyOrder(story.data), story.data.chapters.flatMap((c) => c.beatIds), beatsInBook(story.data))
 
 export const wordsIn = (story: Story, c: Chapter) => story.data.texts[c.id]?.words ?? 0
 

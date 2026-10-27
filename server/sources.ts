@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { buildSampleStory } from '../src/store/sampleStory'
+import { buildExampleStory } from '../src/store/exampleStory'
 
 // Where the stories an assistant reads come from: a writer's account, opened
 // by the private key in their link, or the example story (the link
@@ -51,14 +51,14 @@ export const EXAMPLE_KEY = 'example'
 /** What Arc Creator makes: 32 random bytes, as base64url. */
 export const looksLikeKey = (key: string) => /^[A-Za-z0-9_-]{43}$/.test(key)
 
-let example: ReturnType<typeof buildSampleStory> | null = null
+let example: ReturnType<typeof buildExampleStory> | null = null
 
 /** Comments on the example story: kept only for a while, in this server's memory (and only so many). */
 const exampleComments: CommentRow[] = []
 
-/** The example story, The Lighthouse at Gull Point. */
+/** The example story, The Adventure of the Speckled Band (the app's, with its text). */
 export function exampleSource(): StorySource {
-  example ??= buildSampleStory()
+  example ??= buildExampleStory()
   const data = example
   const find = (id: string) => exampleComments.find((c) => c.id === id)
   return {

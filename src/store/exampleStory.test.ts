@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { RichNode } from '../types'
 import { timeJumps } from '../lib/timeline'
 import { buildExampleStory, EXAMPLE_TITLE } from './exampleStory'
-import { BOOK_END, BOOK_START, columnsOf, normalizeStory, readingOrder, storyOrder } from './storyOps'
+import { BOOK_END, BOOK_START, beatsInBook, columnsOf, normalizeStory, readingOrder, storyOrder } from './storyOps'
 
 describe('the example story', () => {
   const data = buildExampleStory()
@@ -37,6 +38,24 @@ describe('the example story', () => {
     expect(texts.join(' ')).not.toMatch(/@(?!\{)/)
   })
 
+  it('has the whole story written, each beat linked once to its passage in its chapter', () => {
+    const words = data.chapters.map((c) => data.texts[c.id]?.words ?? 0)
+    expect(words.every((w) => w > 700)).toBe(true)
+    expect(words.reduce((a, b) => a + b, 0)).toBeGreaterThan(9700)
+    const links = new Map<string, string[]>()
+    for (const c of data.chapters) {
+      const walk = (n: RichNode) => {
+        for (const m of n.marks ?? []) if (m.type === 'beatLink') links.set(String(m.attrs?.beatId), [...(links.get(String(m.attrs?.beatId)) ?? []), c.id])
+        n.content?.forEach(walk)
+      }
+      walk(data.texts[c.id].doc)
+    }
+    for (const b of Object.values(data.beats)) expect(links.get(b.id), b.title).toEqual([b.chapterId])
+    const first = JSON.stringify(data.texts[data.chapters[0].id].doc)
+    expect(first).toMatch(/^\{"type":"doc","content":\[\{"type":"paragraph","content":\[\{"type":"text","text":"On glancing over my notes/)
+    expect(JSON.stringify(data.texts[data.chapters[3].id].doc)).toContain('£250')
+  })
+
   it('happens in another order than it’s told: backstory, a flashback, an aftermath and a moment two arcs share', () => {
     const story = storyOrder(data)
     const reading = readingOrder(data)
@@ -52,9 +71,14 @@ describe('the example story', () => {
     // Told last of all, it happened before Julia's death.
     expect(reading.at(-1)).toBe(beatNamed('A snake from India').id)
     expect(at('A snake from India')).toBeLessThan(at('“The speckled band!”'))
-    const jumps = timeJumps(story, reading)
+    // Helen's account is told as she gives it, after the book has begun: a flashback, not the book's present.
+    const jumps = timeJumps(story, reading, beatsInBook(data))
     expect(jumps.get(beatNamed('A snake from India').id)).toBe('flashback')
+    expect(jumps.get(beatNamed('A death in Calcutta').id)).toBe('flashback')
+    expect(jumps.get(beatNamed('The whistle again').id)).toBe('flashback')
+    expect(jumps.has(beatNamed('A visitor before breakfast').id)).toBe(false)
     expect(jumps.get(beatNamed('Free to tell it at last').id)).toBe('flash-forward')
+    expect([...jumps.values()].filter((j) => j === 'flashback')).toHaveLength(12)
     // Holmes's lash and the snake turning back are one moment, in two arcs.
     const column = columnsOf(story, data.beats).find((c) => c.includes(beatNamed('Holmes lashes at the bell-pull').id))!
     expect(column).toContain(beatNamed('The snake turns on its master').id)

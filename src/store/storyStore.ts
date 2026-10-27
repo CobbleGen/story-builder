@@ -8,6 +8,7 @@ import { archiveItem, deleteArchived, restoreArchived, throughArchive, upgradeSt
 import * as drafts from './drafts'
 import { archivedNamed } from '../lib/archived'
 import { buildSampleStory } from './sampleStory'
+import { buildExampleStory } from './exampleStory'
 import { lookupOf, type Lookup, type Mentionable } from '../lib/mentions'
 import { STORY_KEY, storyStorage } from './persistence'
 import { forget, notify, remember, travel } from './history'
@@ -188,6 +189,16 @@ const viewOnly = (patch: object) => Object.keys(patch).every((k) => k === 'expan
 
 let openedFresh = false
 
+declare global {
+  interface Window {
+    /** Browser tests (dev builds only) made with the old example: it's the story a first visit opens. */
+    __testStory?: 'lighthouse'
+  }
+}
+
+/** The story a first visit opens: the example (in dev builds' older tests, the one they were made with). */
+const firstStory = () => (import.meta.env.DEV && typeof window !== 'undefined' && window.__testStory === 'lighthouse' ? buildSampleStory() : buildExampleStory())
+
 export const useStory = create<StoryStore>()(
   persist(
     (set, get) => {
@@ -222,7 +233,7 @@ export const useStory = create<StoryStore>()(
         return id
       }
       return {
-        ...buildSampleStory(),
+        ...firstStory(),
         setTitle: (title) => apply({ ...data(), title }, 'setTitle'),
         addChapter: (...a) => withId(ops.addChapter(data(), ...a), 'addChapter', a[0]),
         updateChapter: (...a) => apply(ops.updateChapter(data(), ...a), 'updateChapter', a[0]),

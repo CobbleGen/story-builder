@@ -17,6 +17,26 @@ describe('timeline helpers', () => {
     expect([...jumps]).toEqual([['p', 'flash-forward']])
   })
 
+  it('takes the book’s own present for the main line, given the beats in it', () => {
+    // The book opens on a, then tells the backstory b1–b3 at length, then goes on (c, d); z, after it ends, is told first.
+    const story = ['b1', 'b2', 'b3', 'a', 'c', 'd', 'z']
+    const reading = ['z', 'a', 'b1', 'b2', 'b3', 'c', 'd']
+    expect([...timeJumps(story, reading)]).toEqual([
+      ['a', 'flash-forward'],
+      ['z', 'flash-forward'],
+    ])
+    expect([...timeJumps(story, reading, new Set(['a', 'c', 'd']))]).toEqual([
+      ['b1', 'flashback'],
+      ['b2', 'flashback'],
+      ['b3', 'flashback'],
+      ['z', 'flash-forward'],
+    ])
+    // A prologue from before the book, read first, and an epilogue from after it, read last, are told in order.
+    expect(timeJumps(['p', 'a', 'b', 'e'], ['p', 'a', 'b', 'e'], new Set(['a', 'b'])).size).toBe(0)
+    // With every beat in the book, it's as without.
+    expect([...timeJumps(story, reading, new Set(story))]).toEqual([...timeJumps(story, reading)])
+  })
+
   it('leaves out beats that are in no chapter', () => {
     expect(timeJumps(['x', 'a', 'b'], ['a', 'b']).size).toBe(0)
   })

@@ -23,9 +23,10 @@ import {
 const color = (name: string) => ARC_COLORS.find((c) => c.name === name)!.value
 
 /**
- * A small example story so the board has something to show on first visit.
- * Text is written with plain `@Name` mentions; linkMentions turns them into
- * real links to characters and places at the end.
+ * A small story the tests are built on (the example story first visits
+ * opened, before The Speckled Band; see ./exampleStory). Text is written with
+ * plain `@Name` mentions; linkMentions turns them into real links to
+ * characters and places at the end.
  */
 export function buildSampleStory(): StoryData {
   let data: StoryData = emptyStory('The Lighthouse at Gull Point')

@@ -21,7 +21,8 @@ import {
   FileInput,
 } from 'lucide-react'
 import { pickData, useStory } from '../store/storyStore'
-import { buildBlankStory, buildSampleStory } from '../store/sampleStory'
+import { buildBlankStory } from '../store/sampleStory'
+import { buildExampleStory } from '../store/exampleStory'
 import { Menu } from './Menu'
 import { askConfirm } from '../lib/confirm'
 import { swapInStory } from '../store/swapIn'
@@ -134,7 +135,7 @@ export function TopBar() {
         ]
       : []),
     { label: 'New blank story', icon: <FilePlus2 size={16} />, onSelect: () => replaceWith(buildBlankStory, 'Start a blank story?', 'Start blank story') },
-    { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildSampleStory, 'Load the example story?', 'Load example') },
+    { label: 'Load example story', icon: <Sparkles size={16} />, onSelect: () => replaceWith(buildExampleStory, 'Load the example story?', 'Load example') },
     ...themeItems,
   ]
 

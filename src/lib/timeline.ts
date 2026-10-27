@@ -10,27 +10,32 @@ export type Jump = 'flashback' | 'flash-forward'
  * run of beats told in the order they happen counts as the main line; each
  * other beat is a flashback when it's read later than what happens after it,
  * and a flash-forward when it's read earlier than what happens before it.
+ * Given the beats `inBook` (between where it begins and ends), the main line
+ * is the book's own: backstory told in the book is a flashback even when
+ * there's more of it than of the book around it, and aftermath told early
+ * a flash-forward.
  */
-export function timeJumps(story: string[], reading: string[]): Map<string, Jump> {
+export function timeJumps(story: string[], reading: string[], inBook?: ReadonlySet<string>): Map<string, Jump> {
   const read = new Map(reading.map((id, i) => [id, i]))
   const seq = story.filter((id) => read.has(id))
   const at = seq.map((id) => read.get(id)!)
-  // Longest increasing run of reading positions (patience sorting).
+  // Longest increasing run of reading positions (patience sorting), among the beats the main line can be made of.
+  const line = inBook && seq.some((id) => inBook.has(id)) ? at.flatMap((_, i) => (inBook.has(seq[i]) ? [i] : [])) : at.map((_, i) => i)
   const tails: number[] = []
-  const prev: number[] = at.map(() => -1)
-  at.forEach((value, i) => {
+  const prev: number[] = line.map(() => -1)
+  line.forEach((i, j) => {
     let lo = 0
     let hi = tails.length
     while (lo < hi) {
       const mid = (lo + hi) >> 1
-      if (at[tails[mid]] < value) lo = mid + 1
+      if (at[line[tails[mid]]] < at[i]) lo = mid + 1
       else hi = mid
     }
-    if (lo > 0) prev[i] = tails[lo - 1]
-    tails[lo] = i
+    if (lo > 0) prev[j] = tails[lo - 1]
+    tails[lo] = j
   })
   const main = new Set<number>()
-  for (let k = tails.length ? tails[tails.length - 1] : -1; k !== -1; k = prev[k]) main.add(k)
+  for (let k = tails.length ? tails[tails.length - 1] : -1; k !== -1; k = prev[k]) main.add(line[k])
 
   const jumps = new Map<string, Jump>()
   at.forEach((value, i) => {

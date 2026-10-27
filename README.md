@@ -8,11 +8,21 @@ It has four views: the **chapter board**, the **manuscript**, the
 assistant such as Claude read all of it and give you feedback (see
 [AI assistants](#ai-assistants)).
 
-A first visit opens the example story, *The Lighthouse at Gull Point*, with a
+A first visit opens the example story, Arthur Conan Doyle's Sherlock Holmes
+story *The Adventure of the Speckled Band* (1892, public domain), with a
 welcome saying what it is and where work is kept, and a button to start a
-blank story instead. If something ever breaks, a page says so (the story's
-saved) with a way back and the details to report; a page left open across a
-new version reloads to get it.
+blank story instead. The example has the whole text (about 9,800 words, in
+seven chapters of our own making), its four arcs and 27 beats placed in
+their chapters, each beat linked to the passage that tells it, the story
+time (Helen's account at Baker Street is backstory, told as flashbacks;
+Holmes's lash and the snake turning on its master are one moment in two
+arcs; the snake's training is told last of all), a mystery's outline over
+Holmes's investigation, and two mind maps (the clues, and who's who). ⋯ →
+Load example story loads it again.
+
+If something ever breaks, a page says so (the story's saved) with a way back
+and the details to report; a page left open across a new version reloads to
+get it.
 
 - **Chapters** are columns with a number, title and summary at the top.
   Add beats straight into a chapter, drag beats between chapters, and drag a
@@ -238,7 +248,10 @@ new version reloads to get it.
   keyboard, Shift ← and → on a beat): it lasts until a later beat, so a beat
   added in between makes it longer; moved, it keeps its length; and it never
   runs into its arc's next beat. In reading order each beat has one place.
-  Beats told out of order are marked **Flashback** or **Flash-forward**.
+  Beats told out of order are marked **Flashback** or **Flash-forward**,
+  against the book's own run of events (between where it begins and ends):
+  backstory told in the book is a flashback, however much of it there is,
+  and aftermath told before the end a flash-forward.
 - **Where the book begins and ends**: in story order, two lines run through
   every lane, **Book begins** and **Book ends**, at the very beginning and
   end to start with. Drag a line (or the book at its top) to its place in
@@ -543,6 +556,10 @@ any static host or sub-folder.
 - `src/store/storyOps.ts`: pure, tested operations that keep beats, arcs
   and chapters in sync
 - `src/store/storyStore.ts`: the persisted store wrapping those operations
+- `src/store/exampleStory.ts` and `src/store/exampleText.ts`: the example
+  story (its plan, built with the store's own operations, and its text, from
+  Project Gutenberg); `src/store/sampleStory.ts` is the smaller story the
+  tests are built on, and the blank story
 - `src/pages/BoardPage.tsx`: the chapter board and its drag-and-drop logic
 - `src/pages/ArcPage.tsx`: a single arc's page
 - `src/lib/outlines.ts` and `src/components/ArcOutline.tsx`: the story

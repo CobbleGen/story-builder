@@ -92,24 +92,28 @@ describe('the story server', () => {
 
   it('reads the example story', async () => {
     const client = await connect('example')
-    expect(text(await client.callTool({ name: 'get_story_overview', arguments: {} }))).toMatch(/^# The Lighthouse at Gull Point/)
-    const chapter = text(await client.callTool({ name: 'read_chapter', arguments: { chapter: 'the logbook' } }))
-    expect(chapter).toMatch(/^# Chapter 3: The Logbook/)
-    expect(chapter).toMatch(/In the text: “The bottom drawer stuck/)
-    expect(chapter).toMatch(/The keeper’s cottage had not changed/)
-    expect(text(await client.callTool({ name: 'get_timeline', arguments: {} }))).toMatch(/## Before the book begins \(backstory\)\n1\. \[Twenty years earlier\] Elias’s first run/)
-    expect(text(await client.callTool({ name: 'get_characters', arguments: { name: 'elias' } }))).toMatch(/Secret: Guides smugglers past the reef/)
-    expect(text(await client.callTool({ name: 'get_mind_maps', arguments: {} }))).toMatch(/Elias \(character\) — Mara \(character\): “father of”/)
-    expect(text(await client.callTool({ name: 'search_story', arguments: { query: 'oilcloth' } }))).toMatch(/Chapter 3: The Logbook, paragraph 3/)
-    expect(text(await client.callTool({ name: 'get_writing_progress', arguments: {} }))).toMatch(/Manuscript: 274 words/)
+    expect(text(await client.callTool({ name: 'get_story_overview', arguments: {} }))).toMatch(/^# The Adventure of the Speckled Band/)
+    const chapter = text(await client.callTool({ name: 'read_chapter', arguments: { chapter: 'the vigil' } }))
+    expect(chapter).toMatch(/^# Chapter 6: The Vigil/)
+    expect(chapter).toMatch(/In the text: “How shall I ever forget that dreadful vigil\?”/)
+    expect(chapter).toMatch(/Sherlock Holmes and I had no difficulty in engaging a bedroom and sitting-room at the Crown Inn/)
+    const time = text(await client.callTool({ name: 'get_timeline', arguments: {} }))
+    expect(time).toMatch(/## Before the book begins \(backstory\)\n1\. \[Years before, in India\] A death in Calcutta/)
+    expect(time).toMatch(/## After the book ends \(aftermath\)\n26\. \[Years later\] Free to tell it at last/)
+    expect(time).toMatch(/Holmes lashes at the bell-pull \(Holmes investigates, chapter 6\) \+ at the same moment: The snake turns on its master/)
+    expect(time).toMatch(/“A snake from India” \(chapter 7\) is a flashback/)
+    expect(text(await client.callTool({ name: 'get_characters', arguments: { name: 'roylott' } }))).toMatch(/Was: A doctor in Calcutta, until he beat his butler to death/)
+    expect(text(await client.callTool({ name: 'get_mind_maps', arguments: {} }))).toMatch(/Saucer of milk \(object\) — Swamp adder \(object\): “feeds”/)
+    expect(text(await client.callTool({ name: 'search_story', arguments: { query: 'Eley' } }))).toMatch(/Chapter 4: Holmes, the Meddler, paragraph 32/)
+    expect(text(await client.callTool({ name: 'get_writing_progress', arguments: {} }))).toMatch(/Manuscript: 9,801 words/)
   })
 
   it('says what there is when something asked for isn’t there', async () => {
     const client = await connect('example')
     const result = await client.callTool({ name: 'read_chapter', arguments: { chapter: '9' } })
     expect(result.isError).toBe(true)
-    expect(text(result)).toMatch(/No chapter “9”\. The chapters are: 1\. The Storm, 2\. Wreckage, 3\. The Logbook, 4\. Low Tide\./)
-    expect(text(await client.callTool({ name: 'get_characters', arguments: { name: 'nobody' } }))).toMatch(/There are: Mara, Theo, Elias, Harrow/)
+    expect(text(result)).toMatch(/No chapter “9”\. The chapters are: 1\. Early in April, 2\. The Last of the Roylotts, 3\. The Night Julia Died, 4\. Holmes, the Meddler, 5\. Stoke Moran, 6\. The Vigil, 7\. The Speckled Band\./)
+    expect(text(await client.callTool({ name: 'get_characters', arguments: { name: 'nobody' } }))).toMatch(/There are: Holmes, Watson, Helen Stoner, Dr\. Roylott, Julia Stoner, Percy Armitage/)
   })
 
   it('reads an account’s stories by its key, the latest by default', async () => {
@@ -201,18 +205,18 @@ describe('comments', () => {
   it('comments on a passage, a beat and a card of the example story; replies and resolves', async () => {
     const client = await connect('example')
     const passage = text(
-      await client.callTool({ name: 'add_comment', arguments: { chapter: '3', quote: 'The same kettle with the dent', comment: 'Lovely detail.' } }),
+      await client.callTool({ name: 'add_comment', arguments: { chapter: '3', quote: 'It was a wild night.', comment: 'Lovely detail.' } }),
     )
-    expect(passage).toMatch(/^Comment (\S+) added, on Chapter 3: The Logbook\. The writer sees it/)
+    expect(passage).toMatch(/^Comment (\S+) added, on Chapter 3: The Night Julia Died\. The writer sees it/)
     const id = /^Comment (\S+) added/.exec(passage)![1]
-    expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'the lamp goes dark', comment: 'Why now?' } }))).toMatch(/on Beat “The lamp goes dark”/)
-    expect(text(await client.callTool({ name: 'add_comment', arguments: { mind_map: 'who knows', card: 'smuggling', comment: 'Answer this by chapter 4.' } }))).toMatch(
-      /on Mind map “Who knows what” · Sticky note “What if Theo already knows about the smuggling\?”/,
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'the doctor calls', comment: 'Why now?' } }))).toMatch(/on Beat “The doctor calls”/)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { mind_map: 'clues', card: 'clamped', comment: 'Answer this by chapter 6.' } }))).toMatch(
+      /on Mind map “The clues” · Sticky note “Why is the bed clamped to the floor\?”/,
     )
     let all = text(await client.callTool({ name: 'get_comments', arguments: {} }))
-    expect(all).toMatch(/## Chapter 3: The Logbook\n- Comment \S+, on Chapter 3: The Logbook\n  On the words: “The same kettle with the dent”\n  you \(AI assistant\), [\d-]+ [\d:]+: Lovely detail\./)
-    expect(all).toMatch(/## Beats\n- Comment \S+, on Beat “The lamp goes dark”/)
-    expect(text(await client.callTool({ name: 'get_comments', arguments: { chapter: 'the logbook' } }))).not.toMatch(/## Beats/)
+    expect(all).toMatch(/## Chapter 3: The Night Julia Died\n- Comment \S+, on Chapter 3: The Night Julia Died\n  On the words: “It was a wild night\.”\n  you \(AI assistant\), [\d-]+ [\d:]+: Lovely detail\./)
+    expect(all).toMatch(/## Beats\n- Comment \S+, on Beat “The doctor calls”/)
+    expect(text(await client.callTool({ name: 'get_comments', arguments: { chapter: 'the night julia died' } }))).not.toMatch(/## Beats/)
     // Replies, then resolves (by the first few characters of its id, too)
     expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: id, reply: 'And the barometer.' } }))).toMatch(new RegExp(`added to comment ${id}`))
     expect(text(await client.callTool({ name: 'resolve_comment', arguments: { comment_id: id.slice(0, 8) } }))).toBe(`Comment ${id} resolved.`)
@@ -227,9 +231,9 @@ describe('comments', () => {
     const client = await connect('example')
     const missing = await client.callTool({ name: 'add_comment', arguments: { chapter: '3', quote: 'words that are nowhere', comment: 'x' } })
     expect(missing.isError).toBe(true)
-    expect(text(missing)).toMatch(/Those words aren’t in Chapter 3: The Logbook\. Quote them exactly/)
+    expect(text(missing)).toMatch(/Those words aren’t in Chapter 3: The Night Julia Died\. Quote them exactly/)
     expect(text(await client.callTool({ name: 'add_comment', arguments: { beat: 'x', arc: 'y', comment: 'x' } }))).toMatch(/one thing at a time/)
-    expect(text(await client.callTool({ name: 'add_comment', arguments: { quote: 'The same kettle', comment: 'x' } }))).toMatch(/needs the chapter/)
+    expect(text(await client.callTool({ name: 'add_comment', arguments: { quote: 'It was a wild night', comment: 'x' } }))).toMatch(/needs the chapter/)
     expect(text(await client.callTool({ name: 'reply_to_comment', arguments: { comment_id: 'nope', reply: 'x' } }))).toMatch(/No comment nope/)
   })
 
@@ -238,20 +242,20 @@ describe('comments', () => {
     const passage = text(
       await client.callTool({
         name: 'suggest_change',
-        arguments: { chapter: '3', quote: 'The same kettle with the dent', new_text: 'The dented kettle', comment: 'Fewer words.' },
+        arguments: { chapter: '3', quote: 'The wind was howling outside', new_text: 'The wind howled outside', comment: 'Fewer words.' },
       }),
     )
-    expect(passage).toMatch(/^Suggestion \S+ added, on Chapter 3: The Logbook: new words for the passage\. The writer sees it in Arc Creator and can accept or decline it\./)
-    expect(text(await client.callTool({ name: 'suggest_change', arguments: { beat: 'the lamp goes dark', field: 'title', new_text: 'The lamp fails' } }))).toMatch(
-      /on Beat “The lamp goes dark”: a new title\./,
+    expect(passage).toMatch(/^Suggestion \S+ added, on Chapter 3: The Night Julia Died: new words for the passage\. The writer sees it in Arc Creator and can accept or decline it\./)
+    expect(text(await client.callTool({ name: 'suggest_change', arguments: { beat: 'the doctor calls', field: 'title', new_text: 'Roylott calls' } }))).toMatch(
+      /on Beat “The doctor calls”: a new title\./,
     )
-    expect(text(await client.callTool({ name: 'suggest_change', arguments: { mind_map: 'who knows', card: 'smuggling', new_text: 'Theo knows about the smuggling.' } }))).toMatch(
-      /Sticky note “What if Theo already knows about the smuggling\?”: a new text\./,
+    expect(text(await client.callTool({ name: 'suggest_change', arguments: { mind_map: 'clues', card: 'clamped', new_text: 'Why would anyone clamp a bed to the floor?' } }))).toMatch(
+      /Sticky note “Why is the bed clamped to the floor\?”: a new text\./,
     )
     const all = text(await client.callTool({ name: 'get_comments', arguments: {} }))
-    expect(all).toMatch(/On the words: “The same kettle with the dent”\n  Suggests instead: “The dented kettle”\n  you \(AI assistant\), [\d-]+ [\d:]+: Fewer words\./)
-    expect(all).toMatch(/Suggests a new title: “The lamp fails” \(was “The lamp goes dark”\)\n  you \(AI assistant\), [\d-]+ [\d:]+: Suggests a new title\./)
-    expect(all).toMatch(/Suggests a new text: “Theo knows about the smuggling\.” \(was “What if Theo already knows about the smuggling\?”\)/)
+    expect(all).toMatch(/On the words: “The wind was howling outside”\n  Suggests instead: “The wind howled outside”\n  you \(AI assistant\), [\d-]+ [\d:]+: Fewer words\./)
+    expect(all).toMatch(/Suggests a new title: “Roylott calls” \(was “The doctor calls”\)\n  you \(AI assistant\), [\d-]+ [\d:]+: Suggests a new title\./)
+    expect(all).toMatch(/Suggests a new text: “Why would anyone clamp a bed to the floor\?” \(was “Why is the bed clamped to the floor\?”\)/)
   })
 
   it('says what’s wrong with a change it can’t suggest', async () => {
@@ -262,14 +266,14 @@ describe('comments', () => {
       return text(result)
     }
     expect(await call({ new_text: 'x' })).toMatch(/Name what to change/)
-    expect(await call({ beat: 'the lamp goes dark', new_text: 'x' })).toMatch(/Name the field to change\. What can be changed: title, description \(its notes\), when\./)
-    expect(await call({ arc: 'theo', field: 'summary', new_text: 'x' })).toMatch(/There’s no summary to change on Arc “[^”]+”\. What can be changed: name, description\./)
-    expect(await call({ beat: 'the lamp goes dark', field: 'title', new_text: 'The lamp goes dark' })).toMatch(/That’s what its title says already/)
-    expect(await call({ beat: 'the lamp goes dark', field: 'title', new_text: '  ' })).toMatch(/A title can’t be empty/)
-    expect(await call({ chapter: '3', quote: 'The same kettle with the dent', field: 'title', new_text: 'x' })).toMatch(/changed by its words alone/)
-    expect(await call({ chapter: '3', quote: 'The same kettle with the dent', new_text: 'The same kettle with the dent' })).toMatch(/says already/)
+    expect(await call({ beat: 'the doctor calls', new_text: 'x' })).toMatch(/Name the field to change\. What can be changed: title, description \(its notes\), when\./)
+    expect(await call({ arc: 'roylott', field: 'summary', new_text: 'x' })).toMatch(/There’s no summary to change on Arc “[^”]+”\. What can be changed: name, description\./)
+    expect(await call({ beat: 'the doctor calls', field: 'title', new_text: 'The doctor calls' })).toMatch(/That’s what its title says already/)
+    expect(await call({ beat: 'the doctor calls', field: 'title', new_text: '  ' })).toMatch(/A title can’t be empty/)
+    expect(await call({ chapter: '3', quote: 'The wind was howling outside', field: 'title', new_text: 'x' })).toMatch(/changed by its words alone/)
+    expect(await call({ chapter: '3', quote: 'The wind was howling outside', new_text: 'The wind was howling outside' })).toMatch(/says already/)
     expect(await call({ chapter: '3', quote: 'words that are nowhere', new_text: 'x' })).toMatch(/Those words aren’t in Chapter 3/)
-    expect(await call({ mind_map: 'who knows', new_text: 'x' })).toMatch(/Name the card on the mind map/)
+    expect(await call({ mind_map: 'clues', new_text: 'x' })).toMatch(/Name the card on the mind map/)
   })
 
   it('comments through the account, on the draft asked for, and reads that draft', async () => {

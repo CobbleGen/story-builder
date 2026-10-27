@@ -1,5 +1,7 @@
-import type { ElementKind, StoryData } from '../types'
+import type { ElementKind, RichNode, StoryData } from '../types'
 import { ARC_COLORS, PAPER_NAMES } from '../lib/colors'
+import { wordsInDoc } from '../lib/replace'
+import { SPECKLED_BAND } from './exampleText'
 import type { NewMapNode } from './storyOps'
 import {
   BOOK_END,
@@ -17,13 +19,15 @@ import {
   placeOutlineStep,
   renameMindMap,
   setArcOutline,
+  setChapterText,
   updateChapter,
   updateMapEdge,
 } from './storyOps'
 
 // The example story a first visit opens: Arthur Conan Doyle's "The Adventure
 // of the Speckled Band" (1892, in the public domain), in seven chapters (the
-// breaks are ours), with its storylines planned as arcs and beats. Most of
+// breaks are ours), with its storylines planned as arcs and beats, each beat
+// linked to the passage that tells it (the text is in ./exampleText). Most of
 // the crime is told in flashback, and the narrator mentions at the start a
 // death years after it, so story time and reading order differ a lot:
 // backstory before the book begins, a flashback from the last chapter, an
@@ -136,7 +140,7 @@ export function buildExampleStory(): StoryData {
   // Chapter 2: her stepfather's past.
   const calcutta = beat(scheme, 'A death in Calcutta', 'In a rage, @Dr. Roylott beats his butler to death, and serves a long term in prison.', ch2, 'Years before, in India')
   const married = beat(scheme, 'Married for her money', 'He marries the widowed Mrs. Stoner, whose money is his while her daughters live with him.', ch2, 'In India')
-  const crewe = beat(scheme, 'Killed near Crewe', 'Mrs. Stoner dies in a railway accident, soon after they come home to @Stoke Moran.', ch2, 'Eight years ago')
+  const crewe = beat(scheme, 'Killed near Crewe', 'Mrs. Stoner dies in a railway accident soon after they come home to England, and he takes her daughters to @Stoke Moran.', ch2, 'Eight years ago')
   const terror = beat(scheme, 'The terror of the village', 'He quarrels, brawls and shuts himself away, with the @Gipsies on his land and a cheetah and a baboon in the grounds.', ch2, 'Since then')
 
   // Chapter 3: the night Julia died, and the whistle again.
@@ -161,15 +165,68 @@ export function buildExampleStory(): StoryData {
   // Chapter 6: the night watch.
   const lamp = beat(danger, 'The lamp in the window', 'When her stepfather has gone to bed, @Helen Stoner puts a lamp in the window for @Holmes and @Watson, watching from the @Crown Inn.', ch6, 'About eleven at night')
   const vigil = beat(investigation, 'Waiting in the dark', 'In @Julia’s room, without a light: the church clock strikes twelve, one, two, three.', ch6, 'Midnight to three')
-  const lashes = beat(investigation, 'Holmes lashes at the bell-pull', 'At a low, clear whistle, @Holmes strikes a match and lashes at the @Bell-pull with his cane.', ch6, 'Just after three')
+  const lashes = beat(investigation, 'Holmes lashes at the bell-pull', 'At a soft hiss, like steam from a kettle, @Holmes strikes a match and lashes at the @Bell-pull with his cane; @Watson hears a low, clear whistle.', ch6, 'Just after three')
   const turns = beat(scheme, 'The snake turns on its master', 'Driven back through the @Ventilator, the @Swamp adder strikes the first person it sees. A horrible cry.', ch6, 'Just after three')
 
   // Chapter 7: what they find, and how it was done.
-  const found = beat(investigation, 'The band round his brow', '@Dr. Roylott dead in his chair, a speckled band about his head. @Holmes noses it back into the @Iron safe with the @Dog lash.', ch7, 'Moments later')
+  const found = beat(investigation, 'The band round his brow', '@Dr. Roylott dead in his chair, a speckled band about his head. @Holmes loops the @Dog lash round its neck and shuts it in the @Iron safe.', ch7, 'Moments later')
   const aunt = beat(danger, 'To her aunt at Harrow', '@Helen Stoner goes to her aunt by the morning train; the inquiry finds the doctor died playing with a dangerous pet.', ch7, 'The next morning')
   const explains = beat(investigation, 'How it was done', 'The @Gipsies were a false scent; the @Ventilator, the @Bell-pull and the clamped bed gave it away.', ch7, 'The next day')
   // Told last of all, but it happened before Julia died: the longest flashback in the book.
   const trained = beat(scheme, 'A snake from India', '@Dr. Roylott trains the @Swamp adder to come back to a whistle, and to a saucer of milk, and sends it through the @Ventilator at night.', ch7, 'Before Julia’s death')
+
+  // ---------- The text, each beat linked to the passage that tells it ----------
+
+  const told: [string, string][] = [
+    [freed, 'a promise of secrecy was made at the time, from which I have only been freed during the last month by the untimely death of the lady to whom the pledge was given.'],
+    [visitor, 'A lady dressed in black and heavily veiled, who had been sitting in the window, rose as we entered.'],
+    [calcutta, 'In a fit of anger, however, caused by some robberies which had been perpetrated in the house, he beat his native butler to death and narrowly escaped a capital sentence.'],
+    [married, 'When Dr. Roylott was in India he married my mother, Mrs. Stoner, the young widow of Major-General Stoner, of the Bengal Artillery.'],
+    [crewe, 'she was killed eight years ago in a railway accident near Crewe.'],
+    [terror, 'until at last he became the terror of the village, and the folks would fly at his approach'],
+    [engaged, 'Julia went there at Christmas two years ago, and met there a half-pay major of marines, to whom she became engaged.'],
+    [whistle, 'during the last few nights I have always, about three in the morning, heard a low, clear whistle.'],
+    [band, 'Oh, my God! Helen! It was the band! The speckled band!'],
+    [inquest, 'he was unable to find any satisfactory cause of death.'],
+    [percyAsks, 'A month ago, however, a dear friend, whom I have known for many years, has done me the honour to ask my hand in marriage.'],
+    [moved, 'I have had to move into the chamber in which my sister died, and to sleep in the very bed in which she slept.'],
+    [again, 'I suddenly heard in the silence of the night the low whistle which had been the herald of her own death.'],
+    [takes, 'If we were to come to Stoke Moran to-day, would it be possible for us to see over these rooms without the knowledge of your stepfather?'],
+    [calls, 'our door had been suddenly dashed open, and that a huge man had framed himself in the aperture.'],
+    [poker, 'he picked up the steel poker and, with a sudden effort, straightened it out again.'],
+    [will, 'Each daughter can claim an income of £250, in case of marriage.'],
+    [dummy, 'You can see now that it is fastened to a hook just above where the little opening for the ventilator is.'],
+    [saucer, 'He took up a small saucer of milk which stood on the top of it.'],
+    [lamp, 'just at the stroke of eleven, a single bright light shone out right in front of us.'],
+    [vigil, 'How shall I ever forget that dreadful vigil?'],
+    [lashes, 'Holmes sprang from the bed, struck a match, and lashed furiously with his cane at the bell-pull.'],
+    [turns, 'suddenly there broke from the silence of the night the most horrible cry to which I have ever listened.'],
+    [found, 'Round his brow he had a peculiar yellow band, with brownish speckles, which seemed to be bound tightly round his head.'],
+    [aunt, 'how we conveyed her by the morning train to the care of her good aunt at Harrow'],
+    [explains, 'The discovery that this was a dummy, and that the bed was clamped to the floor, instantly gave rise to the suspicion that the rope was there as a bridge for something passing through the hole and coming to the bed.'],
+    [trained, 'He had trained it, probably by the use of the milk which we saw, to return to him when summoned.'],
+  ]
+  /** A paragraph's text, with the passages that tell beats linked to them. */
+  const paragraph = (text: string): RichNode => {
+    const links = told
+      .map(([beatId, quote]) => ({ beatId, quote, at: text.indexOf(quote) }))
+      .filter((l) => l.at >= 0)
+      .sort((a, b) => a.at - b.at)
+    const content: RichNode[] = []
+    let from = 0
+    for (const { beatId, quote, at } of links) {
+      if (at > from) content.push({ type: 'text', text: text.slice(from, at) })
+      content.push({ type: 'text', text: quote, marks: [{ type: 'beatLink', attrs: { beatId } }] })
+      from = at + quote.length
+    }
+    if (from < text.length) content.push({ type: 'text', text: text.slice(from) })
+    return { type: 'paragraph', content }
+  }
+  const now = Date.now()
+  ;[ch1, ch2, ch3, ch4, ch5, ch6, ch7].forEach((id, i) => {
+    const doc: RichNode = { type: 'doc', content: SPECKLED_BAND[i].map(paragraph) }
+    data = setChapterText(data, id, { doc, words: wordsInDoc(doc), updatedAt: now }, null)
+  })
 
   // Story time: what's told in the visit to Baker Street happened long before it.
   const shared = 'moment_three_am'
@@ -248,15 +305,15 @@ export function buildExampleStory(): StoryData {
   const nRoylottRoom = place({ kind: 'element', refId: roylottRoom, x: 0, y: 0, containerId: wing })
   const nJuliaRoom = place({ kind: 'element', refId: juliaRoom, x: 0, y: 0, containerId: wing })
   const nVentilator = place({ kind: 'element', refId: ventilator, x: 120, y: 200 })
-  const nBell = place({ kind: 'element', refId: bellPull, x: 520, y: 220 })
-  const nSafe = place({ kind: 'element', refId: safe, x: -360, y: 240 })
-  const nMilk = place({ kind: 'element', refId: milk, x: -380, y: 470 })
-  const nLash = place({ kind: 'element', refId: lash, x: -60, y: 520 })
-  const nAdder = place({ kind: 'element', refId: adder, x: 200, y: 480 })
-  const nGipsies = place({ kind: 'element', refId: gipsies, x: 620, y: 470 })
-  const nRoylott = place({ kind: 'character', refId: roylott, x: -420, y: -40 })
+  const nBell = place({ kind: 'element', refId: bellPull, x: 560, y: 200 })
+  const nSafe = place({ kind: 'element', refId: safe, x: -340, y: 260 })
+  const nMilk = place({ kind: 'element', refId: milk, x: -440, y: 540 })
+  const nLash = place({ kind: 'element', refId: lash, x: -440, y: 840 })
+  const nAdder = place({ kind: 'element', refId: adder, x: 120, y: 540 })
+  const nGipsies = place({ kind: 'element', refId: gipsies, x: 660, y: 600 })
+  const nRoylott = place({ kind: 'character', refId: roylott, x: 120, y: 900 })
   place({ kind: 'note', x: 640, y: -150, width: 220, height: 150, color: PAPER_NAMES.yellow, text: 'Why is the bed clamped to the floor?' })
-  place({ kind: 'note', x: 640, y: 640, width: 220, height: 150, color: PAPER_NAMES.pink, text: '“The band”: a band of gipsies, and their spotted handkerchiefs? A false scent.' })
+  place({ kind: 'note', x: 680, y: 840, width: 220, height: 150, color: PAPER_NAMES.pink, text: '“The band”: a band of gipsies, and their spotted handkerchiefs? A false scent.' })
   connect(nVentilator, nRoylottRoom, 'opens into')
   connect(nVentilator, nJuliaRoom, 'high in the wall of')
   connect(nBell, nVentilator, 'hangs from just above')
@@ -270,14 +327,14 @@ export function buildExampleStory(): StoryData {
   // Who's who.
   let whoMap: string
   ;[data, whoMap] = addMindMap(data, 'Who’s who')
-  place({ kind: 'text', x: -40, y: -240, width: 300, text: 'Who’s who', size: 34 }, whoMap)
-  const wHolmes = place({ kind: 'character', refId: holmes, x: -420, y: -60 }, whoMap)
+  place({ kind: 'text', x: -40, y: -380, width: 300, text: 'Who’s who', size: 34 }, whoMap)
+  const wHolmes = place({ kind: 'character', refId: holmes, x: -420, y: -100 }, whoMap)
   const wWatson = place({ kind: 'character', refId: watson, x: -440, y: 240 }, whoMap)
-  const wHelen = place({ kind: 'character', refId: helen, x: 0, y: 0 }, whoMap)
-  const wJulia = place({ kind: 'character', refId: julia, x: 360, y: 260 }, whoMap)
-  const wRoylott = place({ kind: 'character', refId: roylott, x: 380, y: -120 }, whoMap)
-  const wPercy = place({ kind: 'character', refId: percy, x: -60, y: 340 }, whoMap)
-  const wHouse = place({ kind: 'element', refId: stokeMoran, x: 760, y: 60 }, whoMap)
+  const wHelen = place({ kind: 'character', refId: helen, x: 0, y: 60 }, whoMap)
+  const wJulia = place({ kind: 'character', refId: julia, x: 360, y: 300 }, whoMap)
+  const wRoylott = place({ kind: 'character', refId: roylott, x: 400, y: -240 }, whoMap)
+  const wPercy = place({ kind: 'character', refId: percy, x: -60, y: 400 }, whoMap)
+  const wHouse = place({ kind: 'element', refId: stokeMoran, x: 780, y: 40 }, whoMap)
   connect(wHelen, wHolmes, 'asks for help')
   connect(wWatson, wHolmes, 'friend of')
   connect(wRoylott, wHelen, 'stepfather of')
